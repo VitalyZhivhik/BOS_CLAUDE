@@ -1,0 +1,242 @@
+[
+  {
+    "id": "T1190",
+    "name": "Exploit Public-Facing Application",
+    "tactic": "Initial Access",
+    "description": "Эксплуатация уязвимости в публично доступном приложении",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-89", "CWE-79", "CWE-502", "CWE-918", "CWE-20"],
+    "related_capec": ["CAPEC-66", "CAPEC-586", "CAPEC-664"],
+    "requires_service": ["web_server", "web_application"],
+    "detection": "Анализ логов веб-сервера, WAF, IDS/IPS",
+    "mitigations": [
+      "Регулярное обновление ПО",
+      "WAF",
+      "Сканирование уязвимостей",
+      "Сегментация сети"
+    ]
+  },
+  {
+    "id": "T1210",
+    "name": "Exploitation of Remote Services",
+    "tactic": "Lateral Movement",
+    "description": "Эксплуатация уязвимостей в удалённых сервисах для перемещения по сети",
+    "platforms": ["Windows", "Linux"],
+    "related_cwe": ["CWE-119", "CWE-416"],
+    "related_capec": ["CAPEC-100"],
+    "requires_service": ["smb", "rdp", "ssh"],
+    "detection": "Мониторинг сетевого трафика, аномалии в аутентификации",
+    "mitigations": [
+      "Сегментация сети",
+      "Обновление ПО",
+      "Отключение ненужных сервисов",
+      "Мониторинг сетевого трафика"
+    ]
+  },
+  {
+    "id": "T1110",
+    "name": "Brute Force",
+    "tactic": "Credential Access",
+    "description": "Подбор учётных данных методом перебора",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-307"],
+    "related_capec": ["CAPEC-49"],
+    "requires_service": ["authentication_service"],
+    "detection": "Мониторинг неудачных попыток аутентификации",
+    "mitigations": [
+      "Политика блокировки учётных записей",
+      "Многофакторная аутентификация",
+      "Сложные пароли"
+    ]
+  },
+  {
+    "id": "T1059",
+    "name": "Command and Scripting Interpreter",
+    "tactic": "Execution",
+    "description": "Выполнение команд через интерпретаторы (cmd, PowerShell, bash)",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-78"],
+    "related_capec": ["CAPEC-248"],
+    "requires_service": ["command_interpreter"],
+    "detection": "Мониторинг запуска процессов, логирование командной строки",
+    "mitigations": [
+      "Ограничение использования PowerShell (Constrained Language Mode)",
+      "AppLocker / WDAC",
+      "Отключение неиспользуемых интерпретаторов"
+    ]
+  },
+  {
+    "id": "T1068",
+    "name": "Exploitation for Privilege Escalation",
+    "tactic": "Privilege Escalation",
+    "description": "Использование программных уязвимостей для повышения привилегий",
+    "platforms": ["Windows", "Linux"],
+    "related_cwe": ["CWE-269"],
+    "related_capec": ["CAPEC-233"],
+    "requires_service": ["vulnerable_service_running"],
+    "detection": "Мониторинг аномальных процессов с повышенными привилегиями",
+    "mitigations": [
+      "Обновление ПО",
+      "Принцип наименьших привилегий",
+      "Exploit Protection (Windows)"
+    ]
+  },
+  {
+    "id": "T1078",
+    "name": "Valid Accounts",
+    "tactic": "Initial Access",
+    "description": "Использование скомпрометированных учётных данных для первоначального доступа",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-294", "CWE-307"],
+    "related_capec": ["CAPEC-49", "CAPEC-114"],
+    "requires_service": ["authentication_service"],
+    "detection": "Аномалии аутентификации, аудит логонов",
+    "mitigations": [
+      "Многофакторная аутентификация",
+      "Мониторинг аномальных логонов",
+      "Регулярная смена паролей"
+    ]
+  },
+  {
+    "id": "T1498",
+    "name": "Network Denial of Service",
+    "tactic": "Impact",
+    "description": "Генерация избыточного сетевого трафика для отказа в обслуживании",
+    "platforms": ["Windows", "Linux"],
+    "related_cwe": ["CWE-400"],
+    "related_capec": ["CAPEC-125"],
+    "requires_service": ["any_network_service"],
+    "detection": "Мониторинг объёма трафика, anomaly detection",
+    "mitigations": [
+      "DDoS-защита",
+      "Rate limiting",
+      "Фильтрация трафика"
+    ]
+  },
+  {
+    "id": "T1499",
+    "name": "Endpoint Denial of Service",
+    "tactic": "Impact",
+    "description": "Перегрузка конечной точки для отказа в обслуживании",
+    "platforms": ["Windows", "Linux"],
+    "related_cwe": ["CWE-400"],
+    "related_capec": ["CAPEC-125", "CAPEC-130"],
+    "requires_service": ["any_network_service"],
+    "detection": "Мониторинг ресурсов, аномалии нагрузки",
+    "mitigations": [
+      "Rate limiting",
+      "Квоты ресурсов",
+      "Масштабирование"
+    ]
+  },
+  {
+    "id": "T1189",
+    "name": "Drive-by Compromise",
+    "tactic": "Initial Access",
+    "description": "Компрометация через посещение вредоносного веб-ресурса",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-79"],
+    "related_capec": ["CAPEC-86"],
+    "requires_service": ["web_browser"],
+    "detection": "Мониторинг сетевых подключений, IDS",
+    "mitigations": [
+      "Обновление браузера",
+      "Блокировка вредоносных сайтов",
+      "Песочница для браузера"
+    ]
+  },
+  {
+    "id": "T1557",
+    "name": "Adversary-in-the-Middle",
+    "tactic": "Credential Access",
+    "description": "Перехват и модификация сетевого трафика между двумя сторонами",
+    "platforms": ["Windows", "Linux"],
+    "related_cwe": ["CWE-294"],
+    "related_capec": ["CAPEC-94"],
+    "requires_service": ["network"],
+    "detection": "Мониторинг ARP-таблиц, аномалии DNS, инспекция сертификатов",
+    "mitigations": [
+      "Шифрование трафика (TLS/SSL)",
+      "Закрепление сертификатов",
+      "Сегментация сети"
+    ]
+  },
+  {
+    "id": "T1505.003",
+    "name": "Web Shell",
+    "tactic": "Persistence",
+    "description": "Установка веб-шелла для постоянного доступа к серверу",
+    "platforms": ["Windows", "Linux"],
+    "related_cwe": ["CWE-434"],
+    "related_capec": ["CAPEC-650"],
+    "requires_service": ["web_server"],
+    "detection": "Мониторинг файловой системы, анализ веб-директорий",
+    "mitigations": [
+      "Контроль целостности файлов",
+      "Минимальные привилегии для веб-сервера",
+      "Регулярный аудит веб-директорий"
+    ]
+  },
+  {
+    "id": "T1547.012",
+    "name": "Print Processors",
+    "tactic": "Persistence",
+    "description": "Использование Print Spooler для закрепления в системе",
+    "platforms": ["Windows"],
+    "related_cwe": ["CWE-269"],
+    "related_capec": ["CAPEC-233"],
+    "requires_service": ["print_spooler"],
+    "detection": "Мониторинг изменений в Print Spooler",
+    "mitigations": [
+      "Отключение Print Spooler если не требуется",
+      "Обновление ПО"
+    ]
+  },
+  {
+    "id": "T1548",
+    "name": "Abuse Elevation Control Mechanism",
+    "tactic": "Privilege Escalation",
+    "description": "Обход механизмов контроля повышения привилегий (UAC bypass)",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-269"],
+    "related_capec": ["CAPEC-233"],
+    "requires_service": ["operating_system"],
+    "detection": "Мониторинг использования UAC, аудит привилегий",
+    "mitigations": [
+      "Максимальный уровень UAC",
+      "Запрет автоповышения привилегий"
+    ]
+  },
+  {
+    "id": "T1570",
+    "name": "Lateral Tool Transfer",
+    "tactic": "Lateral Movement",
+    "description": "Передача инструментов между скомпрометированными системами через SMB/RDP",
+    "platforms": ["Windows", "Linux"],
+    "related_cwe": ["CWE-119"],
+    "related_capec": ["CAPEC-100"],
+    "requires_service": ["smb", "rdp"],
+    "detection": "Мониторинг файловых операций по сети",
+    "mitigations": [
+      "Сегментация сети",
+      "Контроль SMB-трафика",
+      "Мониторинг подозрительных копирований"
+    ]
+  },
+  {
+    "id": "T1203",
+    "name": "Exploitation for Client Execution",
+    "tactic": "Execution",
+    "description": "Использование уязвимостей клиентского ПО для выполнения кода",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-119", "CWE-416"],
+    "related_capec": ["CAPEC-100"],
+    "requires_service": ["client_application"],
+    "detection": "Мониторинг поведения приложений, anomaly detection",
+    "mitigations": [
+      "Обновление ПО",
+      "Exploit Protection",
+      "Песочница для приложений"
+    ]
+  }
+]

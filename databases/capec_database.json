@@ -1,0 +1,163 @@
+[
+  {
+    "id": "CAPEC-66",
+    "name": "SQL-инъекция",
+    "description": "Атакующий внедряет SQL-код через пользовательский ввод для манипуляции базой данных",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-89"],
+    "related_mitre": ["T1190"],
+    "prerequisites": ["database_running", "web_application_with_db", "unvalidated_input"],
+    "mitigations": [
+      "Параметризованные запросы (Prepared Statements)",
+      "Хранимые процедуры",
+      "Валидация входных данных",
+      "Минимальные привилегии для учётной записи БД",
+      "WAF (Web Application Firewall)"
+    ]
+  },
+  {
+    "id": "CAPEC-86",
+    "name": "XSS через HTTP-заголовки",
+    "description": "Внедрение вредоносного скрипта через HTTP-заголовки",
+    "severity": "MEDIUM",
+    "related_cwe": ["CWE-79"],
+    "related_mitre": ["T1189"],
+    "prerequisites": ["web_application_running", "unvalidated_output"],
+    "mitigations": [
+      "Content Security Policy",
+      "Экранирование выходных данных",
+      "HttpOnly и Secure флаги для cookies"
+    ]
+  },
+  {
+    "id": "CAPEC-100",
+    "name": "Переполнение буфера",
+    "description": "Отправка данных, превышающих размер буфера, для перезаписи памяти",
+    "severity": "CRITICAL",
+    "related_cwe": ["CWE-119", "CWE-787", "CWE-416"],
+    "related_mitre": ["T1210", "T1203"],
+    "prerequisites": ["native_service_running", "unpatched_software"],
+    "mitigations": [
+      "Обновление ПО до актуальных версий",
+      "Включение DEP и ASLR",
+      "Использование компиляторов с защитой стека"
+    ]
+  },
+  {
+    "id": "CAPEC-49",
+    "name": "Brute Force — подбор пароля",
+    "description": "Систематический перебор комбинаций учётных данных",
+    "severity": "MEDIUM",
+    "related_cwe": ["CWE-307"],
+    "related_mitre": ["T1110"],
+    "prerequisites": ["authentication_service_accessible"],
+    "mitigations": [
+      "Блокировка учётной записи после N неудачных попыток",
+      "Прогрессивная задержка между попытками",
+      "Двухфакторная аутентификация (2FA)",
+      "CAPTCHA",
+      "Мониторинг аномальной активности"
+    ]
+  },
+  {
+    "id": "CAPEC-125",
+    "name": "Флуд (Flooding)",
+    "description": "Перегрузка сервиса избыточными запросами для отказа в обслуживании",
+    "severity": "MEDIUM",
+    "related_cwe": ["CWE-400"],
+    "related_mitre": ["T1498", "T1499"],
+    "prerequisites": ["network_accessible"],
+    "mitigations": [
+      "Rate limiting",
+      "Защита от DDoS (Cloudflare, AWS Shield и т.д.)",
+      "Фильтрация трафика на firewall",
+      "SYN cookies"
+    ]
+  },
+  {
+    "id": "CAPEC-233",
+    "name": "Повышение привилегий",
+    "description": "Использование уязвимостей для получения повышенных привилегий",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-269", "CWE-294"],
+    "related_mitre": ["T1068", "T1548"],
+    "prerequisites": ["initial_access", "vulnerable_service"],
+    "mitigations": [
+      "Принцип наименьших привилегий",
+      "Своевременное обновление ПО",
+      "Мониторинг изменений привилегий",
+      "Сегментация сети"
+    ]
+  },
+  {
+    "id": "CAPEC-586",
+    "name": "Атака через десериализацию",
+    "description": "Внедрение вредоносных объектов через десериализацию ненадёжных данных",
+    "severity": "CRITICAL",
+    "related_cwe": ["CWE-502"],
+    "related_mitre": ["T1190", "T1059"],
+    "prerequisites": ["application_with_deserialization", "accessible_endpoint"],
+    "mitigations": [
+      "Не десериализовывать данные из ненадёжных источников",
+      "Белый список разрешённых типов объектов",
+      "Подпись сериализованных данных",
+      "Обновление библиотек"
+    ]
+  },
+  {
+    "id": "CAPEC-114",
+    "name": "Атака на аутентификацию",
+    "description": "Обход или компрометация механизма аутентификации",
+    "severity": "CRITICAL",
+    "related_cwe": ["CWE-330", "CWE-294"],
+    "related_mitre": ["T1078"],
+    "prerequisites": ["authentication_endpoint_accessible"],
+    "mitigations": [
+      "Криптографически стойкие случайные значения",
+      "Многофакторная аутентификация",
+      "Защита от replay-атак"
+    ]
+  },
+  {
+    "id": "CAPEC-664",
+    "name": "Server-Side Request Forgery (SSRF)",
+    "description": "Принуждение сервера к выполнению запросов к внутренним или внешним ресурсам",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-918"],
+    "related_mitre": ["T1190"],
+    "prerequisites": ["web_application_with_url_fetching"],
+    "mitigations": [
+      "Белый список разрешённых URL и IP",
+      "Запрет обращений к внутренним адресам",
+      "Сегментация сети",
+      "Валидация и санитизация URL"
+    ]
+  },
+  {
+    "id": "CAPEC-135",
+    "name": "Внедрение через форматную строку",
+    "description": "Использование спецификаторов формата для чтения/записи памяти",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-20", "CWE-134"],
+    "related_mitre": ["T1190"],
+    "prerequisites": ["native_application_with_format_strings"],
+    "mitigations": [
+      "Запрет пользовательских данных в форматных строках",
+      "Статический анализ кода",
+      "Обновление ПО"
+    ]
+  },
+  {
+    "id": "CAPEC-7",
+    "name": "Слепая SQL-инъекция",
+    "description": "SQL-инъекция без прямого отображения результатов (по времени ответа или boolean)",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-89"],
+    "related_mitre": ["T1190"],
+    "prerequisites": ["database_running", "web_application_with_db"],
+    "mitigations": [
+      "Те же, что и для обычной SQL-инъекции",
+      "Дополнительно: мониторинг аномальных запросов к БД"
+    ]
+  }
+]

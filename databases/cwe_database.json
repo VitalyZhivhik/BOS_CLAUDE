@@ -1,0 +1,132 @@
+[
+  {
+    "id": "CWE-89",
+    "name": "SQL-инъекция",
+    "description": "Неправильная нейтрализация специальных элементов в SQL-запросах",
+    "category": "injection",
+    "related_capec": ["CAPEC-66", "CAPEC-7"],
+    "mitigation": "Использование параметризованных запросов, ORM, валидация входных данных",
+    "requires_technology": ["database", "web_application"],
+    "detection_methods": ["static_analysis", "dynamic_analysis", "manual_review"]
+  },
+  {
+    "id": "CWE-79",
+    "name": "Межсайтовый скриптинг (XSS)",
+    "description": "Неправильная нейтрализация входных данных при генерации веб-страниц",
+    "category": "injection",
+    "related_capec": ["CAPEC-86", "CAPEC-198"],
+    "mitigation": "Экранирование выходных данных, Content Security Policy, валидация входных данных",
+    "requires_technology": ["web_application", "web_server"],
+    "detection_methods": ["static_analysis", "dynamic_analysis"]
+  },
+  {
+    "id": "CWE-119",
+    "name": "Переполнение буфера",
+    "description": "Некорректное ограничение операций в пределах буфера памяти",
+    "category": "memory_safety",
+    "related_capec": ["CAPEC-100"],
+    "mitigation": "DEP, ASLR, безопасные функции работы с памятью, обновление ПО",
+    "requires_technology": ["native_application"],
+    "detection_methods": ["static_analysis", "fuzzing"]
+  },
+  {
+    "id": "CWE-307",
+    "name": "Недостаточное ограничение попыток аутентификации",
+    "description": "Отсутствие механизма блокировки после нескольких неудачных попыток входа",
+    "category": "authentication",
+    "related_capec": ["CAPEC-49"],
+    "mitigation": "Блокировка учётных записей, CAPTCHA, двухфакторная аутентификация, задержки между попытками",
+    "requires_technology": ["authentication_service"],
+    "detection_methods": ["log_analysis", "monitoring"]
+  },
+  {
+    "id": "CWE-269",
+    "name": "Некорректное управление привилегиями",
+    "description": "Программа неправильно назначает, изменяет или проверяет привилегии",
+    "category": "privilege_management",
+    "related_capec": ["CAPEC-233"],
+    "mitigation": "Принцип наименьших привилегий, контроль доступа, аудит привилегий",
+    "requires_technology": ["operating_system"],
+    "detection_methods": ["access_review", "privilege_audit"]
+  },
+  {
+    "id": "CWE-502",
+    "name": "Десериализация ненадёжных данных",
+    "description": "Десериализация данных из ненадёжных источников без проверки",
+    "category": "data_integrity",
+    "related_capec": ["CAPEC-586"],
+    "mitigation": "Валидация данных перед десериализацией, белые списки типов, подпись данных",
+    "requires_technology": ["java_application", "dotnet_application", "web_application"],
+    "detection_methods": ["static_analysis", "code_review"]
+  },
+  {
+    "id": "CWE-416",
+    "name": "Использование после освобождения (Use After Free)",
+    "description": "Обращение к памяти после её освобождения",
+    "category": "memory_safety",
+    "related_capec": ["CAPEC-100"],
+    "mitigation": "Обновление ПО, использование безопасных языков программирования, ASLR/DEP",
+    "requires_technology": ["native_application"],
+    "detection_methods": ["fuzzing", "static_analysis"]
+  },
+  {
+    "id": "CWE-918",
+    "name": "Подделка запросов на стороне сервера (SSRF)",
+    "description": "Сервер выполняет запросы к произвольным URL от имени атакующего",
+    "category": "request_forgery",
+    "related_capec": ["CAPEC-664"],
+    "mitigation": "Валидация и фильтрация URL, белый список разрешённых хостов, сегментация сети",
+    "requires_technology": ["web_application", "web_server"],
+    "detection_methods": ["dynamic_analysis", "penetration_testing"]
+  },
+  {
+    "id": "CWE-400",
+    "name": "Неконтролируемое потребление ресурсов",
+    "description": "Программа не ограничивает количество потребляемых ресурсов",
+    "category": "resource_management",
+    "related_capec": ["CAPEC-125", "CAPEC-130"],
+    "mitigation": "Rate limiting, квоты ресурсов, мониторинг, защита от DDoS",
+    "requires_technology": ["any_network_service"],
+    "detection_methods": ["monitoring", "load_testing"]
+  },
+  {
+    "id": "CWE-330",
+    "name": "Использование недостаточно случайных значений",
+    "description": "Использование предсказуемых значений в криптографических операциях",
+    "category": "cryptography",
+    "related_capec": ["CAPEC-114"],
+    "mitigation": "Использование криптографически стойких генераторов случайных чисел",
+    "requires_technology": ["cryptographic_application"],
+    "detection_methods": ["code_review", "static_analysis"]
+  },
+  {
+    "id": "CWE-20",
+    "name": "Некорректная валидация входных данных",
+    "description": "Программа не проводит или неправильно проводит валидацию входных данных",
+    "category": "input_validation",
+    "related_capec": ["CAPEC-135", "CAPEC-153"],
+    "mitigation": "Строгая валидация по белому списку, проверка типов, длины и формата",
+    "requires_technology": ["any_application"],
+    "detection_methods": ["static_analysis", "dynamic_analysis", "code_review"]
+  },
+  {
+    "id": "CWE-294",
+    "name": "Обход аутентификации через перехват",
+    "description": "Перехват и повторная отправка аутентификационных данных",
+    "category": "authentication",
+    "related_capec": ["CAPEC-233", "CAPEC-94"],
+    "mitigation": "Шифрование трафика (TLS), одноразовые токены, привязка к сессии",
+    "requires_technology": ["authentication_service", "network"],
+    "detection_methods": ["network_monitoring", "traffic_analysis"]
+  },
+  {
+    "id": "CWE-787",
+    "name": "Запись за пределами буфера",
+    "description": "Запись данных за пределами выделенного буфера памяти",
+    "category": "memory_safety",
+    "related_capec": ["CAPEC-100"],
+    "mitigation": "Проверка границ, безопасные функции, ASLR, обновление ПО",
+    "requires_technology": ["native_application"],
+    "detection_methods": ["fuzzing", "static_analysis"]
+  }
+]
