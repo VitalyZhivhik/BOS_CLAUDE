@@ -1,14 +1,7 @@
 """
 Серверный агент — графический интерфейс PyQt6.
-Анализирует систему, принимает данные от атакующего, генерирует отчёты.
-Включает локальный сканер уязвимостей (замена OVALDI).
-
 ИСПРАВЛЕНИЯ:
-  - Проверка доступности порта перед запуском
-  - Логирование КАЖДОГО входящего HTTP-запроса
-  - Защита от NoneType при обращении к system_summary
-  - Явное отображение подключений клиентов
-  - Диагностика при ошибках
+  - Существенно расширено логирование HTTP-запросов и внутреннего состояния.
 """
 
 import sys, os, json, socket, threading, webbrowser
@@ -69,7 +62,7 @@ def is_port_available(port):
         r = s.connect_ex(("127.0.0.1", port))
         s.close()
         if r == 0:
-            return False, f"Порт {port} уже занят другим процессом"
+            return False, f"Порт {port} уже занят"
         return True, f"Порт {port} свободен"
     except Exception as e:
         return True, str(e)
@@ -79,7 +72,9 @@ class AnalysisWorker(QThread):
     error = pyqtSignal(str)
     def run(self):
         try:
+            logger.info("[SYS] Запущен глубокий анализ системы...")
             a = SystemAnalyzer(); info = a.analyze(); s = a.get_summary()
+            logger.debug(f"[SYS] Найденные службы: {s.get('running_services_count')}, Порты: {s.get('open_ports_count')}")
             self.finished.emit({"info": info, "summary": s, "analyzer": a})
         except Exception as e:
             logger.error(f"Ошибка анализа: {e}", exc_info=True); self.error.emit(str(e))
@@ -89,7 +84,10 @@ class DBLoadWorker(QThread):
     error = pyqtSignal(str)
     def run(self):
         try:
-            db = VulnerabilityDatabase(PROJECT_DIR); db.load_all(); self.finished.emit(db)
+            logger.info("[DB] Начинается загрузка баз уязвимостей с диска...")
+            db = VulnerabilityDatabase(PROJECT_DIR); db.load_all()
+            logger.info(f"[DB] Загрузка успешна. Размеры баз - CVE: {len(db.cve_db)}, CWE: {len(db.cwe_db)}, CAPEC: {len(db.capec_db)}, MITRE: {len(db.mitre_db)}")
+            self.finished.emit(db)
         except Exception as e:
             logger.error(f"Ошибка загрузки БД: {e}", exc_info=True); self.error.emit(str(e))
 
@@ -99,9 +97,12 @@ class VulnScanWorker(QThread):
     error = pyqtSignal(str)
     def run(self):
         try:
+            logger.info("[SCAN] Запуск локального сканирования политик...")
             sc = LocalVulnScanner()
             sc.progress_callback = lambda c, t, m: self.progress.emit(c, t, m)
-            self.finished.emit(sc.scan_all())
+            res = sc.scan_all()
+            logger.info(f"[SCAN] Локальное сканирование завершено. Уязвимо: {res.vulnerable}")
+            self.finished.emit(res)
         except Exception as e:
             logger.error(f"Ошибка сканирования: {e}", exc_info=True); self.error.emit(str(e))
 
@@ -109,6 +110,7 @@ class ServerGUI(QMainWindow):
     log_signal = pyqtSignal(str, str)
     client_connected_signal = pyqtSignal(str)
     analysis_done_signal = pyqtSignal(dict, str)
+    update_results_signal = pyqtSignal(object) 
 
     def __init__(self):
         super().__init__()
@@ -117,7 +119,11 @@ class ServerGUI(QMainWindow):
         self.system_info = None; self.system_summary = None; self.vuln_db = None
         self.vuln_scan_report = None; self.http_server = None; self.server_thread = None
         self.server_running = False; self.last_report_path = None; self.actual_server_port = None
+        
         self._build_ui(); self.setStyleSheet(STYLE)
+        
+        self.update_results_signal.connect(self._update_results_table_slot)
+        
         gh = GUILogHandler(self._on_log_message); gh.setLevel(10); logger.addHandler(gh)
         self.log_signal.connect(self._append_log)
         self.client_connected_signal.connect(self._on_client_connected)
@@ -171,13 +177,12 @@ class ServerGUI(QMainWindow):
         ll.addWidget(sf2); ml.addWidget(left)
 
         self.tabs = QTabWidget()
-        # Система
         st = QWidget(); stl = QVBoxLayout(st)
         self.sys_table = QTableWidget(0,2); self.sys_table.setHorizontalHeaderLabels(["Параметр","Значение"])
         self.sys_table.horizontalHeader().setStretchLastSection(True); self.sys_table.setColumnWidth(0,220)
         self.sys_table.verticalHeader().setVisible(False); self.sys_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         stl.addWidget(self.sys_table); self.tabs.addTab(st,"Система")
-        # Локальный скан
+        
         vt = QWidget(); vtl = QVBoxLayout(vt)
         self.vuln_table = QTableWidget(0,5); self.vuln_table.setHorizontalHeaderLabels(["ID","Серьёзность","Статус","Категория","Описание"])
         self.vuln_table.horizontalHeader().setStretchLastSection(True); self.vuln_table.setColumnWidth(0,70); self.vuln_table.setColumnWidth(1,85); self.vuln_table.setColumnWidth(2,100); self.vuln_table.setColumnWidth(3,80)
@@ -185,13 +190,13 @@ class ServerGUI(QMainWindow):
         vtl.addWidget(self.vuln_table)
         self.vuln_summary_label = QLabel(""); self.vuln_summary_label.setStyleSheet("color:#888;font-size:11px;padding:4px;"); vtl.addWidget(self.vuln_summary_label)
         self.tabs.addTab(vt,"Локальный скан")
-        # Корреляция
+        
         rt = QWidget(); rtl = QVBoxLayout(rt)
         self.results_table = QTableWidget(0,5); self.results_table.setHorizontalHeaderLabels(["CVE","Серьёзность","Реализуемость","Атака","Описание"])
         self.results_table.horizontalHeader().setStretchLastSection(True); self.results_table.setColumnWidth(0,130); self.results_table.setColumnWidth(1,85); self.results_table.setColumnWidth(2,130); self.results_table.setColumnWidth(3,180)
         self.results_table.verticalHeader().setVisible(False); self.results_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         rtl.addWidget(self.results_table); self.tabs.addTab(rt,"Корреляция")
-        # Лог
+        
         lt = QWidget(); ltl = QVBoxLayout(lt); self.log_output = QTextEdit(); self.log_output.setReadOnly(True); ltl.addWidget(self.log_output); self.tabs.addTab(lt,"Лог")
         ml.addWidget(self.tabs,1)
         self.setStatusBar(QStatusBar()); self.statusBar().showMessage("Готов к работе")
@@ -215,7 +220,7 @@ class ServerGUI(QMainWindow):
         self.system_info = result["info"]; self.system_summary = result["summary"]
         self.sys_table.setRowCount(0)
         for p,v in [("ОС",self.system_summary.get("os","?")),("Имя хоста",self.system_summary.get("hostname","?")),("IP-адреса",", ".join(self.system_summary.get("ip_addresses",[]))),("ПО",str(self.system_summary.get("installed_software_count",0))),("Службы",str(self.system_summary.get("running_services_count",0))),("Порты",str(self.system_summary.get("open_ports_count",0))),("Файрвол","Активен" if self.system_summary.get("firewall") else "Не активен"),("Антивирус","Активен" if self.system_summary.get("antivirus") else "Не активен"),("RDP","Вкл" if self.system_summary.get("has_rdp") else "Выкл"),("SMB","Да" if self.system_summary.get("has_smb") else "Нет"),("БД",", ".join(self.system_summary.get("database_types",[])) or "Нет")]:
-            r = self.sys_table.rowCount(); self.sys_table.insertRow(r); self.sys_table.setItem(r,0,QTableWidgetItem(p)); self.sys_table.setItem(r,1,QTableWidgetItem(v))
+            r = self.sys_table.rowCount(); self.sys_table.insertRow(r); self.sys_table.setItem(r,0,QTableWidgetItem(str(p))); self.sys_table.setItem(r,1,QTableWidgetItem(str(v)))
         self.btn_analyze.setText("1. Анализ системы (выполнен)"); self.btn_analyze.setEnabled(True); self.btn_load_db.setEnabled(True)
 
     def _on_analysis_error(self, e):
@@ -243,11 +248,11 @@ class ServerGUI(QMainWindow):
         self.vuln_table.setRowCount(0); so = {"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3,"INFO":4}
         for f in sorted(report.findings, key=lambda x: so.get(x.severity,5)):
             r = self.vuln_table.rowCount(); self.vuln_table.insertRow(r)
-            self.vuln_table.setItem(r,0,QTableWidgetItem(f.check_id))
-            si = QTableWidgetItem(f.severity); si.setForeground(QColor({"CRITICAL":"#c44","HIGH":"#a85","MEDIUM":"#997","LOW":"#696","INFO":"#668"}.get(f.severity,"#888"))); self.vuln_table.setItem(r,1,si)
-            sti = QTableWidgetItem(f.status); sti.setForeground(QColor({"VULNERABLE":"#b55","SECURE":"#696","UNKNOWN":"#888"}.get(f.status,"#888"))); self.vuln_table.setItem(r,2,sti)
-            self.vuln_table.setItem(r,3,QTableWidgetItem(f.category))
-            d = f.title + (f" | {f.recommendation}" if f.recommendation else ""); self.vuln_table.setItem(r,4,QTableWidgetItem(d))
+            self.vuln_table.setItem(r,0,QTableWidgetItem(str(f.check_id)))
+            si = QTableWidgetItem(str(f.severity)); si.setForeground(QColor({"CRITICAL":"#c44","HIGH":"#a85","MEDIUM":"#997","LOW":"#696","INFO":"#668"}.get(f.severity,"#888"))); self.vuln_table.setItem(r,1,si)
+            sti = QTableWidgetItem(str(f.status)); sti.setForeground(QColor({"VULNERABLE":"#b55","SECURE":"#696","UNKNOWN":"#888"}.get(f.status,"#888"))); self.vuln_table.setItem(r,2,sti)
+            self.vuln_table.setItem(r,3,QTableWidgetItem(str(f.category)))
+            d = str(f.title) + (f" | {f.recommendation}" if f.recommendation else ""); self.vuln_table.setItem(r,4,QTableWidgetItem(d))
         self.vuln_summary_label.setText(f"Проверок:{report.total_checks} Уязвимо:{report.vulnerable} Защищено:{report.secure} Риск:{report.risk_score:.1f}/100")
         self.btn_vuln_scan.setText("3. Локальный скан (выполнен)"); self.btn_vuln_scan.setEnabled(True); self.tabs.setCurrentIndex(1)
 
@@ -261,7 +266,8 @@ class ServerGUI(QMainWindow):
         port = self.port_spin.value()
         ok, desc = is_port_available(port)
         if not ok:
-            QMessageBox.critical(self,"Порт занят",f"Порт {port} уже используется!\n\nВыберите другой порт или освободите его.\nДиагностика: netstat -ano | findstr :{port}"); return
+            QMessageBox.critical(self,"Порт занят",f"Порт {port} уже используется!\n\nВыберите другой порт или освободите его.")
+            return
 
         gui = self
         from server.api_server import state
@@ -276,14 +282,14 @@ class ServerGUI(QMainWindow):
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
                 ip = self.client_address[0]
-                logger.info(f"[HTTP-IN] GET {self.path} от {ip}")
+                logger.debug(f"[API] Входящий GET запрос: {self.path} от {ip}")
                 try:
                     ss = state.system_summary if isinstance(state.system_summary, dict) else {}
                     hn = ss.get("hostname", "")
                     if self.path == "/ping":
                         if ip not in state.connected_clients:
                             state.connected_clients.append(ip)
-                            logger.info(f"[HTTP-IN] НОВЫЙ КЛИЕНТ: {ip}")
+                            logger.info(f"[API] Зарегистрирован новый клиент: {ip}")
                         if state.on_client_connected:
                             state.on_client_connected(ip)
                         self._r(200, {"status":"pong","ready":state.ready,"hostname":hn,"server_port":port})
@@ -294,45 +300,63 @@ class ServerGUI(QMainWindow):
                     else:
                         self._r(200, {"message":"Security Assessment Server","ready":state.ready,"endpoints":["/ping","/status","/analyze (POST)"]})
                 except Exception as e:
-                    logger.error(f"[HTTP-IN] Ошибка GET: {e}", exc_info=True)
+                    logger.error(f"[API] Ошибка обработки GET {self.path}: {e}", exc_info=True)
                     self._r(500, {"error":str(e)})
 
             def do_POST(self):
                 ip = self.client_address[0]
-                logger.info(f"[HTTP-IN] POST {self.path} от {ip}")
+                logger.info(f"[API] Получен POST запрос {self.path} от {ip}")
                 if self.path != "/analyze":
                     self._r(404, {"error":"Not Found"}); return
                 if not state.ready or not state.system_info or not state.vuln_db:
-                    parts = []
-                    if not state.system_info: parts.append("анализ системы не выполнен")
-                    if not state.vuln_db: parts.append("базы не загружены")
-                    reason = "; ".join(parts) or "сервер не готов"
-                    logger.warning(f"[HTTP-IN] /analyze от {ip}: НЕ ГОТОВ ({reason})")
-                    self._r(503, {"error":f"Сервер не готов: {reason}","ready":False,"hint":"Выполните шаги 1-2 на сервере"}); return
+                    logger.warning(f"[API] Отказ {ip}: Сервер не готов (не нажаты кнопки 1 и 2).")
+                    self._r(503, {"error":f"Сервер не готов","ready":False,"hint":"Выполните шаги 1-2 на сервере"}); return
                 try:
                     ln = int(self.headers.get("Content-Length",0))
-                    if ln == 0: self._r(400,{"error":"Пустое тело"}); return
-                    body = self.rfile.read(ln).decode("utf-8"); scan_data = json.loads(body)
-                    logger.info(f"[HTTP-IN] Данные от {ip}: {len(scan_data.get('open_ports',[]))} портов, {len(scan_data.get('attack_vectors',[]))} атак")
+                    if ln == 0: 
+                        logger.warning(f"[API] Отказ {ip}: Пустое тело запроса.")
+                        self._r(400,{"error":"Пустое тело"}); return
+                    
+                    body = self.rfile.read(ln).decode("utf-8")
+                    logger.debug(f"[API] Размер полученного payload: {ln} байт. Первые 200 символов: {body[:200]}...")
+                    
+                    scan_data = json.loads(body)
+                    logger.info(f"[API] Распакованы данные от {ip}: {len(scan_data.get('open_ports',[]))} портов, {len(scan_data.get('attack_vectors',[]))} векторов атак")
+                    
                     if ip not in state.connected_clients: state.connected_clients.append(ip)
                     if state.on_client_connected: state.on_client_connected(ip)
+                    
+                    logger.debug("[CORE] Запуск AttackCorrelator (сопоставление векторов атак с ОС)...")
                     sr = from_json_scan_result(scan_data)
-                    cor = AttackCorrelator(state.system_info, state.vuln_db); results = cor.correlate(sr); summary = cor.get_summary()
+                    cor = AttackCorrelator(state.system_info, state.vuln_db)
+                    results = cor.correlate(sr)
+                    summary = cor.get_summary()
+                    
+                    logger.info(f"[CORE] Корреляция завершена. Итоговых уязвимостей: {len(results)}")
+                    
                     rd = os.path.join(PROJECT_DIR,"reports"); os.makedirs(rd,exist_ok=True)
                     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                     rep = ReportGenerator(state.system_summary or {}, results, summary)
-                    hp = rep.generate_html(os.path.join(rd,f"report_{ts}.html")); rep.generate_json(os.path.join(rd,f"report_{ts}.json"))
+                    hp = rep.generate_html(os.path.join(rd,f"report_{ts}.html"))
+                    rep.generate_json(os.path.join(rd,f"report_{ts}.json"))
+                    
                     gui.last_report_path = hp
+                    logger.debug(f"[CORE] Отчеты сохранены. HTML: {hp}")
+                    
                     resp = {"status":"success","summary":summary,"html_report":hp,"results_count":len(results),
                             "details":[{"cve_id":r.cve_id,"attack_name":r.attack_name,"severity":r.severity,"feasibility":r.feasibility,"description":r.description,"recommendation":r.recommendation} for r in results]}
+                    
                     self._r(200, resp)
-                    logger.info(f"[HTTP-IN] Корреляция: {len(results)} результатов для {ip}")
+                    logger.info(f"[API] Ответ 200 OK успешно отправлен клиенту {ip}")
+                    
                     if state.on_analysis_complete: state.on_analysis_complete(summary, hp)
-                    gui._update_results_table(results)
+                    
+                    gui.update_results_signal.emit(results)
+                    
                 except json.JSONDecodeError as e:
-                    logger.error(f"[HTTP-IN] Bad JSON: {e}"); self._r(400,{"error":f"Некорректный JSON: {e}"})
+                    logger.error(f"[API] Ошибка парсинга JSON: {e}"); self._r(400,{"error":f"Некорректный JSON: {e}"})
                 except Exception as e:
-                    logger.error(f"[HTTP-IN] Ошибка: {e}", exc_info=True); self._r(500,{"error":str(e)})
+                    logger.error(f"[API] Критическая ошибка POST обработчика: {e}", exc_info=True); self._r(500,{"error":str(e)})
 
             def _r(self, code, data):
                 self.send_response(code)
@@ -352,12 +376,12 @@ class ServerGUI(QMainWindow):
             self.port_display.setStyleSheet("color:#8a8;")
             self.btn_server.setText("4. Остановить сервер"); self.btn_open_report.setEnabled(True); self.port_spin.setEnabled(False)
             self.statusBar().showMessage(f"Сервер на порту {port}. Ожидание подключений...")
-            logger.info(f"HTTP-сервер запущен на порту {port}")
+            logger.info(f"[SRV] HTTP-сервер успешно стартовал на порту {port}")
         except OSError as e:
             if "10048" in str(e) or "in use" in str(e).lower():
                 QMessageBox.critical(self,"Порт занят",f"Порт {port} занят!\nnetstat -ano | findstr :{port}")
             else: QMessageBox.critical(self,"Ошибка",str(e))
-            logger.error(f"Ошибка запуска на порту {port}: {e}")
+            logger.error(f"[SRV] Ошибка запуска на порту {port}: {e}")
         except Exception as e:
             QMessageBox.critical(self,"Ошибка",str(e)); logger.error(f"Ошибка: {e}")
 
@@ -366,7 +390,7 @@ class ServerGUI(QMainWindow):
         self.server_running = False; self.actual_server_port = None
         self.status_icon.setText("●  Сервер остановлен"); self.status_icon.setStyleSheet("color:#666;")
         self.port_display.setText(""); self.btn_server.setText("4. Запустить сервер"); self.port_spin.setEnabled(True)
-        logger.info("HTTP-сервер остановлен")
+        logger.info("[SRV] HTTP-сервер остановлен пользователем")
 
     def _on_client_connected(self, ip):
         from server.api_server import state
@@ -377,18 +401,35 @@ class ServerGUI(QMainWindow):
     def _on_server_analysis_done(self, summary, path):
         self.last_report_path = path; self.tabs.setCurrentIndex(2); self.btn_open_report.setEnabled(True)
 
-    def _update_results_table(self, results):
-        def upd():
+    def _update_results_table_slot(self, results):
+        try:
             self.results_table.setRowCount(0)
+            logger.debug(f"[UI] Обновление таблицы корреляции. Строк для добавления: {len(results)}")
             for r in results:
-                row = self.results_table.rowCount(); self.results_table.insertRow(row)
-                self.results_table.setItem(row,0,QTableWidgetItem(r.cve_id))
-                si = QTableWidgetItem(r.severity); si.setForeground(QColor({"CRITICAL":"#c44","HIGH":"#a85","MEDIUM":"#997","LOW":"#696"}.get(r.severity,"#888"))); self.results_table.setItem(row,1,si)
-                fi = QTableWidgetItem(r.feasibility)
-                if r.feasibility == "РЕАЛИЗУЕМА": fi.setForeground(QColor("#b55"))
-                elif r.feasibility == "НЕ РЕАЛИЗУЕМА": fi.setForeground(QColor("#696"))
-                self.results_table.setItem(row,2,fi); self.results_table.setItem(row,3,QTableWidgetItem(r.attack_name)); self.results_table.setItem(row,4,QTableWidgetItem(r.description[:150]))
-        QTimer.singleShot(0, upd)
+                row = self.results_table.rowCount()
+                self.results_table.insertRow(row)
+                
+                cve = str(r.cve_id or "Нет CVE")
+                sev = str(r.severity or "INFO")
+                feas = str(r.feasibility or "UNKNOWN")
+                name = str(r.attack_name or "Неизвестная атака")
+                desc = str(r.description or "")[:150]
+                
+                self.results_table.setItem(row, 0, QTableWidgetItem(cve))
+                
+                si = QTableWidgetItem(sev)
+                si.setForeground(QColor({"CRITICAL":"#c44","HIGH":"#a85","MEDIUM":"#997","LOW":"#696"}.get(sev, "#888")))
+                self.results_table.setItem(row, 1, si)
+                
+                fi = QTableWidgetItem(feas)
+                if feas == "РЕАЛИЗУЕМА": fi.setForeground(QColor("#b55"))
+                elif feas == "НЕ РЕАЛИЗУЕМА": fi.setForeground(QColor("#696"))
+                self.results_table.setItem(row, 2, fi)
+                
+                self.results_table.setItem(row, 3, QTableWidgetItem(name))
+                self.results_table.setItem(row, 4, QTableWidgetItem(desc))
+        except Exception as e:
+            logger.error(f"[UI] Сбой при заполнении таблицы GUI: {e}", exc_info=True)
 
     def _open_report(self):
         if self.last_report_path and os.path.exists(self.last_report_path): webbrowser.open(f"file:///{self.last_report_path}"); return
