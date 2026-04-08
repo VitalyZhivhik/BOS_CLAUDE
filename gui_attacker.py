@@ -3,15 +3,21 @@
 Сканирует цель, генерирует векторы атак, отправляет на сервер.
 
 ИСПРАВЛЕНИЯ:
-  - Лучшая обработка 503: показывает причину и подсказку
-  - Глубокий фингерпринтинг (HTTP-зондирование, версии)
-  - Строгая монохромная тема
-  - Экспорт лога
+  - Интегрирован сканер Nuclei (C:\BOS\tools\nuclei.exe) для мощного отчета
+  - Исправлен баг зависания надписи "Проверка связи..." (переведено на QThread)
+  - Увеличен диапазон портов по умолчанию (от 1 до 10000)
+  - Добавлен обход системных прокси (исправление ошибки 503)
 """
 import sys, os, json, socket, urllib.request, urllib.error
+import subprocess, tempfile
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
+
+# Принудительно отключаем использование системных прокси-серверов или VPN
+proxy_handler = urllib.request.ProxyHandler({})
+opener = urllib.request.build_opener(proxy_handler)
+urllib.request.install_opener(opener)
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -59,15 +65,49 @@ QStatusBar { background: #0e0e0e; color: #666; border-top: 1px solid #222; }
 QLabel { color: #b0b0b0; }
 """
 
+class CheckConnectionWorker(QThread):
+    """Надежный поток для проверки связи с сервером (без зависаний интерфейса)"""
+    connected_signal = pyqtSignal(str, bool, int)
+    failed_signal = pyqtSignal(str)
+
+    def __init__(self, target, port):
+        super().__init__()
+        self.target = target
+        self.port = port
+
+    def run(self):
+        try:
+            url = f"http://{self.target}:{self.port}/ping"
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                hn = data.get("hostname", "?")
+                ready = data.get("ready", False)
+                sp = data.get("server_port", self.port)
+                self.connected_signal.emit(hn, ready, sp)
+        except urllib.error.HTTPError as e:
+            msg = f"HTTP {e.code}: Сервер отклонил запрос."
+            if e.code == 503:
+                msg = f"Порт {self.port} отвечает 503 (Не готов).\n\nСервер найден, но вы не выполнили шаги 1 и 2 в серверной программе."
+            self.failed_signal.emit(msg)
+        except Exception as e:
+            msg = str(e)
+            if "10061" in msg or "refused" in msg.lower():
+                msg = f"Подключение не удалось. Сервер выключен или указан неверный порт ({self.port})."
+            self.failed_signal.emit(msg)
+
 class ScanWorker(QThread):
     port_found = pyqtSignal(object)
     progress = pyqtSignal(int, int)
     finished = pyqtSignal(list)
     error = pyqtSignal(str)
-    def __init__(self, target, ps, pe, timeout=0.5, deep=False):
+    
+    def __init__(self, target, ps, pe, timeout=0.3, deep=False):
         super().__init__()
         self.target=target; self.ps=ps; self.pe=pe; self.timeout=timeout; self.deep=deep; self._cancel=False
+        
     def cancel(self): self._cancel=True
+    
     def run(self):
         try:
             ports=[]; total=self.pe-self.ps+1; scanned=0
@@ -109,6 +149,95 @@ class ScanWorker(QThread):
         except Exception: pass
         return pi
 
+class NucleiWorker(QThread):
+    """Интеграция с утилитой Nuclei для глубокого поиска уязвимостей"""
+    progress = pyqtSignal(str)
+    finished = pyqtSignal(list)
+    error = pyqtSignal(str)
+
+    def __init__(self, target, open_ports):
+        super().__init__()
+        self.target = target
+        self.open_ports = open_ports
+        self.nuclei_path = r"C:\BOS\tools\nuclei.exe"
+        
+    def run(self):
+        vectors = []
+        if not os.path.exists(self.nuclei_path):
+            self.error.emit(f"Утилита Nuclei не найдена ({self.nuclei_path}). Будут использованы только базовые проверки.")
+            self.finished.emit([])
+            return
+
+        urls = []
+        for p in self.open_ports:
+            # Nuclei лучше всего работает с веб-протоколами
+            if p.port in (80, 443, 8080, 8443, 8000, 8888):
+                scheme = "https" if p.port in (443, 8443) else "http"
+                urls.append(f"{scheme}://{self.target}:{p.port}")
+        
+        if not urls:
+            urls = [self.target] # Если нет явных веб-портов, сканируем сам IP
+
+        self.progress.emit("Инициализация Nuclei...")
+        fd, temp_path = tempfile.mkstemp(suffix=".json")
+        os.close(fd)
+        
+        try:
+            cmd = [self.nuclei_path, "-u", ",".join(urls), "-json-export", temp_path, "-silent"]
+            
+            startupinfo = None
+            if os.name == 'nt':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8', startupinfo=startupinfo)
+            
+            for line in process.stdout:
+                if line.strip():
+                    self.progress.emit(f"Nuclei: Поиск уязвимостей в процессе...")
+            
+            process.wait()
+            
+            if os.path.exists(temp_path) and os.path.getsize(temp_path) > 0:
+                with open(temp_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if not line.strip(): continue
+                        try:
+                            vuln = json.loads(line)
+                            info = vuln.get("info", {})
+                            name = info.get("name", vuln.get("template-id", "Unknown"))
+                            desc = info.get("description", "")
+                            if not desc:
+                                desc = " ".join(vuln.get("extracted-results", []))
+                            if not desc:
+                                desc = "Уязвимость обнаружена мощным сканером Nuclei."
+                                
+                            sev = str(info.get("severity", "INFO")).upper()
+                            if sev not in ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]:
+                                sev = "MEDIUM"
+                                
+                            port_str = vuln.get("port", "")
+                            tgt_port = int(port_str) if port_str and port_str.isdigit() else None
+                            
+                            av = AttackVector(
+                                id=vuln.get("template-id", "nuclei-vuln")[:50],
+                                name=name[:100],
+                                description=desc[:500],
+                                severity=sev,
+                                target_port=tgt_port
+                            )
+                            vectors.append(av)
+                        except json.JSONDecodeError:
+                            pass
+        except Exception as e:
+            self.error.emit(f"Ошибка при работе с Nuclei: {str(e)}")
+        finally:
+            if os.path.exists(temp_path):
+                try: os.remove(temp_path)
+                except: pass
+                
+        self.finished.emit(vectors)
+
 class SendWorker(QThread):
     finished = pyqtSignal(dict)
     error = pyqtSignal(str)
@@ -126,13 +255,10 @@ class SendWorker(QThread):
                 body=e.read().decode("utf-8")
                 try:
                     ed=json.loads(body)
-                    # Извлекаем подробную ошибку
                     err_msg = ed.get("error", "")
                     hint = ed.get("hint", "")
-                    if hint:
-                        body = f"{err_msg}\n\nПодсказка: {hint}"
-                    elif err_msg:
-                        body = err_msg
+                    if hint: body = f"{err_msg}\n\nПодсказка: {hint}"
+                    elif err_msg: body = err_msg
                 except (json.JSONDecodeError, KeyError): pass
             except Exception: pass
             msg=f"HTTP {e.code}: {body or e.reason}"
@@ -170,9 +296,12 @@ class AttackerGUI(QMainWindow):
         self.target_input=QLineEdit(TARGET_SERVER_HOST); self.target_input.setFont(QFont("Consolas",12)); tl.addWidget(self.target_input)
         tl.addWidget(QLabel("Порт API сервера:"))
         self.port_spin=QSpinBox(); self.port_spin.setRange(1024,65535); self.port_spin.setValue(TARGET_SERVER_PORT); tl.addWidget(self.port_spin)
+        
+        # --- ИСПРАВЛЕНИЕ: Увеличен диапазон портов по умолчанию (1 до 10000) ---
         r=QHBoxLayout(); r.addWidget(QLabel("Порты от:"))
-        self.ps_spin=QSpinBox(); self.ps_spin.setRange(1,65535); self.ps_spin.setValue(SCAN_PORT_START); r.addWidget(self.ps_spin)
-        r.addWidget(QLabel("до:")); self.pe_spin=QSpinBox(); self.pe_spin.setRange(1,65535); self.pe_spin.setValue(SCAN_PORT_END); r.addWidget(self.pe_spin); tl.addLayout(r)
+        self.ps_spin=QSpinBox(); self.ps_spin.setRange(1,65535); self.ps_spin.setValue(1); r.addWidget(self.ps_spin)
+        r.addWidget(QLabel("до:")); self.pe_spin=QSpinBox(); self.pe_spin.setRange(1,65535); self.pe_spin.setValue(10000); r.addWidget(self.pe_spin); tl.addLayout(r)
+        
         self.chk_deep=QCheckBox("Глубокий фингерпринтинг"); self.chk_deep.setChecked(True); tl.addWidget(self.chk_deep)
         ll.addWidget(tg)
 
@@ -220,62 +349,25 @@ class AttackerGUI(QMainWindow):
         self.log_output.moveCursor(QTextCursor.MoveOperation.End)
 
     def _check_connection(self):
-        self.btn_check.setEnabled(False); self.btn_check.setText("Проверка...")
-        self.conn_icon.setText("●  Проверка связи..."); self.conn_icon.setStyleSheet("color:#888;")
-        target=self.target_input.text(); port=self.port_spin.value()
-        def check():
-            try:
-                url=f"http://{target}:{port}/ping"
-                req=urllib.request.Request(url, method="GET")
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    data=json.loads(resp.read().decode("utf-8"))
-                    hn=data.get("hostname","?"); ready=data.get("ready",False)
-                    sp=data.get("server_port", port)
-                    QTimer.singleShot(0, lambda: self._on_connected(hn, ready, sp))
-            except urllib.error.HTTPError as e:
-                # Если 503 — значит НЕ НАШ сервер или сервер не готов
-                body = ""
-                try:
-                    body = e.read().decode("utf-8")
-                    try:
-                        ed = json.loads(body)
-                        body = ed.get("error", "") or ed.get("message", "")
-                    except: pass
-                except: pass
-                msg = f"HTTP {e.code}"
-                if e.code == 503:
-                    msg = (f"Порт {port} отвечает 503 (Service Unavailable).\n\n"
-                           f"Возможные причины:\n"
-                           f"  1. На этом порту запущен ДРУГОЙ сервис (не наш)\n"
-                           f"  2. Сервер запущен, но не готов (шаги 1-2 не выполнены)\n"
-                           f"  3. Проверьте порт на сервере — он показан в GUI")
-                    if body: msg += f"\n\nОтвет: {body[:200]}"
-                else:
-                    msg += f": {body or e.reason}"
-                logger.error(f"Нет связи с {target}:{port}: HTTP {e.code}")
-                QTimer.singleShot(0, lambda: self._on_connection_failed(msg))
-            except urllib.error.URLError as e:
-                reason = str(e.reason) if hasattr(e, 'reason') else str(e)
-                if "10061" in reason or "refused" in reason.lower():
-                    msg = (f"Порт {port} закрыт — нет сервера.\n\n"
-                           f"Убедитесь что:\n"
-                           f"  1. Серверный агент запущен\n"
-                           f"  2. Порт совпадает (на сервере показан текущий порт)\n"
-                           f"  3. Файрвол не блокирует порт {port}")
-                else:
-                    msg = f"Ошибка сети: {reason}"
-                logger.error(f"Нет связи с {target}:{port}: {e}")
-                QTimer.singleShot(0, lambda: self._on_connection_failed(msg))
-            except Exception as e:
-                logger.error(f"Нет связи с {target}:{port}: {e}")
-                QTimer.singleShot(0, lambda: self._on_connection_failed(str(e)))
-        import threading; threading.Thread(target=check, daemon=True).start()
+        self.btn_check.setEnabled(False)
+        self.btn_check.setText("Проверка...")
+        self.conn_icon.setText("●  Проверка связи...")
+        self.conn_icon.setStyleSheet("color:#888;")
+        
+        target = self.target_input.text()
+        port = self.port_spin.value()
+        
+        # Запускаем QThread, чтобы интерфейс не зависал
+        self.check_worker = CheckConnectionWorker(target, port)
+        self.check_worker.connected_signal.connect(self._on_connected)
+        self.check_worker.failed_signal.connect(self._on_connection_failed)
+        self.check_worker.start()
 
     def _on_connected(self, hostname, ready, server_port):
         self.connected_to_server = True
         self.conn_icon.setText("●  Связь установлена"); self.conn_icon.setStyleSheet("color:#8a8;")
         ready_text = "Готов к приёму" if ready else "НЕ ГОТОВ (выполните шаги 1-2 на сервере)"
-        self.conn_detail.setText(f"Сервер: {hostname}\n{ready_text}\nПорт сервера: {server_port}")
+        self.conn_detail.setText(f"Сервер: {hostname}\n{ready_text}\nПорт: {server_port}")
         self.conn_frame.setStyleSheet("background:#1a1a1a;border:1px solid #3a5a3a;border-radius:4px;padding:8px;")
         self.btn_check.setText("1. Связь установлена"); self.btn_check.setEnabled(True)
         self.statusBar().showMessage(f"Подключено к {hostname} (порт {server_port})")
@@ -285,15 +377,16 @@ class AttackerGUI(QMainWindow):
         self.conn_icon.setText("●  Нет связи"); self.conn_icon.setStyleSheet("color:#866;")
         self.conn_detail.setText(error[:300])
         self.conn_frame.setStyleSheet("background:#1a1a1a;border:1px solid #5a3a3a;border-radius:4px;padding:8px;")
-        self.btn_check.setText("1. Проверить связь с сервером"); self.btn_check.setEnabled(True)
-        self.statusBar().showMessage("Нет связи с сервером")
+        self.btn_check.setText("1. Повторить проверку"); self.btn_check.setEnabled(True)
+        self.statusBar().showMessage("Сбой подключения к серверу")
 
     def _start_scan(self):
         if self.scan_worker and self.scan_worker.isRunning(): self.scan_worker.cancel(); self.btn_scan.setText("2. Сканировать порты"); return
         t=self.target_input.text(); ps=self.ps_spin.value(); pe=self.pe_spin.value(); deep=self.chk_deep.isChecked()
         self.open_ports=[]; self.ports_table.setRowCount(0); self.attacks_table.setRowCount(0); self.progress_bar.setValue(0); self.progress_bar.setVisible(True); self.btn_send.setEnabled(False); self.btn_scan.setText("Остановить")
         logger.info(f"Начало сканирования {t} [{ps}-{pe}]{' (глубокий)' if deep else ''}")
-        self.scan_worker=ScanWorker(t,ps,pe,SCAN_TIMEOUT,deep); self.scan_worker.port_found.connect(self._on_port_found); self.scan_worker.progress.connect(self._on_scan_progress)
+        # Таймаут 0.3 сек, чтобы быстро пробежаться по 10000 портам
+        self.scan_worker=ScanWorker(t,ps,pe,0.3,deep); self.scan_worker.port_found.connect(self._on_port_found); self.scan_worker.progress.connect(self._on_scan_progress)
         self.scan_worker.finished.connect(self._on_scan_done); self.scan_worker.error.connect(self._on_scan_error); self.scan_worker.start()
 
     def _on_port_found(self, p):
@@ -301,27 +394,68 @@ class AttackerGUI(QMainWindow):
         self.ports_table.setItem(r,0,QTableWidgetItem(str(p.port))); self.ports_table.setItem(r,1,QTableWidgetItem(p.protocol))
         self.ports_table.setItem(r,2,QTableWidgetItem(p.service)); self.ports_table.setItem(r,3,QTableWidgetItem(p.banner or ""))
 
-    def _on_scan_progress(self, s, t): self.progress_bar.setValue(int(s/t*100) if t else 0); self.progress_bar.setFormat(f"{s}/{t}")
+    def _on_scan_progress(self, s, t): self.progress_bar.setValue(int(s/t*100) if t else 0); self.progress_bar.setFormat(f"Сканирование портов: {s}/{t}")
 
     def _on_scan_done(self, ports):
-        self.open_ports=ports; self.progress_bar.setValue(100); self.progress_bar.setVisible(False); self.btn_scan.setText("2. Сканировать порты")
-        gen=AttackVectorGenerator(); self.attack_vectors=gen.generate(ports)
-        self.attacks_table.setRowCount(0); so={"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3,"INFO":4}
+        self.open_ports=ports
+        
+        # Сначала генерируем базовые векторы на основе портов
+        gen=AttackVectorGenerator()
+        self.attack_vectors=gen.generate(ports)
+        
+        # Запускаем интеграцию с Nuclei
+        self.btn_scan.setText("Анализ Nuclei...")
+        self.progress_bar.setFormat("Подготовка Nuclei...")
+        self.progress_bar.setValue(0)
+        
+        self.nuclei_worker = NucleiWorker(self.target_input.text(), ports)
+        self.nuclei_worker.progress.connect(self._on_nuclei_progress)
+        self.nuclei_worker.finished.connect(self._on_nuclei_done)
+        self.nuclei_worker.error.connect(self._on_nuclei_error)
+        self.nuclei_worker.start()
+
+    def _on_nuclei_progress(self, msg):
+        self.progress_bar.setFormat(msg)
+        v = self.progress_bar.value() + 5
+        if v > 95: v = 10
+        self.progress_bar.setValue(v)
+
+    def _on_nuclei_error(self, e):
+        logger.warning(e)
+
+    def _on_nuclei_done(self, nuclei_vectors):
+        self.progress_bar.setValue(100)
+        self.progress_bar.setVisible(False)
+        self.btn_scan.setText("2. Сканировать порты")
+        
+        # Добавляем векторы от Nuclei к базовым
+        self.attack_vectors.extend(nuclei_vectors)
+        
+        self.attacks_table.setRowCount(0)
+        so={"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3,"INFO":4}
+        
+        # Фильтруем уникальные уязвимости
+        unique_vectors = {}
+        for av in self.attack_vectors: unique_vectors[av.id] = av
+        self.attack_vectors = list(unique_vectors.values())
+        
         for av in sorted(self.attack_vectors, key=lambda v: so.get(v.severity,5)):
             r=self.attacks_table.rowCount(); self.attacks_table.insertRow(r)
             self.attacks_table.setItem(r,0,QTableWidgetItem(av.id))
             si=QTableWidgetItem(av.severity); si.setForeground(QColor({"CRITICAL":"#c44","HIGH":"#a85","MEDIUM":"#997","LOW":"#696","INFO":"#668"}.get(av.severity,"#888"))); self.attacks_table.setItem(r,1,si)
             self.attacks_table.setItem(r,2,QTableWidgetItem(str(av.target_port or "-"))); self.attacks_table.setItem(r,3,QTableWidgetItem(av.name)); self.attacks_table.setItem(r,4,QTableWidgetItem(av.description))
+            
         cr=sum(1 for v in self.attack_vectors if v.severity=="CRITICAL"); hi=sum(1 for v in self.attack_vectors if v.severity=="HIGH")
-        self.lbl_stats.setText(f"Порты: {len(ports)}\nВекторы: {len(self.attack_vectors)}\nCRITICAL: {cr} | HIGH: {hi}")
-        self.btn_send.setEnabled(len(ports)>0); self.tabs.setCurrentIndex(1)
-        self.statusBar().showMessage(f"Найдено {len(ports)} портов, {len(self.attack_vectors)} векторов")
-        logger.info(f"Найдено {len(ports)} портов, {len(self.attack_vectors)} векторов атак")
+        self.lbl_stats.setText(f"Порты: {len(self.open_ports)}\nВекторы: {len(self.attack_vectors)}\nCRITICAL: {cr} | HIGH: {hi}")
+        self.btn_send.setEnabled(len(self.open_ports)>0 or len(self.attack_vectors)>0)
+        self.tabs.setCurrentIndex(1)
+        self.statusBar().showMessage(f"Завершено. Найдено {len(self.open_ports)} портов, {len(self.attack_vectors)} векторов")
+        logger.info(f"Скан завершен. Найдено {len(self.open_ports)} портов, {len(self.attack_vectors)} векторов атак")
 
     def _on_scan_error(self, e): self.progress_bar.setVisible(False); self.btn_scan.setText("2. Сканировать порты"); QMessageBox.critical(self,"Ошибка",e)
 
     def _send_results(self):
-        if not self.open_ports: QMessageBox.warning(self,"Отправка","Нет данных."); return
+        if not self.open_ports and not self.attack_vectors: QMessageBox.warning(self,"Отправка","Нет данных."); return
         t=self.target_input.text(); p=self.port_spin.value()
         sr=ScanResult(scanner_ip=socket.gethostbyname(socket.gethostname()),target_ip=t,open_ports=self.open_ports,
                       discovered_services=[f"{x.service} (:{x.port})" for x in self.open_ports],
@@ -351,7 +485,6 @@ class AttackerGUI(QMainWindow):
 
     def _on_send_error(self, error):
         self.btn_send.setText("3. Отправить на сервер"); self.btn_send.setEnabled(True)
-        # Показываем подробную ошибку
         if "503" in error:
             QMessageBox.warning(self, "Сервер не готов", error)
         else:
