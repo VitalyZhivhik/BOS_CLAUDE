@@ -238,5 +238,55 @@
       "Exploit Protection",
       "Песочница для приложений"
     ]
+  },
+  {
+    "id": "T1190",
+    "name": "Exploit Public-Facing Application",
+    "tactic": "Initial Access",
+    "description": "Атака на внешнее веб-приложение или службу (веб-сайт, база данных, API) для проникновения во внутреннюю сеть.",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-89", "CWE-22", "CWE-502"],
+    "related_capec": ["CAPEC-66", "CAPEC-126", "CAPEC-586"],
+    "detection": "Анализ логов веб-сервера (WAF), выявление необычно длинных URL или SQL-команд в GET/POST параметрах."
+  },
+  {
+    "id": "T1210",
+    "name": "Exploitation of Remote Services",
+    "tactic": "Lateral Movement",
+    "description": "Использование уязвимостей в удаленных службах (SMB, RDP, RPC) для скрытого перемещения между компьютерами внутри сети (как это делал вирус WannaCry).",
+    "platforms": ["Windows", "Linux"],
+    "related_cwe": ["CWE-119"],
+    "related_capec": ["CAPEC-100"],
+    "detection": "Мониторинг внутреннего сетевого трафика (IDS) на предмет аномальной активности по портам 445 и 135."
+  },
+  {
+    "id": "T1552",
+    "name": "Unsecured Credentials",
+    "tactic": "Credential Access",
+    "description": "Поиск и извлечение незащищенных учетных данных из файлов, конфигураций или оперативной памяти (утечки памяти).",
+    "platforms": ["Windows", "Linux"],
+    "related_cwe": ["CWE-125"],
+    "related_capec": ["CAPEC-540"],
+    "detection": "Практически не поддается сетевому обнаружению (если ключи читаются из памяти легитимно). Обнаруживается сканерами уязвимостей на хосте."
+  },
+  {
+    "id": "T1078",
+    "name": "Valid Accounts",
+    "tactic": "Initial Access / Persistence",
+    "description": "Использование скомпрометированных, дефолтных или заводских учетных данных для обхода систем обнаружения вторжений (так как вход выглядит легитимно).",
+    "platforms": ["Windows", "Linux", "Network", "Cloud"],
+    "related_cwe": ["CWE-1188"],
+    "related_capec": ["CAPEC-115"],
+    "detection": "Отслеживание входов в нерабочее время, входов с неизвестных IP-адресов под локальными административными учетками."
+  },
+  {
+    "id": "T1110",
+    "name": "Brute Force",
+    "tactic": "Credential Access",
+    "description": "Систематический перебор паролей по словарю для получения доступа к удаленному порту (SSH, RDP).",
+    "platforms": ["Windows", "Linux"],
+    "related_cwe": ["CWE-307"],
+    "related_capec": ["CAPEC-49"],
+    "detection": "Множественные события Event ID 4625 (Отказ входа) в журналах безопасности Windows в течение короткого промежутка времени."
   }
 ]

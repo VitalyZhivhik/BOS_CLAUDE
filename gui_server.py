@@ -404,8 +404,21 @@ class ServerGUI(QMainWindow):
     def _update_results_table_slot(self, results):
         try:
             self.results_table.setRowCount(0)
-            logger.debug(f"[UI] Обновление таблицы корреляции. Строк для добавления: {len(results)}")
+            
+            # ФИЛЬТРАЦИЯ ДУБЛИКАТОВ ДЛЯ ИНТЕРФЕЙСА СЕРВЕРА
+            seen = set()
+            unique_results = []
             for r in results:
+                cve = str(r.cve_id or "Нет CVE")
+                name = str(r.attack_name or "Неизвестная атака")
+                key = f"{cve}_{name}"
+                if key not in seen:
+                    seen.add(key)
+                    unique_results.append(r)
+            
+            logger.debug(f"[UI] Обновление таблицы корреляции. Уникальных строк: {len(unique_results)}")
+            
+            for r in unique_results:
                 row = self.results_table.rowCount()
                 self.results_table.insertRow(row)
                 
@@ -430,7 +443,7 @@ class ServerGUI(QMainWindow):
                 self.results_table.setItem(row, 4, QTableWidgetItem(desc))
         except Exception as e:
             logger.error(f"[UI] Сбой при заполнении таблицы GUI: {e}", exc_info=True)
-
+            
     def _open_report(self):
         if self.last_report_path and os.path.exists(self.last_report_path): webbrowser.open(f"file:///{self.last_report_path}"); return
         rd = os.path.join(PROJECT_DIR,"reports")

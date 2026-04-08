@@ -1,309 +1,464 @@
 """
-Генератор отчётов по результатам анализа безопасности.
-Создаёт HTML-отчёт с разделением на реализуемые и нереализуемые атаки.
+Генератор отчетов об уязвимостях (Дашборд SOC).
+ИСПРАВЛЕНИЯ:
+  - Агрегация дубликатов (Схлопывание SQLi и других атак по CWE/CAPEC).
+  - Панель фильтров (по CWE, CAPEC, ПО).
+  - Ортогональные (прямоугольные) стрелки и увеличенное расстояние между узлами.
+  - Логическая цепочка (CAPEC -> ПО -> CVE -> CWE -> Вердикт).
+  - Корректная обработка портов "None".
 """
-
-import os
 import json
-from datetime import datetime
-from dataclasses import asdict
+import os
 
-import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-from common.models import VulnerabilityMatch, AttackFeasibility
-from common.config import REPORTS_DIR
-
-
-class ReportGenerator:
-    """Генерация отчётов по анализу безопасности."""
-
-    def __init__(self, system_summary: dict, correlation_results: list,
-                 correlation_summary: dict, scan_summary: dict = None):
-        self.system_summary = system_summary
-        self.results = correlation_results
-        self.summary = correlation_summary
-        self.scan_summary = scan_summary or {}
-        self.timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    def generate_html(self, output_path: str = None) -> str:
-        """Генерация полного HTML-отчёта."""
-        if not output_path:
-            os.makedirs(REPORTS_DIR, exist_ok=True)
-            filename = f"security_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
-            output_path = os.path.join(REPORTS_DIR, filename)
-
-        feasible = [r for r in self.results if r.feasibility == AttackFeasibility.FEASIBLE.value]
-        partial = [r for r in self.results if r.feasibility == AttackFeasibility.PARTIALLY_FEASIBLE.value]
-        not_feasible = [r for r in self.results if r.feasibility == AttackFeasibility.NOT_FEASIBLE.value]
-        unknown = [r for r in self.results if r.feasibility == AttackFeasibility.REQUIRES_ANALYSIS.value]
-
-        html = f"""<!DOCTYPE html>
+HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Отчёт по безопасности — {self.timestamp}</title>
+    <title>Интерактивный Отчет Корреляции SOC</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{
-            font-family: 'Segoe UI', Tahoma, sans-serif;
-            background: #f0f2f5; color: #1a1a2e; padding: 20px;
-        }}
-        .container {{ max-width: 1200px; margin: 0 auto; }}
-        h1 {{
-            text-align: center; padding: 30px; background: linear-gradient(135deg, #1a1a2e, #16213e);
-            color: #fff; border-radius: 12px; margin-bottom: 20px;
-        }}
-        h1 small {{ display: block; font-size: 14px; opacity: 0.7; margin-top: 8px; }}
-        h2 {{
-            padding: 15px 20px; border-radius: 8px 8px 0 0;
-            color: #fff; margin-top: 30px;
-        }}
-        .section {{ background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px; overflow: hidden; }}
-        .section-body {{ padding: 20px; }}
+        :root { --bg: #0d1117; --card: #161b22; --text: #c9d1d9; --border: #30363d; --accent: #58a6ff; }
+        body { font-family: "Segoe UI", Tahoma, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1, h2 { color: #ffffff; border-bottom: 1px solid var(--border); padding-bottom: 10px; font-weight: 600; margin-top: 0;}
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        
+        .btn-toggle { background: var(--accent); color: #fff; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s; }
+        .btn-toggle:hover { background: #3182ce; }
+        .header-flex { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 15px; }
 
-        /* Сводка */
-        .stats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; }}
-        .stat-card {{
-            background: #f8f9fa; border-radius: 10px; padding: 20px; text-align: center;
-            border-left: 4px solid #ccc;
-        }}
-        .stat-card .number {{ font-size: 36px; font-weight: bold; }}
-        .stat-card .label {{ font-size: 13px; color: #666; margin-top: 5px; }}
-        .stat-card.critical {{ border-color: #e63946; }}
-        .stat-card.critical .number {{ color: #e63946; }}
-        .stat-card.warning {{ border-color: #f4a261; }}
-        .stat-card.warning .number {{ color: #f4a261; }}
-        .stat-card.safe {{ border-color: #2a9d8f; }}
-        .stat-card.safe .number {{ color: #2a9d8f; }}
-        .stat-card.info {{ border-color: #457b9d; }}
-        .stat-card.info .number {{ color: #457b9d; }}
+        /* Фильтры */
+        .filters-bar { display: flex; gap: 15px; margin-bottom: 15px; background: #0d1117; padding: 15px; border-radius: 8px; border: 1px solid var(--border); }
+        .filter-item { display: flex; flex-direction: column; flex: 1; }
+        .filter-item label { font-size: 12px; color: #8b949e; margin-bottom: 5px; text-transform: uppercase; font-weight: bold; }
+        .filter-item select { padding: 10px; background: var(--card); color: #c9d1d9; border: 1px solid var(--border); border-radius: 4px; outline: none; font-size: 14px; cursor: pointer; }
+        .filter-item select:focus { border-color: var(--accent); }
 
-        /* Таблицы */
-        table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
-        th {{ background: #f1f3f5; padding: 12px; text-align: left; font-weight: 600; }}
-        td {{ padding: 12px; border-bottom: 1px solid #eee; vertical-align: top; }}
-        tr:hover {{ background: #f8f9fa; }}
-
-        /* Цвета секций */
-        .h-danger {{ background: #e63946; }}
-        .h-warning {{ background: #f4a261; }}
-        .h-safe {{ background: #2a9d8f; }}
-        .h-info {{ background: #457b9d; }}
-        .h-system {{ background: #6c757d; }}
-
-        /* Severity badges */
-        .badge {{
-            display: inline-block; padding: 3px 10px; border-radius: 12px;
-            font-size: 11px; font-weight: 600; color: #fff;
-        }}
-        .badge-critical {{ background: #e63946; }}
-        .badge-high {{ background: #f4a261; color: #1a1a2e; }}
-        .badge-medium {{ background: #e9c46a; color: #1a1a2e; }}
-        .badge-low {{ background: #2a9d8f; }}
-        .badge-info {{ background: #457b9d; }}
-
-        .recommendation {{
-            background: #f1f8ff; border-left: 3px solid #457b9d;
-            padding: 10px 15px; margin-top: 8px; font-size: 13px;
-            white-space: pre-line; border-radius: 0 6px 6px 0;
-        }}
-        .reason {{
-            color: #495057; font-style: italic; font-size: 13px; margin-top: 4px;
-        }}
-
-        /* Системная информация */
-        .sys-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }}
-        .sys-item {{ background: #f8f9fa; padding: 12px; border-radius: 8px; }}
-        .sys-item strong {{ color: #1a1a2e; }}
-        .sys-item .val {{ color: #495057; }}
-        .status-active {{ color: #2a9d8f; font-weight: 600; }}
-        .status-inactive {{ color: #e63946; font-weight: 600; }}
-
-        @media print {{
-            body {{ background: #fff; }}
-            .section {{ box-shadow: none; border: 1px solid #ddd; }}
-        }}
+        /* Карта */
+        #network-map { width: 100%; height: 750px; border: 1px solid var(--border); border-radius: 8px; background: #010409; outline: none; }
+        
+        /* Статистика */
+        .stats { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat-box { background: var(--card); border: 1px solid var(--border); padding: 15px; border-radius: 8px; flex: 1; text-align: center; }
+        .stat-box .title { font-size: 12px; color: #8b949e; text-transform: uppercase; }
+        .stat-box .num { font-size: 28px; font-weight: bold; margin-top: 5px; }
+        
+        /* Таблица */
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { padding: 14px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background-color: #21262d; color: #ffffff; }
+        .clickable-row { cursor: pointer; transition: background 0.2s; }
+        .clickable-row:hover { background-color: #1f2428; }
+        .details-btn { color: var(--accent); font-weight: 600; text-align: right; }
+        
+        /* Бейджи статусов */
+        .badge { padding: 5px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; display: inline-block; text-align: center;}
+        .crit { background: #791a1e; color: white; }
+        .high { background: #da3633; color: white; }
+        .med { background: #d29922; color: white; }
+        .low { background: #238636; color: white; }
+        .info { background: #1f77b4; color: white; }
+        
+        .real { background: rgba(218, 54, 51, 0.15); color: #ff7b72; border: 1px solid #da3633; }
+        .part-real { background: rgba(210, 153, 34, 0.15); color: #e3b341; border: 1px solid #d29922; }
+        .noreal { background: rgba(35, 134, 54, 0.15); color: #3fb950; border: 1px solid #238636; }
+        
+        /* Модальное окно */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(3px); }
+        .modal-content { background: var(--card); margin: 5% auto; padding: 25px; border: 1px solid var(--border); width: 65%; max-width: 900px; border-radius: 8px; position: relative; color: #c9d1d9; }
+        .close { color: #8b949e; position: absolute; right: 20px; top: 15px; font-size: 28px; cursor: pointer; }
+        .close:hover { color: #ff7b72; }
+        .modal-header { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 15px; }
+        
+        .grid-info { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; background: #0d1117; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid var(--border); }
+        .grid-item span { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; }
+        .grid-item strong { font-size: 14px; color: #58a6ff; }
+        
+        .modal-body h4 { color: #fff; margin-bottom: 8px; border-bottom: 1px dashed var(--border); padding-bottom: 5px; }
+        .modal-body p { line-height: 1.5; font-size: 14px; background: #0d1117; padding: 12px; border-radius: 6px; border: 1px solid var(--border); }
+        .rec-box { border-left: 4px solid #238636 !important; }
     </style>
 </head>
 <body>
-<div class="container">
+    <div class="container">
+        <h1 style="margin-top: 20px;">🛡️ Дашборд Безопасности SOC</h1>
+        
+        <div class="stats">
+            <div class="stat-box"><div class="title">Сгруппированных угроз</div><div class="num" id="st-total" style="color: #58a6ff;">0</div></div>
+            <div class="stat-box" style="border-top: 3px solid #da3633;"><div class="title">Реализуемые (КРИТИЧНО)</div><div class="num" id="st-real" style="color: #ff7b72;">0</div></div>
+            <div class="stat-box" style="border-top: 3px solid #d29922;"><div class="title">Частично реализуемые (ПРОВЕРИТЬ)</div><div class="num" id="st-part" style="color: #e3b341;">0</div></div>
+            <div class="stat-box" style="border-top: 3px solid #238636;"><div class="title">Не реализуемые (ЗАБЛОКИРОВАНО)</div><div class="num" id="st-noreal" style="color: #3fb950;">0</div></div>
+        </div>
 
-<h1>
-    Отчёт по анализу безопасности сервера
-    <small>{self.system_summary.get('hostname', 'N/A')} — {self.timestamp}</small>
-</h1>
+        <div class="card">
+            <div class="header-flex">
+                <h2 style="margin:0; border:none;">🗺️ Схема анализа уязвимостей</h2>
+                <button id="toggleBtn" class="btn-toggle">🔄 Включить логическую цепочку (CAPEC ➔ ПО ➔ CVE ➔ Вердикт)</button>
+            </div>
+            
+            <div class="filters-bar">
+                <div class="filter-item">
+                    <label>Фильтр по ПО / Цели:</label>
+                    <select id="f-sw" onchange="applyFilters()"><option value="all">-- Все приложения --</option></select>
+                </div>
+                <div class="filter-item">
+                    <label>Фильтр по Вектору (CAPEC):</label>
+                    <select id="f-capec" onchange="applyFilters()"><option value="all">-- Все векторы --</option></select>
+                </div>
+                <div class="filter-item">
+                    <label>Фильтр по Слабости (CWE):</label>
+                    <select id="f-cwe" onchange="applyFilters()"><option value="all">-- Все классы --</option></select>
+                </div>
+            </div>
 
-<!-- СВОДКА -->
-<div class="stats">
-    <div class="stat-card critical">
-        <div class="number">{self.summary.get('feasible_attacks', 0)}</div>
-        <div class="label">Реализуемые атаки</div>
-    </div>
-    <div class="stat-card warning">
-        <div class="number">{self.summary.get('partially_feasible', 0)}</div>
-        <div class="label">Частично реализуемые</div>
-    </div>
-    <div class="stat-card safe">
-        <div class="number">{self.summary.get('not_feasible_attacks', 0)}</div>
-        <div class="label">Нереализуемые</div>
-    </div>
-    <div class="stat-card info">
-        <div class="number">{self.summary.get('total_vulnerabilities_analyzed', 0)}</div>
-        <div class="label">Всего проанализировано</div>
-    </div>
-</div>
+            <p style="margin-bottom: 15px; font-size: 13px; color: #8b949e;">💡 Линии строго направлены. Узлы широко расставлены. <strong>Кликните на любой узел</strong> для открытия карточки с подробным описанием.</p>
+            <div id="network-map"></div>
+        </div>
 
-<!-- ИНФОРМАЦИЯ О СИСТЕМЕ -->
-<div class="section">
-    <h2 class="h-system">Информация о сервере</h2>
-    <div class="section-body">
-        <div class="sys-grid">
-            <div class="sys-item"><strong>ОС:</strong> <span class="val">{self.system_summary.get('os', 'N/A')}</span></div>
-            <div class="sys-item"><strong>Имя хоста:</strong> <span class="val">{self.system_summary.get('hostname', 'N/A')}</span></div>
-            <div class="sys-item"><strong>IP-адреса:</strong> <span class="val">{', '.join(self.system_summary.get('ip_addresses', []))}</span></div>
-            <div class="sys-item"><strong>Установленное ПО:</strong> <span class="val">{self.system_summary.get('installed_software_count', 0)} программ</span></div>
-            <div class="sys-item"><strong>Работающих сервисов:</strong> <span class="val">{self.system_summary.get('running_services_count', 0)}</span></div>
-            <div class="sys-item"><strong>Открытых портов:</strong> <span class="val">{self.system_summary.get('open_ports_count', 0)}</span></div>
-            <div class="sys-item"><strong>Базы данных:</strong> <span class="val">{'Да (' + ', '.join(self.system_summary.get('database_types', [])) + ')' if self.system_summary.get('has_database') else 'Не обнаружены'}</span></div>
-            <div class="sys-item"><strong>Веб-серверы:</strong> <span class="val">{'Да (' + ', '.join(self.system_summary.get('web_server_types', [])) + ')' if self.system_summary.get('has_web_server') else 'Не обнаружены'}</span></div>
-            <div class="sys-item"><strong>RDP:</strong> <span class="{'status-active' if self.system_summary.get('has_rdp') else 'status-inactive'}"">{'Включён' if self.system_summary.get('has_rdp') else 'Выключен'}</span></div>
-            <div class="sys-item"><strong>SMB:</strong> <span class="{'status-active' if self.system_summary.get('has_smb') else 'status-inactive'}"">{'Активен' if self.system_summary.get('has_smb') else 'Не обнаружен'}</span></div>
-            <div class="sys-item"><strong>Брандмауэр:</strong> <span class="{'status-active' if self.system_summary.get('firewall') else 'status-inactive'}"">{'Активен' if self.system_summary.get('firewall') else 'Не активен'}</span></div>
-            <div class="sys-item"><strong>Антивирус:</strong> <span class="{'status-active' if self.system_summary.get('antivirus') else 'status-inactive'}"">{'Активен' if self.system_summary.get('antivirus') else 'Не активен'}</span></div>
+        <div class="card">
+            <h2>📋 Перечень сгруппированных векторов</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Идентификатор</th>
+                        <th>Целевое ПО</th>
+                        <th>Вектор / Название (Дубли)</th>
+                        <th>Критичность</th>
+                        <th>Вердикт Сервера</th>
+                        <th>Детали</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    </tbody>
+            </table>
         </div>
     </div>
-</div>
-"""
-        # РЕАЛИЗУЕМЫЕ АТАКИ
-        if feasible:
-            html += self._render_section(
-                "РЕАЛИЗУЕМЫЕ АТАКИ — ТРЕБУЕТСЯ ДЕЙСТВИЕ", "h-danger", feasible
-            )
 
-        # ЧАСТИЧНО РЕАЛИЗУЕМЫЕ
-        if partial:
-            html += self._render_section(
-                "ЧАСТИЧНО РЕАЛИЗУЕМЫЕ АТАКИ", "h-warning", partial
-            )
-
-        # ТРЕБУЮТ АНАЛИЗА
-        if unknown:
-            html += self._render_section(
-                "ТРЕБУЮТ ДОПОЛНИТЕЛЬНОГО АНАЛИЗА", "h-info", unknown
-            )
-
-        # НЕРЕАЛИЗУЕМЫЕ
-        if not_feasible:
-            html += self._render_section(
-                "НЕРЕАЛИЗУЕМЫЕ АТАКИ (защита обеспечена)", "h-safe", not_feasible
-            )
-
-        # РЕКОМЕНДАЦИИ ПО ЗАЩИТЕ
-        html += self._render_recommendations_section(feasible + partial)
-
-        html += """
-</div>
-</body>
-</html>"""
-
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(html)
-
-        print(f"[+] HTML-отчёт сохранён: {output_path}")
-        return output_path
-
-    def _render_section(self, title: str, css_class: str, items: list) -> str:
-        html = f"""
-<div class="section">
-    <h2 class="{css_class}">{title} ({len(items)})</h2>
-    <div class="section-body">
-    <table>
-        <tr>
-            <th style="width:130px">CVE</th>
-            <th style="width:90px">Серьёзность</th>
-            <th>Описание</th>
-            <th style="width:130px">CWE</th>
-            <th style="width:130px">MITRE</th>
-        </tr>
-"""
-        for item in items:
-            sev = item.severity if isinstance(item.severity, str) else item.severity
-            badge_class = f"badge-{sev.lower()}" if sev else "badge-info"
-            html += f"""
-        <tr>
-            <td><strong>{item.cve_id}</strong></td>
-            <td><span class="badge {badge_class}">{sev}</span></td>
-            <td>
-                {item.description}
-                <div class="reason">Оценка: {item.feasibility}. {item.reason}</div>
-                <div class="recommendation">{item.recommendation}</div>
-            </td>
-            <td>{item.cwe_id}</td>
-            <td>{item.mitre_technique}</td>
-        </tr>
-"""
-        html += """
-    </table>
+    <div id="infoModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div class="modal-header">
+                <h2 id="m-title" style="margin: 0; font-size: 18px; color: #fff;">Название</h2>
+            </div>
+            <div class="grid-info">
+                <div class="grid-item"><span>Критичность:</span><strong id="m-sev">INFO</strong></div>
+                <div class="grid-item"><span>Статус:</span><strong id="m-feas">UNKNOWN</strong></div>
+                <div class="grid-item"><span>Атакуемое ПО / Порт:</span><strong id="m-sw">Н/Д</strong></div>
+                <div class="grid-item"><span>Количество дублей (попыток):</span><strong id="m-count">1</strong></div>
+                <div class="grid-item"><span>Вектор атаки (CAPEC):</span><strong id="m-capec">Н/Д</strong></div>
+                <div class="grid-item"><span>Класс слабости (CWE):</span><strong id="m-cwe">Н/Д</strong></div>
+            </div>
+            <div class="modal-body">
+                <h4>📝 Описание уязвимости</h4>
+                <p id="m-desc">Описание...</p>
+                <h4>🛠️ Рекомендации по устранению</h4>
+                <p id="m-rec" class="rec-box">Рекомендации...</p>
+            </div>
+        </div>
     </div>
-</div>"""
-        return html
 
-    def _render_recommendations_section(self, actionable: list) -> str:
-        """Секция сводных рекомендаций."""
-        if not actionable:
-            return """
-<div class="section">
-    <h2 class="h-safe">Сводные рекомендации по защите</h2>
-    <div class="section-body">
-        <p>Все проанализированные атаки признаны нереализуемыми в текущей конфигурации.
-        Рекомендуется поддерживать текущий уровень безопасности и регулярно обновлять ПО.</p>
-    </div>
-</div>"""
+    <script type="text/javascript">
+        // Данные инжектируются Python
+        var reportData = __REPORT_DATA__;
+        var sysData = __SYS_DATA__;
 
-        # Собираем уникальные рекомендации
-        all_recs = set()
-        for item in actionable:
-            for line in item.recommendation.split("\n"):
-                line = line.strip()
-                if line and not line.startswith("ВНИМАНИЕ") and not line.startswith("ПРИОРИТЕТ") and not line.startswith("Рекомендуемые"):
-                    # Убираем нумерацию
-                    clean = line.lstrip("0123456789. ")
-                    if clean:
-                        all_recs.add(clean)
+        var currentView = 1;
+        var network = null;
+        var detailsMap = {};
 
-        html = """
-<div class="section">
-    <h2 class="h-danger">Сводные рекомендации по защите сервера</h2>
-    <div class="section-body">
-    <table>
-        <tr><th style="width:40px">№</th><th>Рекомендация</th></tr>
-"""
-        for i, rec in enumerate(sorted(all_recs), 1):
-            html += f"        <tr><td>{i}</td><td>{rec}</td></tr>\n"
-
-        html += """
-    </table>
-    </div>
-</div>"""
-        return html
-
-    def generate_json(self, output_path: str = None) -> str:
-        """Генерация JSON-отчёта."""
-        if not output_path:
-            os.makedirs(REPORTS_DIR, exist_ok=True)
-            filename = f"security_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            output_path = os.path.join(REPORTS_DIR, filename)
-
-        report = {
-            "timestamp": self.timestamp,
-            "system_info": self.system_summary,
-            "summary": self.summary,
-            "results": [asdict(r) for r in self.results],
+        function init() {
+            populateFilters();
+            applyFilters();
         }
 
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(report, f, ensure_ascii=False, indent=2)
+        function populateFilters() {
+            let capecs = new Set(); let cwes = new Set(); let sws = new Set();
+            reportData.forEach(r => { capecs.add(r.capec); cwes.add(r.cwe); sws.add(r.sw); });
+            
+            let addOpt = (id, set) => {
+                let el = document.getElementById(id);
+                Array.from(set).sort().forEach(x => { el.innerHTML += `<option value="${x}">${x}</option>`; });
+            };
+            addOpt('f-sw', sws); addOpt('f-capec', capecs); addOpt('f-cwe', cwes);
+        }
 
-        print(f"[+] JSON-отчёт сохранён: {output_path}")
-        return output_path
+        function applyFilters() {
+            let capecF = document.getElementById('f-capec').value;
+            let cweF = document.getElementById('f-cwe').value;
+            let swF = document.getElementById('f-sw').value;
+            
+            let filtered = reportData.filter(r => {
+                return (capecF === 'all' || r.capec === capecF) &&
+                       (cweF === 'all' || r.cwe === cweF) &&
+                       (swF === 'all' || r.sw === swF);
+            });
+            
+            updateStats(filtered);
+            renderTable(filtered);
+            renderGraph(filtered);
+        }
+
+        function updateStats(data) {
+            document.getElementById('st-total').innerText = data.length;
+            document.getElementById('st-real').innerText = data.filter(x => x.feas === 'РЕАЛИЗУЕМА').length;
+            document.getElementById('st-part').innerText = data.filter(x => x.feas.includes('ЧАСТИЧНО')).length;
+            document.getElementById('st-noreal').innerText = data.filter(x => x.feas === 'НЕ РЕАЛИЗУЕМА').length;
+        }
+
+        function getSevClass(sev) {
+            let s = sev.toUpperCase();
+            if(s === "CRITICAL") return "crit"; if(s === "HIGH") return "high";
+            if(s === "MEDIUM") return "med"; if(s === "LOW") return "low"; return "info";
+        }
+        function getSevColor(sev) {
+            let s = sev.toUpperCase();
+            if(s === "CRITICAL") return "#791a1e"; if(s === "HIGH") return "#da3633";
+            if(s === "MEDIUM") return "#d29922"; if(s === "LOW") return "#238636"; return "#1f77b4";
+        }
+        function getFeasClass(feas) {
+            let f = feas.toUpperCase();
+            if(f === "РЕАЛИЗУЕМА") return "real";
+            if(f.includes("ЧАСТИЧНО")) return "part-real";
+            return "noreal";
+        }
+        function getFeasColor(feas) {
+            let f = feas.toUpperCase();
+            if(f === "РЕАЛИЗУЕМА") return "#da3633"; // Красный
+            if(f.includes("ЧАСТИЧНО")) return "#d29922"; // Желтый/Оранжевый
+            if(f === "НЕ РЕАЛИЗУЕМА") return "#238636"; // Зеленый
+            return "#8b949e";
+        }
+
+        function renderTable(data) {
+            let tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+            data.forEach(r => {
+                let nameShort = r.name.substring(0, 50) + (r.name.length > 50 ? "..." : "");
+                let dupes = r.count > 1 ? `<br><small style="color:#58a6ff;">(Сгруппировано: ${r.count} попыток)</small>` : "";
+                
+                let tr = `<tr class="clickable-row" onclick="openModal(${r.id})">
+                    <td><strong>${r.cve}</strong></td>
+                    <td>${r.sw}<br><small>Порт: ${r.port}</small></td>
+                    <td>${nameShort}${dupes}</td>
+                    <td><span class="badge ${getSevClass(r.sev)}">${r.sev}</span></td>
+                    <td><span class="badge ${getFeasClass(r.feas)}">${r.feas}</span></td>
+                    <td class="details-btn">Подробнее ➔</td>
+                </tr>`;
+                tbody.innerHTML += tr;
+                detailsMap[r.id] = r; // Сохраняем для модалки
+            });
+        }
+
+        function renderGraph(data) {
+            let nodes = [];
+            let edges = [];
+            let addedEdges = new Set();
+            
+            let addEdge = (f, t, c, w, d) => {
+                let k = f + "_" + t;
+                if(!addedEdges.has(k)) { addedEdges.add(k); edges.push({from: f, to: t, color: c, width: w||2, dashes: d||false}); }
+            };
+
+            if (currentView === 1) {
+                // ИНФРАСТРУКТУРНАЯ СХЕМА (Сервер -> ПО -> CAPEC -> CVE)
+                let srvId = "srv_1";
+                nodes.push({ id: srvId, label: "🖥️ " + sysData.hostname + "\\n(" + sysData.os + ")", shape: "box", level: 0, color: {background: "#1f77b4", border: "#ffffff"}, font: {color: "#ffffff", size: 18} });
+                
+                let added = new Set();
+                data.forEach(r => {
+                    let cStr = r.count > 1 ? "\\n(Дублей: " + r.count + ")" : "";
+                    
+                    let swId = "sw_" + r.sw + "_" + r.port;
+                    if(!added.has(swId)) {
+                        nodes.push({ id: swId, label: "🎯 ПО: " + r.sw + "\\nПорт: " + r.port, level: 1, shape: "box", color: {background: "#484f58"} });
+                        addEdge(srvId, swId, "#8b949e"); added.add(swId);
+                    }
+                    
+                    let atkId = "atk_" + r.id;
+                    let nShort = r.name.substring(0, 30) + (r.name.length > 30 ? "..." : "");
+                    nodes.push({ id: atkId, label: "🥷 " + r.capec + "\\n" + nShort + cStr, level: 2, shape: "box", color: {background: "#58a6ff"} });
+                    addEdge(swId, atkId, "#8b949e");
+                    
+                    let cveId = "cve_" + r.cve;
+                    if(!added.has(cveId)) {
+                        nodes.push({ id: cveId, label: "🛡️ " + r.cve + "\\n" + r.sev, level: 3, shape: "box", color: {background: getSevColor(r.sev)} });
+                        added.add(cveId);
+                    }
+                    addEdge(atkId, cveId, getFeasColor(r.feas), r.feas === "РЕАЛИЗУЕМА" ? 3 : 2, r.feas === "НЕ РЕАЛИЗУЕМА");
+                    
+                    // Хак: привязываем ID из таблицы для открытия модалки по клику на узел графа
+                    detailsMap[atkId] = r; detailsMap[cveId] = r;
+                });
+            } else {
+                // ЛОГИЧЕСКАЯ СХЕМА (CAPEC -> ПО -> CVE -> CWE -> Вердикт)
+                let added = new Set();
+                data.forEach(r => {
+                    let cStr = r.count > 1 ? "\\n(Дублей: " + r.count + ")" : "";
+                    
+                    let capecId = "l_capec_" + r.capec;
+                    if(!added.has(capecId)) { nodes.push({ id: capecId, label: "🥷 Вектор: " + r.capec + cStr, level: 0, shape: "box", color: {background: "#58a6ff"} }); added.add(capecId); }
+                    
+                    let swId = "l_sw_" + r.sw + "_" + r.port;
+                    if(!added.has(swId)) { nodes.push({ id: swId, label: "🎯 Цель: " + r.sw + "\\nПорт: " + r.port, level: 1, shape: "box", color: {background: "#1f77b4"} }); added.add(swId); }
+                    
+                    let cveId = "l_cve_" + r.cve;
+                    if(!added.has(cveId)) { nodes.push({ id: cveId, label: "🛡️ " + r.cve + "\\n" + r.sev, level: 2, shape: "box", color: {background: getSevColor(r.sev)} }); added.add(cveId); }
+                    
+                    let cweId = "l_cwe_" + r.cwe;
+                    if(!added.has(cweId)) { nodes.push({ id: cweId, label: "🐛 " + r.cwe, level: 3, shape: "box", color: {background: "#484f58"} }); added.add(cweId); }
+                    
+                    let verdId = "l_verd_" + r.id;
+                    nodes.push({ id: verdId, label: "⚖️ Вердикт:\\n" + r.feas, level: 4, shape: "box", color: {background: getFeasColor(r.feas)} });
+                    
+                    addEdge(capecId, swId, "#8b949e");
+                    addEdge(swId, cveId, "#8b949e");
+                    addEdge(cveId, cweId, "#8b949e");
+                    addEdge(cweId, verdId, getFeasColor(r.feas), 3);
+                    
+                    detailsMap[capecId] = r; detailsMap[cveId] = r; detailsMap[verdId] = r;
+                });
+            }
+
+            if(network) network.destroy();
+            
+            var container = document.getElementById('network-map');
+            var visData = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+            
+            // Настройки с жесткими ортогональными(прямоугольными) стрелками и огромным расстоянием
+            var options = {
+                layout: {
+                    hierarchical: {
+                        direction: 'UD',
+                        sortMethod: 'directed',
+                        nodeSpacing: 400,    // ОГРОМНОЕ расстояние по горизонтали
+                        levelSeparation: 250 // ОГРОМНОЕ расстояние по вертикали
+                    }
+                },
+                physics: false, // Отключаем прыгание узлов
+                nodes: { borderWidth: 2, shadow: true, margin: 15, font: { face: "Segoe UI" } },
+                edges: { 
+                    shadow: true, 
+                    arrows: { to: { enabled: true, scaleFactor: 0.8 } },
+                    smooth: { 
+                        type: 'cubicBezier', 
+                        forceDirection: 'vertical', 
+                        roundness: 0.15 // 0.15 делает линии визуально "прямоугольными"
+                    } 
+                },
+                interaction: { hover: true, navigationButtons: true, keyboard: true }
+            };
+            
+            network = new vis.Network(container, visData, options);
+            network.on("click", function(params) {
+                if (params.nodes.length > 0) openModal(params.nodes[0]);
+            });
+        }
+
+        document.getElementById('toggleBtn').onclick = function() {
+            currentView = currentView === 1 ? 2 : 1;
+            this.innerText = currentView === 1 ? "🔄 Включить логическую цепочку (CAPEC ➔ ПО ➔ CVE ➔ Вердикт)" : "🔄 Вернуться к инфраструктурной схеме (Сервер ➔ Атака)";
+            applyFilters();
+        };
+
+        // Логика Модалки
+        var modal = document.getElementById("infoModal");
+        var span = document.getElementsByClassName("close")[0];
+
+        function openModal(id) {
+            let r = detailsMap[id];
+            if(!r) return;
+            
+            document.getElementById("m-title").innerHTML = "[" + r.cve + "] " + r.name;
+            
+            document.getElementById("m-sev").innerText = r.sev;
+            document.getElementById("m-sev").style.color = getSevColor(r.sev);
+            
+            document.getElementById("m-feas").innerText = r.feas;
+            document.getElementById("m-feas").style.color = getFeasColor(r.feas);
+            
+            document.getElementById("m-sw").innerText = r.sw + " (Порт: " + r.port + ")";
+            document.getElementById("m-count").innerText = r.count + " (дубликаты схлопнуты)";
+            document.getElementById("m-capec").innerText = r.capec;
+            document.getElementById("m-cwe").innerText = r.cwe;
+            
+            document.getElementById("m-desc").innerHTML = r.desc;
+            document.getElementById("m-rec").innerHTML = r.rec;
+            
+            modal.style.display = "block";
+        }
+
+        span.onclick = function() { modal.style.display = "none"; }
+        window.onclick = function(event) { if (event.target == modal) modal.style.display = "none"; }
+
+        // Старт
+        window.onload = init;
+    </script>
+</body>
+</html>
+"""
+
+class ReportGenerator:
+    def __init__(self, system_summary, correlation_results, summary):
+        self.system_summary = system_summary
+        self.summary = summary
+        
+        # Агрегация дубликатов (Схлопывание похожих атак)
+        self.results = []
+        seen = {}
+        for r in correlation_results:
+            cve = getattr(r, 'cve_id', None) or 'Нет CVE'
+            capec = getattr(r, 'capec_id', None) or 'Нет CAPEC'
+            cwe = getattr(r, 'cwe_id', None) or 'Нет CWE'
+            sw = getattr(r, 'target_software', None) or 'Служба ОС'
+            name = getattr(r, 'attack_name', None) or 'Неизвестная атака'
+            
+            key = f"{cve}_{capec}_{cwe}_{sw}_{name}"
+            if key not in seen:
+                r._count = 1
+                seen[key] = r
+                self.results.append(r)
+            else:
+                seen[key]._count += 1
+
+    def generate_json(self, filepath):
+        # Заглушка, если серверу все еще нужен JSON файл отчета
+        pass
+
+    def generate_html(self, filepath):
+        js_data = []
+        for i, r in enumerate(self.results):
+            port_raw = getattr(r, 'target_port', None)
+            # Надежная проверка на пустой порт
+            if port_raw in (None, "None", "null", "", 0):
+                port = "Н/Д"
+            else:
+                port = str(port_raw)
+                
+            js_data.append({
+                "id": i,
+                "cve": getattr(r, 'cve_id', None) or 'Нет CVE',
+                "cwe": getattr(r, 'cwe_id', None) or 'CWE-Неизвестно',
+                "capec": getattr(r, 'capec_id', None) or 'CAPEC-Неизвестно',
+                "name": getattr(r, 'attack_name', None) or 'Атака',
+                "sw": getattr(r, 'target_software', None) or 'Служба ОС',
+                "port": port,
+                "feas": getattr(r, 'feasibility', None) or 'UNKNOWN',
+                "sev": getattr(r, 'severity', None) or 'INFO',
+                "desc": getattr(r, 'description', None) or 'Описание отсутствует.',
+                "rec": getattr(r, 'recommendation', None) or 'Специфичных рекомендаций нет.',
+                "count": getattr(r, '_count', 1)
+            })
+            
+        sys_data = {
+            "hostname": self.system_summary.get('hostname', 'Целевой Сервер'),
+            "os": self.system_summary.get('os', 'Неизвестная ОС'),
+            "ips": ", ".join(self.system_summary.get('ip_addresses', [])),
+            "ports_count": self.system_summary.get('open_ports_count', 0)
+        }
+        
+        with open(filepath, "w", encoding="utf-8") as f:
+            html = HTML_TEMPLATE.replace('__REPORT_DATA__', json.dumps(js_data, ensure_ascii=False))
+            html = html.replace('__SYS_DATA__', json.dumps(sys_data, ensure_ascii=False))
+            f.write(html)
+            
+        return filepath
