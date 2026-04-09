@@ -130,99 +130,373 @@
     "detection_methods": ["fuzzing", "static_analysis"]
   },
   {
-    "id": "CWE-89",
-    "name": "SQL-инъекция",
-    "description": "Неправильная нейтрализация специальных элементов в SQL-запросах",
+    "id": "CWE-22",
+    "name": "Обход ограничений директории (Path Traversal)",
+    "description": "Использование символов обхода пути (../) для доступа к файлам вне разрешённой директории",
+    "category": "path_traversal",
+    "related_capec": ["CAPEC-126", "CAPEC-133"],
+    "mitigation": "Валидация и канонизация путей, chroot/jail, белый список разрешённых директорий",
+    "requires_technology": ["web_application", "file_system"],
+    "detection_methods": ["static_analysis", "input_filtering", "log_analysis"]
+  },
+  {
+    "id": "CWE-78",
+    "name": "Внедрение команд ОС (OS Command Injection)",
+    "description": "Неправильная нейтрализация специальных элементов при вызове команд операционной системы",
     "category": "injection",
-    "related_capec": ["CAPEC-66", "CAPEC-7"],
-    "mitigation": "Использование параметризованных запросов, ORM, валидация входных данных"
+    "related_capec": ["CAPEC-88", "CAPEC-234"],
+    "mitigation": "Использование безопасных API вместо exec(), экранирование аргументов, принцип наименьших привилегий",
+    "requires_technology": ["native_application", "web_application"],
+    "detection_methods": ["static_analysis", "dynamic_analysis", "command_monitoring"]
   },
   {
-    "id": "CWE-20",
-    "name": "Некорректная валидация входных данных",
-    "description": "Программа не проводит валидацию данных, что приводит к RCE или сбоям",
-    "category": "input_validation",
-    "related_capec": ["CAPEC-135", "CAPEC-153"],
-    "mitigation": "Строгая валидация по белому списку (Whitelist)"
+    "id": "CWE-352",
+    "name": "Межсайтовая подделка запроса (CSRF)",
+    "description": "Веб-приложение не проверяет источник запроса, позволяя выполнять действия от имени авторизованного пользователя",
+    "category": "session_management",
+    "related_capec": ["CAPEC-62", "CAPEC-130"],
+    "mitigation": "CSRF-токены, атрибут SameSite для cookies, проверка заголовков Origin/Referer",
+    "requires_technology": ["web_application"],
+    "detection_methods": ["dynamic_analysis", "code_review", "traffic_analysis"]
   },
   {
-    "id": "CWE-506",
-    "name": "Внедренный вредоносный код (Бэкдор)",
-    "description": "Программа содержит скрытый функционал для обхода механизмов безопасности.",
-    "category": "supply_chain",
-    "related_capec": ["CAPEC-475"],
-    "mitigation": "Проверка целостности компонентов (Supply Chain Security), аудит исходного кода."
+    "id": "CWE-434",
+    "name": "Неограниченная загрузка опасных файлов",
+    "description": "Разрешение загрузки файлов без строгой проверки типа или содержимого, что может привести к удалённому выполнению кода",
+    "category": "file_handling",
+    "related_capec": ["CAPEC-152", "CAPEC-444"],
+    "mitigation": "Проверка сигнатур и MIME-типов, переименование файлов, отключение прав на выполнение в директории загрузок",
+    "requires_technology": ["web_application", "file_system"],
+    "detection_methods": ["dynamic_analysis", "file_integrity_monitoring", "sandbox_analysis"]
+  },
+  {
+    "id": "CWE-798",
+    "name": "Жёстко заданные учётные данные",
+    "description": "Встроенные пароли, ключи или токены в исходном коде или конфигурационных файлах",
+    "category": "authentication",
+    "related_capec": ["CAPEC-350", "CAPEC-555"],
+    "mitigation": "Использование внешних хранилищ секретов (HashiCorp Vault, AWS KMS), регулярная ротация ключей",
+    "requires_technology": ["any_application"],
+    "detection_methods": ["static_analysis", "code_review", "secret_scanning"]
+  },
+  {
+    "id": "CWE-611",
+    "name": "Неправильное ограничение внешних сущностей XML (XXE)",
+    "description": "Уязвимость парсера XML, позволяющая загружать локальные файлы или выполнять SSRF-атаки через внешние сущности",
+    "category": "injection",
+    "related_capec": ["CAPEC-233", "CAPEC-664"],
+    "mitigation": "Отключение DTD и внешних сущностей, обновление XML-парсеров, строгая валидация схемы",
+    "requires_technology": ["xml_parser", "web_application"],
+    "detection_methods": ["static_analysis", "dynamic_analysis", "xml_parsing_monitoring"]
   },
   {
     "id": "CWE-287",
-    "name": "Некорректная аутентификация",
-    "description": "Злоумышленник может выдать себя за другого пользователя без пароля.",
+    "name": "Неправильная аутентификация",
+    "description": "Ошибки в реализации проверки подлинности, позволяющие обойти вход без валидных учётных данных",
     "category": "authentication",
-    "related_capec": ["CAPEC-115"],
-    "mitigation": "Использование надежных протоколов и библиотек аутентификации."
-  },
-  {
-    "id": "CWE-307",
-    "name": "Отсутствие защиты от Brute Force",
-    "description": "Система позволяет бесконечно подбирать пароли",
-    "category": "authentication",
-    "related_capec": ["CAPEC-49"],
-    "mitigation": "Блокировка учетных записей (Account Lockout), Fail2Ban, MFA"
-  },
-  {
-    "id": "CWE-89",
-    "name": "SQL-инъекция",
-    "description": "Внедрение SQL-кода из-за неправильной фильтрации ввода.",
-    "category": "injection",
-    "related_capec": ["CAPEC-66", "CAPEC-7"],
-    "mitigation": "Использование параметризованных запросов, ORM, экранирование спецсимволов."
-  },
-  {
-    "id": "CWE-22",
-    "name": "Обход каталога (Path Traversal)",
-    "description": "Программа позволяет манипулировать путями файлов (например, через '../'), получая доступ к закрытым системным файлам.",
-    "category": "file_system",
-    "related_capec": ["CAPEC-126"],
-    "mitigation": "Проверка нормализованных (абсолютных) путей, запрет спецсимволов '../' в запросах, запуск с минимальными правами."
-  },
-  {
-    "id": "CWE-119",
-    "name": "Переполнение буфера памяти",
-    "description": "Запись за пределами выделенного блока памяти, ведущая к выполнению произвольного кода.",
-    "category": "memory_safety",
-    "related_capec": ["CAPEC-100"],
-    "mitigation": "Использование безопасных языков/функций (например, strncpy вместо strcpy), включение DEP и ASLR на уровне ОС."
+    "related_capec": ["CAPEC-114", "CAPEC-233"],
+    "mitigation": "Строгая проверка сессий, внедрение MFA, безопасное хранение хэшей паролей (bcrypt, Argon2)",
+    "requires_technology": ["authentication_service"],
+    "detection_methods": ["access_review", "log_analysis", "penetration_testing"]
   },
   {
     "id": "CWE-125",
-    "name": "Чтение за пределами буфера",
-    "description": "Чтение данных за границами памяти (пример: Heartbleed), что приводит к утечке секретов.",
+    "name": "Чтение за пределами буфера (Out-of-bounds Read)",
+    "description": "Чтение данных из памяти за пределами допустимого диапазона, приводящее к утечке конфиденциальной информации",
     "category": "memory_safety",
-    "related_capec": ["CAPEC-540"],
-    "mitigation": "Строгая проверка границ массивов, статический анализ кода (SAST)."
+    "related_capec": ["CAPEC-100", "CAPEC-553"],
+    "mitigation": "Строгая проверка границ массивов, использование языков с автоматическим управлением памятью, ASLR",
+    "requires_technology": ["native_application"],
+    "detection_methods": ["fuzzing", "static_analysis", "memory_monitoring"]
   },
   {
-    "id": "CWE-502",
-    "name": "Десериализация ненадежных данных",
-    "description": "Десериализация данных от пользователя без проверки (Log4Shell), приводящая к RCE.",
+    "id": "CWE-327",
+    "name": "Использование уязвимых криптографических алгоритмов",
+    "description": "Применение устаревших или скомпрометированных алгоритмов шифрования, хэширования или генерации случайных чисел",
+    "category": "cryptography",
+    "related_capec": ["CAPEC-114", "CAPEC-553"],
+    "mitigation": "Переход на AES-256/GCM, SHA-256/3, TLS 1.2+, регулярный аудит криптостойкости",
+    "requires_technology": ["cryptographic_application"],
+    "detection_methods": ["static_analysis", "code_review", "cryptography_audit"]
+  },
+  {
+    "id": "CWE-862",
+    "name": "Отсутствие проверки авторизации",
+    "description": "Программа не проверяет права пользователя на выполнение запрошенного действия или доступ к ресурсу",
+    "category": "access_control",
+    "related_capec": ["CAPEC-233", "CAPEC-555"],
+    "mitigation": "Централизованная проверка прав, внедрение RBAC/ABAC, принцип наименьших привилегий",
+    "requires_technology": ["operating_system", "web_application"],
+    "detection_methods": ["access_review", "audit_logs", "dynamic_analysis"]
+  },
+  {
+    "id": "CWE-404",
+    "name": "Неправильное освобождение ресурсов",
+    "description": "Программа не освобождает системные ресурсы (файлы, соединения, память) после завершения использования",
+    "category": "resource_management",
+    "related_capec": ["CAPEC-126", "CAPEC-553"],
+    "mitigation": "Блоки try-finally/defer, пулы соединений, автоматический сборщик мусора, мониторинг утечек",
+    "requires_technology": ["any_application"],
+    "detection_methods": ["static_analysis", "memory_profiling", "resource_monitoring"]
+  },
+  {
+    "id": "CWE-94",
+    "name": "Внедрение кода (Code Injection)",
+    "description": "Неправильная нейтрализация специального кода, что позволяет атакующему выполнять произвольные команды в контексте приложения",
     "category": "injection",
-    "related_capec": ["CAPEC-586"],
-    "mitigation": "Запрет десериализации от неавторизованных источников, использование чистых форматов данных (JSON) вместо сериализованных объектов."
+    "related_capec": ["CAPEC-88", "CAPEC-234"],
+    "mitigation": "Белый список входных данных, изоляция песочницами, отключение опасных функций eval/exec",
+    "requires_technology": ["web_application", "scripting_engine"],
+    "detection_methods": ["static_analysis", "dynamic_analysis", "runtime_monitoring"]
   },
   {
-    "id": "CWE-1188",
-    "name": "Использование паролей по умолчанию",
-    "description": "Оставление системных паролей (admin/admin, root/toor) без изменений после установки.",
+    "id": "CWE-306",
+    "name": "Отсутствие аутентификации для критических функций",
+    "description": "Программа не требует аутентификации для выполнения важных операций, позволяя неавторизованным пользователям получать доступ",
     "category": "authentication",
-    "related_capec": ["CAPEC-115"],
-    "mitigation": "Принудительная смена пароля при первом входе, запрет пустых паролей для сервисов, торчащих в сеть."
+    "related_capec": ["CAPEC-114", "CAPEC-555"],
+    "mitigation": "Обязательная проверка сессий для всех критичных эндпоинтов, внедрение middleware авторизации",
+    "requires_technology": ["web_application", "api"],
+    "detection_methods": ["dynamic_analysis", "code_review", "access_testing"]
   },
   {
-    "id": "CWE-307",
-    "name": "Отсутствие защиты от перебора",
-    "description": "Сервис позволяет неограниченное число попыток входа (Brute Force).",
+    "id": "CWE-311",
+    "name": "Отсутствие шифрования конфиденциальных данных",
+    "description": "Конфиденциальная информация передаётся или хранится без применения криптографической защиты",
+    "category": "cryptography",
+    "related_capec": ["CAPEC-112", "CAPEC-117"],
+    "mitigation": "Внедрение AES-256 для хранения, TLS 1.2+ для передачи, автоматическое шифрование дисков",
+    "requires_technology": ["database", "network", "file_system"],
+    "detection_methods": ["static_analysis", "network_monitoring", "compliance_scan"]
+  },
+  {
+    "id": "CWE-312",
+    "name": "Хранение конфиденциальной информации в открытом виде",
+    "description": "Чувствительные данные (пароли, ключи, токены) сохраняются в логах, конфигах или кэше без защиты",
+    "category": "data_integrity",
+    "related_capec": ["CAPEC-350", "CAPEC-535"],
+    "mitigation": "Использование защищённых хранилищ (Vault, KMS), маскирование логов, шифрование конфигов",
+    "requires_technology": ["file_system", "database", "logging_framework"],
+    "detection_methods": ["secret_scanning", "static_analysis", "log_audit"]
+  },
+  {
+    "id": "CWE-326",
+    "name": "Недостаточная стойкость шифрования",
+    "description": "Использование алгоритмов или ключей, которые могут быть скомпрометированы современными вычислительными мощностями",
+    "category": "cryptography",
+    "related_capec": ["CAPEC-553", "CAPEC-114"],
+    "mitigation": "Переход на RSA-2048+/ECC, AES-256, SHA-256+, отключение DES/RC4/MD5",
+    "requires_technology": ["cryptographic_application"],
+    "detection_methods": ["cryptography_audit", "static_analysis", "vulnerability_scanning"]
+  },
+  {
+    "id": "CWE-347",
+    "name": "Некорректная проверка криптографической подписи",
+    "description": "Приложение принимает данные с невалидной или отсутствующей подписью, доверяя непроверенному источнику",
+    "category": "cryptography",
+    "related_capec": ["CAPEC-598", "CAPEC-444"],
+    "mitigation": "Строгая верификация подписей, проверка цепочек доверия, отказ от неподписанных пакетов",
+    "requires_technology": ["update_service", "package_manager", "jwt_handler"],
+    "detection_methods": ["static_analysis", "dynamic_analysis", "supply_chain_scanning"]
+  },
+  {
+    "id": "CWE-354",
+    "name": "Некорректная валидация значения проверки целостности",
+    "description": "Приложение неверно проверяет контрольные суммы или HMAC, позволяя подменять данные",
+    "category": "data_integrity",
+    "related_capec": ["CAPEC-112", "CAPEC-553"],
+    "mitigation": "Использование криптографически стойких хэшей, безопасное сравнение (constant-time), валидация на сервере",
+    "requires_technology": ["network", "file_system", "api"],
+    "detection_methods": ["dynamic_analysis", "integrity_monitoring", "fuzzing"]
+  },
+  {
+    "id": "CWE-367",
+    "name": "Состояние гонки TOCTOU",
+    "description": "Временной разрыв между проверкой условия и использованием ресурса позволяет атакующему изменить состояние системы",
+    "category": "race_condition",
+    "related_capec": ["CAPEC-584", "CAPEC-233"],
+    "mitigation": "Атомарные операции, блокировки файлов/ресурсов, минимизация окна проверки, безопасные системные вызовы",
+    "requires_technology": ["operating_system", "file_system", "database"],
+    "detection_methods": ["static_analysis", "concurrency_testing", "thread_monitoring"]
+  },
+  {
+    "id": "CWE-451",
+    "name": "Введение пользователя в заблуждение через UI",
+    "description": "Интерфейс отображает информацию так, что пользователь не может отличить легитимный элемент от вредоносного",
+    "category": "ui_security",
+    "related_capec": ["CAPEC-163", "CAPEC-597"],
+    "mitigation": "Чёткие индикаторы безопасности, защита от кликджекинга, обучение пользователей, валидация визуальных элементов",
+    "requires_technology": ["web_application", "browser", "gui_framework"],
+    "detection_methods": ["ux_testing", "phishing_simulation", "header_audit"]
+  },
+  {
+    "id": "CWE-494",
+    "name": "Загрузка кода без проверки целостности",
+    "description": "Приложение загружает и выполняет сторонний код без проверки его подлинности или хэша",
+    "category": "data_integrity",
+    "related_capec": ["CAPEC-444", "CAPEC-446"],
+    "mitigation": "Подпись кода, проверка SHA-256 перед выполнением, использование доверенных репозиториев",
+    "requires_technology": ["update_service", "package_manager", "cdn"],
+    "detection_methods": ["supply_chain_scanning", "static_analysis", "binary_verification"]
+  },
+  {
+    "id": "CWE-521",
+    "name": "Слабые требования к паролям",
+    "description": "Система допускает использование простых, часто встречающихся или утёкших паролей",
     "category": "authentication",
-    "related_capec": ["CAPEC-49"],
-    "mitigation": "Установка Fail2Ban, блокировка учеток после 5 неверных попыток, внедрение MFA (двухфакторной аутентификации)."
+    "related_capec": ["CAPEC-49", "CAPEC-114"],
+    "mitigation": "Политика сложности, проверка по базам утечек (HaveIBeenPwned), обязательная смена при компрометации",
+    "requires_technology": ["authentication_service"],
+    "detection_methods": ["password_audit", "dynamic_analysis", "compliance_scanning"]
+  },
+  {
+    "id": "CWE-522",
+    "name": "Недостаточная защита учётных данных",
+    "description": "Учётные данные хранятся или передаются с недостаточными мерами безопасности, повышая риск утечки",
+    "category": "authentication",
+    "related_capec": ["CAPEC-535", "CAPEC-350"],
+    "mitigation": "Соль+хэширование (Argon2/bcrypt), ограничение доступа к таблицам пользователей, шифрование при передаче",
+    "requires_technology": ["database", "authentication_service"],
+    "detection_methods": ["access_review", "log_analysis", "secret_scanning"]
+  },
+  {
+    "id": "CWE-601",
+    "name": "Перенаправление URL на ненадёжный сайт (Open Redirect)",
+    "description": "Приложение перенаправляет пользователя на внешний ресурс без проверки доверенности целевого URL",
+    "category": "input_validation",
+    "related_capec": ["CAPEC-586", "CAPEC-163"],
+    "mitigation": "Белый список разрешённых доменов, валидация параметров редиректа, предупреждения для пользователей",
+    "requires_technology": ["web_application"],
+    "detection_methods": ["dynamic_analysis", "url_monitoring", "static_analysis"]
+  },
+  {
+    "id": "CWE-706",
+    "name": "Использование некорректно разрешённого имени или ссылки",
+    "description": "Приложение работает с файлами или ресурсами по именам, которые могут быть подменены через символические ссылки или обходы",
+    "category": "input_validation",
+    "related_capec": ["CAPEC-126", "CAPEC-584"],
+    "mitigation": "Канонизация путей, проверка символьных ссылок, использование chroot/jail, валидация realpath",
+    "requires_technology": ["file_system", "operating_system"],
+    "detection_methods": ["static_analysis", "path_audit", "dynamic_analysis"]
+  },
+  {
+    "id": "CWE-778",
+    "name": "Недостаточное логирование",
+    "description": "Отсутствие критически важных логов (ошибки аутентификации, доступ к данным) затрудняет расследование инцидентов",
+    "category": "logging",
+    "related_capec": ["CAPEC-122", "CAPEC-233"],
+    "mitigation": "Централизованный сбор логов, логирование всех событий безопасности, интеграция с SIEM, защита логов",
+    "requires_technology": ["any_application"],
+    "detection_methods": ["audit_review", "compliance_scanning", "siem_validation"]
+  },
+  {
+    "id": "CWE-829",
+    "name": "Включение функциональности из ненадёжной сферы управления",
+    "description": "Приложение загружает и выполняет код из недоверенных источников (плагины, скрипты, iframe)",
+    "category": "architecture_security",
+    "related_capec": ["CAPEC-446", "CAPEC-112"],
+    "mitigation": "Строгая валидация источников, песочницы для исполнения, подпись кода, контроль зависимостей",
+    "requires_technology": ["web_application", "scripting_engine", "browser"],
+    "detection_methods": ["dependency_scanning", "static_analysis", "sandbox_monitoring"]
+  },
+  {
+    "id": "CWE-939",
+    "name": "Некорректная авторизация в веб-форме",
+    "description": "Сервер не проверяет права пользователя при обработке данных формы, позволяя выполнять действия от чужого имени",
+    "category": "access_control",
+    "related_capec": ["CAPEC-233", "CAPEC-62"],
+    "mitigation": "Серверная проверка прав для каждого запроса, валидация ownership ресурсов, использование токенов",
+    "requires_technology": ["web_application", "api"],
+    "detection_methods": ["dynamic_analysis", "code_review", "access_testing"]
+  },
+  {
+    "id": "CWE-1021",
+    "name": "Некорректное ограничение слоёв или фреймов интерфейса",
+    "description": "Отсутствие защиты от встраивания приложения в iframe, что позволяет злоумышленникам осуществлять кликджекинг",
+    "category": "ui_security",
+    "related_capec": ["CAPEC-597", "CAPEC-163"],
+    "mitigation": "Заголовки X-Frame-Options/Deny, CSP frame-ancestors, защита на уровне браузера",
+    "requires_technology": ["web_application", "web_server"],
+    "detection_methods": ["dynamic_analysis", "header_audit", "pentesting"]
+  },
+  {
+    "id": "CWE-117",
+    "name": "Некорректная нейтрализация вывода для логов",
+    "description": "Нефильтрованные пользовательские данные записываются в логи, позволяя осуществлять атаки log injection или log forging",
+    "category": "logging",
+    "related_capec": ["CAPEC-113", "CAPEC-86"],
+    "mitigation": "Санитизация всех данных перед логированием, структурированное логирование (JSON), экранирование спецсимволов",
+    "requires_technology": ["any_application", "logging_framework"],
+    "detection_methods": ["static_analysis", "log_injection_testing", "code_review"]
+  },
+  {
+    "id": "CWE-190",
+    "name": "Переполнение целого числа",
+    "description": "Арифметическая операция приводит к переполнению или недополнению целочисленной переменной, изменяя логику программы",
+    "category": "memory_safety",
+    "related_capec": ["CAPEC-100", "CAPEC-233"],
+    "mitigation": "Проверка границ перед операциями, использование безопасных библиотек математики, статический анализ переполнений",
+    "requires_technology": ["native_application", "embedded_system"],
+    "detection_methods": ["fuzzing", "static_analysis", "integer_overflow_detection"]
+  },
+  {
+    "id": "CWE-275",
+    "name": "Проблемы с правами доступа",
+    "description": "Некорректное назначение, наследование или проверка прав доступа к файлам, процессам или объектам системы",
+    "category": "access_control",
+    "related_capec": ["CAPEC-233", "CAPEC-555"],
+    "mitigation": "Принцип наименьших привилегий, регулярный аудит DACL/ACL, автоматический контроль_umask",
+    "requires_technology": ["operating_system", "database", "file_system"],
+    "detection_methods": ["access_review", "privilege_audit", "compliance_scanning"]
+  },
+  {
+    "id": "CWE-300",
+    "name": "Канал, доступный не из конечной точки",
+    "description": "Защита канала связи (IPC, shared memory, socket) отсутствует или слаба, позволяя локальным процессам перехватывать данные",
+    "category": "network_security",
+    "related_capec": ["CAPEC-112", "CAPEC-233"],
+    "mitigation": "Изоляция каналов, аутентификация на уровне соединения, использование защищённых механизмов IPC",
+    "requires_technology": ["operating_system", "ipc", "network"],
+    "detection_methods": ["network_monitoring", "process_auditing", "dynamic_analysis"]
+  },
+  {
+    "id": "CWE-319",
+    "name": "Передача конфиденциальной информации в открытом виде",
+    "description": "Конфиденциальные данные передаются по сети без шифрования, подвергаясь перехвату",
+    "category": "cryptography",
+    "related_capec": ["CAPEC-117", "CAPEC-94"],
+    "mitigation": "Принудительный HTTPS/TLS, HSTS-заголовки, запрет fallback на HTTP, инспекция трафика",
+    "requires_technology": ["web_server", "network", "api"],
+    "detection_methods": ["traffic_inspection", "dynamic_analysis", "certificate_monitoring"]
+  },
+  {
+    "id": "CWE-384",
+    "name": "Фиксация сессии",
+    "description": "Атакующий может заранее установить или предсказать идентификатор сессии пользователя до его аутентификации",
+    "category": "session_management",
+    "related_capec": ["CAPEC-62", "CAPEC-114"],
+    "mitigation": "Перегенерация ID сессии после успешного входа, безопасные флаги cookies (Secure, HttpOnly, SameSite), таймауты",
+    "requires_technology": ["web_application", "session_store"],
+    "detection_methods": ["session_monitoring", "dynamic_analysis", "code_review"]
+  },
+  {
+    "id": "CWE-476",
+    "name": "Разыменование нулевого указателя",
+    "description": "Попытка обращения к памяти по нулевому адресу приводит к аварийному завершению работы приложения или отказу в обслуживании",
+    "category": "memory_safety",
+    "related_capec": ["CAPEC-100", "CAPEC-126"],
+    "mitigation": "Проверки на null перед использованием указателей, использование языков с безопасной памятью, анализ статическими анализаторами",
+    "requires_technology": ["native_application"],
+    "detection_methods": ["static_analysis", "fuzzing", "crash_monitoring"]
+  },
+  {
+    "id": "CWE-863",
+    "name": "Некорректная авторизация",
+    "description": "Механизм авторизации не проверяет корректность прав для запрашиваемого действия, позволяя горизонтальное или вертикальное повышение привилегий",
+    "category": "access_control",
+    "related_capec": ["CAPEC-233", "CAPEC-555"],
+    "mitigation": "Централизованная проверка прав на каждом запросе, явные проверки ownership, тестирование на IDOR",
+    "requires_technology": ["web_application", "api", "backend_service"],
+    "detection_methods": ["dynamic_analysis", "access_testing", "code_review"]
   }
 ]
