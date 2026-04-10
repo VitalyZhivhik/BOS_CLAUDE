@@ -9,12 +9,7 @@
     "related_capec": ["CAPEC-66", "CAPEC-586", "CAPEC-664"],
     "requires_service": ["web_server", "web_application"],
     "detection": "Анализ логов веб-сервера, WAF, IDS/IPS",
-    "mitigations": [
-      "Регулярное обновление ПО",
-      "WAF",
-      "Сканирование уязвимостей",
-      "Сегментация сети"
-    ]
+    "mitigations": ["Регулярное обновление ПО", "WAF", "Сканирование уязвимостей", "Сегментация сети"]
   },
   {
     "id": "T1210",
@@ -26,12 +21,7 @@
     "related_capec": ["CAPEC-100"],
     "requires_service": ["smb", "rdp", "ssh"],
     "detection": "Мониторинг сетевого трафика, аномалии в аутентификации",
-    "mitigations": [
-      "Сегментация сети",
-      "Обновление ПО",
-      "Отключение ненужных сервисов",
-      "Мониторинг сетевого трафика"
-    ]
+    "mitigations": ["Сегментация сети", "Обновление ПО", "Отключение ненужных сервисов", "Мониторинг сетевого трафика"]
   },
   {
     "id": "T1110",
@@ -43,11 +33,7 @@
     "related_capec": ["CAPEC-49"],
     "requires_service": ["authentication_service"],
     "detection": "Мониторинг неудачных попыток аутентификации",
-    "mitigations": [
-      "Политика блокировки учётных записей",
-      "Многофакторная аутентификация",
-      "Сложные пароли"
-    ]
+    "mitigations": ["Политика блокировки учётных записей", "Многофакторная аутентификация", "Сложные пароли"]
   },
   {
     "id": "T1059",
@@ -59,11 +45,7 @@
     "related_capec": ["CAPEC-248"],
     "requires_service": ["command_interpreter"],
     "detection": "Мониторинг запуска процессов, логирование командной строки",
-    "mitigations": [
-      "Ограничение использования PowerShell (Constrained Language Mode)",
-      "AppLocker / WDAC",
-      "Отключение неиспользуемых интерпретаторов"
-    ]
+    "mitigations": ["Ограничение использования PowerShell (Constrained Language Mode)", "AppLocker / WDAC", "Отключение неиспользуемых интерпретаторов"]
   },
   {
     "id": "T1068",
@@ -75,11 +57,7 @@
     "related_capec": ["CAPEC-233"],
     "requires_service": ["vulnerable_service_running"],
     "detection": "Мониторинг аномальных процессов с повышенными привилегиями",
-    "mitigations": [
-      "Обновление ПО",
-      "Принцип наименьших привилегий",
-      "Exploit Protection (Windows)"
-    ]
+    "mitigations": ["Обновление ПО", "Принцип наименьших привилегий", "Exploit Protection (Windows)"]
   },
   {
     "id": "T1078",
@@ -91,11 +69,7 @@
     "related_capec": ["CAPEC-49", "CAPEC-114"],
     "requires_service": ["authentication_service"],
     "detection": "Аномалии аутентификации, аудит логонов",
-    "mitigations": [
-      "Многофакторная аутентификация",
-      "Мониторинг аномальных логонов",
-      "Регулярная смена паролей"
-    ]
+    "mitigations": ["Многофакторная аутентификация", "Мониторинг аномальных логонов", "Регулярная смена паролей"]
   },
   {
     "id": "T1498",
@@ -107,11 +81,7 @@
     "related_capec": ["CAPEC-125"],
     "requires_service": ["any_network_service"],
     "detection": "Мониторинг объёма трафика, anomaly detection",
-    "mitigations": [
-      "DDoS-защита",
-      "Rate limiting",
-      "Фильтрация трафика"
-    ]
+    "mitigations": ["DDoS-защита", "Rate limiting", "Фильтрация трафика"]
   },
   {
     "id": "T1499",
@@ -123,11 +93,7 @@
     "related_capec": ["CAPEC-125", "CAPEC-130"],
     "requires_service": ["any_network_service"],
     "detection": "Мониторинг ресурсов, аномалии нагрузки",
-    "mitigations": [
-      "Rate limiting",
-      "Квоты ресурсов",
-      "Масштабирование"
-    ]
+    "mitigations": ["Rate limiting", "Квоты ресурсов", "Масштабирование"]
   },
   {
     "id": "T1189",
@@ -139,11 +105,7 @@
     "related_capec": ["CAPEC-86"],
     "requires_service": ["web_browser"],
     "detection": "Мониторинг сетевых подключений, IDS",
-    "mitigations": [
-      "Обновление браузера",
-      "Блокировка вредоносных сайтов",
-      "Песочница для браузера"
-    ]
+    "mitigations": ["Обновление браузера", "Блокировка вредоносных сайтов", "Песочница для браузера"]
   },
   {
     "id": "T1557",
@@ -155,11 +117,7 @@
     "related_capec": ["CAPEC-94"],
     "requires_service": ["network"],
     "detection": "Мониторинг ARP-таблиц, аномалии DNS, инспекция сертификатов",
-    "mitigations": [
-      "Шифрование трафика (TLS/SSL)",
-      "Закрепление сертификатов",
-      "Сегментация сети"
-    ]
+    "mitigations": ["Шифрование трафика (TLS/SSL)", "Закрепление сертификатов", "Сегментация сети"]
   },
   {
     "id": "T1505.003",
@@ -171,11 +129,7 @@
     "related_capec": ["CAPEC-650"],
     "requires_service": ["web_server"],
     "detection": "Мониторинг файловой системы, анализ веб-директорий",
-    "mitigations": [
-      "Контроль целостности файлов",
-      "Минимальные привилегии для веб-сервера",
-      "Регулярный аудит веб-директорий"
-    ]
+    "mitigations": ["Контроль целостности файлов", "Минимальные привилегии для веб-сервера", "Регулярный аудит веб-директорий"]
   },
   {
     "id": "T1547.012",
@@ -187,10 +141,7 @@
     "related_capec": ["CAPEC-233"],
     "requires_service": ["print_spooler"],
     "detection": "Мониторинг изменений в Print Spooler",
-    "mitigations": [
-      "Отключение Print Spooler если не требуется",
-      "Обновление ПО"
-    ]
+    "mitigations": ["Отключение Print Spooler если не требуется", "Обновление ПО"]
   },
   {
     "id": "T1548",
@@ -202,10 +153,7 @@
     "related_capec": ["CAPEC-233"],
     "requires_service": ["operating_system"],
     "detection": "Мониторинг использования UAC, аудит привилегий",
-    "mitigations": [
-      "Максимальный уровень UAC",
-      "Запрет автоповышения привилегий"
-    ]
+    "mitigations": ["Максимальный уровень UAC", "Запрет автоповышения привилегий"]
   },
   {
     "id": "T1570",
@@ -217,11 +165,7 @@
     "related_capec": ["CAPEC-100"],
     "requires_service": ["smb", "rdp"],
     "detection": "Мониторинг файловых операций по сети",
-    "mitigations": [
-      "Сегментация сети",
-      "Контроль SMB-трафика",
-      "Мониторинг подозрительных копирований"
-    ]
+    "mitigations": ["Сегментация сети", "Контроль SMB-трафика", "Мониторинг подозрительных копирований"]
   },
   {
     "id": "T1203",
@@ -233,60 +177,522 @@
     "related_capec": ["CAPEC-100"],
     "requires_service": ["client_application"],
     "detection": "Мониторинг поведения приложений, anomaly detection",
-    "mitigations": [
-      "Обновление ПО",
-      "Exploit Protection",
-      "Песочница для приложений"
-    ]
+    "mitigations": ["Обновление ПО", "Exploit Protection", "Песочница для приложений"]
   },
   {
-    "id": "T1190",
-    "name": "Exploit Public-Facing Application",
-    "tactic": "Initial Access",
-    "description": "Атака на внешнее веб-приложение или службу (веб-сайт, база данных, API) для проникновения во внутреннюю сеть.",
+    "id": "T1055",
+    "name": "Process Injection",
+    "tactic": "Execution",
+    "description": "Внедрение кода в адресное пространство легитимного процесса для скрытия и обхода защиты",
     "platforms": ["Windows", "Linux", "macOS"],
-    "related_cwe": ["CWE-89", "CWE-22", "CWE-502"],
-    "related_capec": ["CAPEC-66", "CAPEC-126", "CAPEC-586"],
-    "detection": "Анализ логов веб-сервера (WAF), выявление необычно длинных URL или SQL-команд в GET/POST параметрах."
+    "related_cwe": ["CWE-78", "CWE-88"],
+    "related_capec": ["CAPEC-456"],
+    "requires_service": ["os_api"],
+    "detection": "Мониторинг создания процессов, сканирование памяти, анализ вызовов API (WriteProcessMemory, NtCreateThreadEx)",
+    "mitigations": ["Включение DEP/ASLR", "Контроль целостности памяти", "EDR/XDR решения"]
   },
   {
-    "id": "T1210",
-    "name": "Exploitation of Remote Services",
+    "id": "T1566",
+    "name": "Phishing",
+    "tactic": "Initial Access",
+    "description": "Отправка фишинговых сообщений с вредоносными ссылками или вложениями для первоначального доступа",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-20", "CWE-79", "CWE-1258"],
+    "related_capec": ["CAPEC-163", "CAPEC-206"],
+    "requires_service": ["email_server", "web_browser"],
+    "detection": "Анализ заголовков писем, sandboxing вложений, мониторинг переходов по внешним URL",
+    "mitigations": ["Спам-фильтры", "DMARC/DKIM/SPF", "Обучение пользователей", "Фильтрация URL"]
+  },
+  {
+    "id": "T1003",
+    "name": "OS Credential Dumping",
+    "tactic": "Credential Access",
+    "description": "Извлечение учётных данных (хэшей, паролей, тикетов) напрямую из памяти или системных файлов ОС",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-522"],
+    "related_capec": ["CAPEC-427"],
+    "requires_service": ["lsass", "shadow_file", "keychain"],
+    "detection": "Мониторинг доступа к LSASS, аномальные запросы к SAM/Shadow, запуск утилит типа Mimikatz",
+    "mitigations": ["Credential Guard (Windows)", "Ограничение прав локальных администраторов", "Многофакторная аутентификация"]
+  },
+  {
+    "id": "T1071",
+    "name": "Application Layer Protocol",
+    "tactic": "Command and Control",
+    "description": "Использование стандартных протоколов прикладного уровня (HTTP, DNS, SMTP) для скрытого управления",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-319"],
+    "related_capec": ["CAPEC-117"],
+    "requires_service": ["http", "dns", "smtp"],
+    "detection": "Анализ сетевых пакетов, выявление аномальных объемов трафика, DPI, поведенческий анализ",
+    "mitigations": ["Сегментация сети", "Прокси-серверы", "Блокировка неиспользуемых портов/протоколов"]
+  },
+  {
+    "id": "T1486",
+    "name": "Data Encrypted for Impact",
+    "tactic": "Impact",
+    "description": "Шифрование данных жертвы с целью вымогательства, саботажа или нарушения доступности",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-327"],
+    "related_capec": ["CAPEC-581"],
+    "requires_service": ["file_system"],
+    "detection": "Мониторинг массовых операций чтения/записи файлов, анализ энтропии, поведение процессов-шифровальщиков",
+    "mitigations": ["Регулярные изолированные бэкапы", "Принцип наименьших привилегий", "Сетевая изоляция", "EDR"]
+  },
+  {
+    "id": "T1082",
+    "name": "System Information Discovery",
+    "tactic": "Discovery",
+    "description": "Сбор информации о конфигурации, ОС, сетевых интерфейсах и установленном ПО",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-200"],
+    "related_capec": ["CAPEC-312"],
+    "requires_service": ["os_api", "shell"],
+    "detection": "Логирование запуска системных утилит (systeminfo, uname, ipconfig, ifconfig)",
+    "mitigations": ["Ограничение выполнения системных утилит", "Мониторинг командной строки", "Запрет непривилегированного доступа"]
+  },
+  {
+    "id": "T1105",
+    "name": "Ingress Tool Transfer",
+    "tactic": "Command and Control",
+    "description": "Загрузка дополнительных инструментов, скриптов или вредоносного ПО на целевую систему",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-494"],
+    "related_capec": ["CAPEC-444"],
+    "requires_service": ["web_client", "ftp", "scp"],
+    "detection": "Мониторинг исходящих/входящих сетевых подключений, анализ загружаемых бинарных файлов",
+    "mitigations": ["Блокировка неиспользуемых протоколов", "Контроль приложений (AppLocker)", "Анализ трафика"]
+  },
+  {
+    "id": "T1546",
+    "name": "Event Triggered Execution",
+    "tactic": "Persistence",
+    "description": "Настройка выполнения вредоносного кода при срабатывании определённых системных или пользовательских событий",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-269"],
+    "related_capec": ["CAPEC-233"],
+    "requires_service": ["os_api", "registry", "cron"],
+    "detection": "Мониторинг изменений в реестре (Run/RunOnce), планировщиках задач, launchd/cron, udev",
+    "mitigations": ["Контроль целостности реестра/конфигов", "Ограничение прав на автозапуск", "Аудит конфигураций"]
+  },
+  {
+    "id": "T1021",
+    "name": "Remote Services",
     "tactic": "Lateral Movement",
-    "description": "Использование уязвимостей в удаленных службах (SMB, RDP, RPC) для скрытого перемещения между компьютерами внутри сети (как это делал вирус WannaCry).",
-    "platforms": ["Windows", "Linux"],
-    "related_cwe": ["CWE-119"],
-    "related_capec": ["CAPEC-100"],
-    "detection": "Мониторинг внутреннего сетевого трафика (IDS) на предмет аномальной активности по портам 445 и 135."
+    "description": "Перемещение по сети с использованием легитимных удалённых сервисов и скомпрометированных учётных данных",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-288"],
+    "related_capec": ["CAPEC-114"],
+    "requires_service": ["smb", "rdp", "ssh", "wmi"],
+    "detection": "Анализ логонов с необычных узлов, мониторинг сетевых подключений к удалённым сервисам",
+    "mitigations": ["Сегментация сети", "Ограничение доступа по протоколам", "Многофакторная аутентификация"]
   },
   {
-    "id": "T1552",
-    "name": "Unsecured Credentials",
+    "id": "T1053",
+    "name": "Scheduled Task/Job",
+    "tactic": "Execution",
+    "description": "Использование системного планировщика задач для выполнения кода в заданное время или при определённых условиях",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-269"],
+    "related_capec": ["CAPEC-233"],
+    "requires_service": ["scheduler", "cron"],
+    "detection": "Мониторинг создания/изменения задач, аудит планировщика, анализ параметров запуска",
+    "mitigations": ["Ограничение прав на создание задач", "Контроль изменений конфигураций", "AppLocker"]
+  },
+  {
+    "id": "T1027",
+    "name": "Obfuscated Files or Information",
+    "tactic": "Defense Evasion",
+    "description": "Маскировка вредоносного кода, конфигов или данных для обхода сигнатурного и поведенческого обнаружения",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-1006"],
+    "related_capec": ["CAPEC-553"],
+    "requires_service": ["command_interpreter"],
+    "detection": "Статический/динамический анализ, sandboxing, деобфускация трафика, анализ энтропии файлов",
+    "mitigations": ["Анализ поведения", "Контроль целостности", "Обновление сигнатур и эвристик EDR"]
+  },
+  {
+    "id": "T1048",
+    "name": "Exfiltration Over Alternative Protocol",
+    "tactic": "Exfiltration",
+    "description": "Передача похищенных данных через нестандартные или легитимные альтернативные протоколы",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-319", "CWE-444"],
+    "related_capec": ["CAPEC-117"],
+    "requires_service": ["network", "dns", "icmp"],
+    "detection": "Анализ аномальных сетевых потоков, мониторинг DNS-туннелирования, контроль объёма исходящих данных",
+    "mitigations": ["Сетевая сегментация", "Контроль исходящего трафика", "DLP-системы", "Фильтрация DNS"]
+  },
+  {
+    "id": "T1070",
+    "name": "Indicator Removal",
+    "tactic": "Defense Evasion",
+    "description": "Удаление или модификация системных артефактов, логов и метаданных для сокрытия следов активности",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-778"],
+    "related_capec": ["CAPEC-122"],
+    "requires_service": ["file_system", "log_service"],
+    "detection": "Мониторинг удаления логов, аномальное изменение временных меток (timestomping), вызовы очистки событий",
+    "mitigations": ["Централизованное логирование (SIEM)", "Защита логов от удаления", "WORM-хранилища", "Аудит привилегий"]
+  },
+  {
+    "id": "T1569",
+    "name": "System Services",
+    "tactic": "Execution",
+    "description": "Использование системных служб и механизмов их управления для запуска вредоносного кода",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-269"],
+    "related_capec": ["CAPEC-233"],
+    "requires_service": ["service_manager"],
+    "detection": "Мониторинг создания/изменения служб, анализ путей запуска бинарных файлов служб",
+    "mitigations": ["Ограничение прав на управление службами", "Контроль автозапуска", "AppLocker/WDAC"]
+  },
+  {
+    "id": "T1136.001",
+    "name": "Create Account: Local Account",
+    "tactic": "Persistence",
+    "description": "Создание локальной учётной записи для сохранения доступа к системе после компрометации",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-269", "CWE-287"],
+    "related_capec": ["CAPEC-555"],
+    "requires_service": ["user_management_service"],
+    "detection": "Мониторинг создания учётных записей, аудит логов безопасности, оповещения о новых админах",
+    "mitigations": ["Ограничение прав на создание учётных записей", "MFA для локальных администраторов", "Регулярный аудит пользователей"]
+  },
+  {
+    "id": "T1036",
+    "name": "Masquerading",
+    "tactic": "Defense Evasion",
+    "description": "Маскировка вредоносных файлов или процессов под легитимные системные компоненты",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-1006"],
+    "related_capec": ["CAPEC-597"],
+    "requires_service": ["file_system", "os_api"],
+    "detection": "Проверка цифровых подписей, анализ путей запуска и метаданных файлов, контроль целостности",
+    "mitigations": ["AppLocker/WDAC", "Строгий контроль подписей ПО", "Обучение персонала распознаванию поддельных файлов"]
+  },
+  {
+    "id": "T1560",
+    "name": "Archive Collected Data",
+    "tactic": "Collection",
+    "description": "Сжатие и архивирование собранных данных перед подготовкой к эксфильтрации",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-319"],
+    "related_capec": ["CAPEC-112"],
+    "requires_service": ["compression_utility"],
+    "detection": "Мониторинг запуска архиваторов (zip, rar, 7z), анализ аномального доступа к большим объёмам файлов",
+    "mitigations": ["DLP-системы", "Контроль запуска утилит сжатия", "Аудит активности пользовательских процессов"]
+  },
+  {
+    "id": "T1195.002",
+    "name": "Supply Chain Compromise: Compromise Software Supply Chain",
+    "tactic": "Initial Access",
+    "description": "Внедрение вредоносного кода в обновления ПО или сторонние библиотеки для массового заражения",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-937", "CWE-352"],
+    "related_capec": ["CAPEC-446"],
+    "requires_service": ["package_manager", "update_service"],
+    "detection": "Проверка хэшей и подписей обновлений, контроль целостности пакетов, аудит зависимостей",
+    "mitigations": ["Использование SBOM", "Верификация подписей репозиториев", "Изоляция критических систем от внешних обновлений"]
+  },
+  {
+    "id": "T1040",
+    "name": "Network Sniffing",
     "tactic": "Credential Access",
-    "description": "Поиск и извлечение незащищенных учетных данных из файлов, конфигураций или оперативной памяти (утечки памяти).",
-    "platforms": ["Windows", "Linux"],
-    "related_cwe": ["CWE-125"],
-    "related_capec": ["CAPEC-540"],
-    "detection": "Практически не поддается сетевому обнаружению (если ключи читаются из памяти легитимно). Обнаруживается сканерами уязвимостей на хосте."
+    "description": "Перехват и анализ сетевого трафика для получения учётных данных или конфиденциальной информации",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-319", "CWE-200"],
+    "related_capec": ["CAPEC-112"],
+    "requires_service": ["network_interface"],
+    "detection": "Мониторинг переключения сетевых адаптеров в promiscuous mode, анализ аномального объёма входящего трафика",
+    "mitigations": ["Обязательное шифрование трафика (TLS/IPsec)", "Сегментация сети", "Ограничение прав на доступ к сетевым интерфейсам"]
   },
   {
-    "id": "T1078",
-    "name": "Valid Accounts",
-    "tactic": "Initial Access / Persistence",
-    "description": "Использование скомпрометированных, дефолтных или заводских учетных данных для обхода систем обнаружения вторжений (так как вход выглядит легитимно).",
-    "platforms": ["Windows", "Linux", "Network", "Cloud"],
-    "related_cwe": ["CWE-1188"],
-    "related_capec": ["CAPEC-115"],
-    "detection": "Отслеживание входов в нерабочее время, входов с неизвестных IP-адресов под локальными административными учетками."
-  },
-  {
-    "id": "T1110",
-    "name": "Brute Force",
+    "id": "T1552.001",
+    "name": "Unsecured Credentials: Credentials In Files",
     "tactic": "Credential Access",
-    "description": "Систематический перебор паролей по словарю для получения доступа к удаленному порту (SSH, RDP).",
+    "description": "Поиск и извлечение учётных данных, хранящихся в открытом виде в конфигурационных файлах или скриптах",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-256", "CWE-312"],
+    "related_capec": ["CAPEC-535"],
+    "requires_service": ["file_system"],
+    "detection": "Сканирование файловой системы на plaintext-пароли, мониторинг доступа к конфигам СУБД/веб-серверов",
+    "mitigations": ["Использование защищённых хранилищ (Vault, Keychain)", "Шифрование конфигов", "Регулярный аудит прав доступа"]
+  },
+  {
+    "id": "T1489",
+    "name": "Service Stop",
+    "tactic": "Impact",
+    "description": "Принудительная остановка легитимных сервисов или защитных решений для нарушения работы системы",
     "platforms": ["Windows", "Linux"],
-    "related_cwe": ["CWE-307"],
-    "related_capec": ["CAPEC-49"],
-    "detection": "Множественные события Event ID 4625 (Отказ входа) в журналах безопасности Windows в течение короткого промежутка времени."
+    "related_cwe": ["CWE-703"],
+    "related_capec": ["CAPEC-126"],
+    "requires_service": ["service_manager"],
+    "detection": "Мониторинг внезапных остановок критических служб, аудит прав на управление сервисами",
+    "mitigations": ["Ограничение прав на остановку служб", "Резервирование критических компонентов", "Контроль целостности конфигураций"]
+  },
+  {
+    "id": "T1135",
+    "name": "Network Share Discovery",
+    "tactic": "Discovery",
+    "description": "Поиск общих сетевых ресурсов для дальнейшего перемещения или сбора конфиденциальных данных",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-200"],
+    "related_capec": ["CAPEC-312"],
+    "requires_service": ["network_api", "smb"],
+    "detection": "Мониторинг запросов к общим ресурсам (net view, smbclient), анализ SMB-трафика",
+    "mitigations": ["Ограничение доступа к сетевым шарам", "Сегментация сети", "Аудит прав доступа к общим папкам"]
+  },
+  {
+    "id": "T1047",
+    "name": "Windows Management Instrumentation",
+    "tactic": "Execution",
+    "description": "Использование WMI для удалённого выполнения кода, сбора информации и управления системой",
+    "platforms": ["Windows"],
+    "related_cwe": ["CWE-78"],
+    "related_capec": ["CAPEC-248"],
+    "requires_service": ["wmi_service"],
+    "detection": "Логирование вызовов WMI (wmic.exe, PowerShell WMI cmdlets), мониторинг аномальных дочерних процессов",
+    "mitigations": ["Ограничение удалённого доступа к WMI", "Аудит привилегий", "Настройка правил брандмауэра"]
+  },
+  {
+    "id": "T1553.002",
+    "name": "Subvert Trust Controls: Code Signing",
+    "tactic": "Defense Evasion",
+    "description": "Использование краденых или поддельных сертификатов подписи кода для обхода проверок безопасности",
+    "platforms": ["Windows", "macOS", "Linux"],
+    "related_cwe": ["CWE-345", "CWE-297"],
+    "related_capec": ["CAPEC-598"],
+    "requires_service": ["code_signing_infrastructure"],
+    "detection": "Проверка валидности сертификатов через CRL/OCSP, мониторинг запуска файлов с новыми или отозванными подписями",
+    "mitigations": ["Строгая проверка цепочек доверия", "Контроль инфраструктуры PKI", "Обновление списков отозванных сертификатов"]
+  },
+  {
+    "id": "T1074.001",
+    "name": "Data Staged: Local Data Staging",
+    "tactic": "Collection",
+    "description": "Консолидация собранных данных в локальной временной директории перед отправкой на внешний сервер",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-200"],
+    "related_capec": ["CAPEC-112"],
+    "requires_service": ["file_system"],
+    "detection": "Мониторинг создания временных архивов, анализ доступа к чувствительным директориям (Temp, Public)",
+    "mitigations": ["DLP-системы", "Контроль целостности временных файлов", "Аудит активности пользователей и сервисов"]
+  },
+  {
+    "id": "T1574.001",
+    "name": "Hijack Execution Flow: DLL Search Order Hijacking",
+    "tactic": "Privilege Escalation",
+    "description": "Подмена легитимной DLL на вредоносную путём манипуляции порядком поиска библиотек ОС",
+    "platforms": ["Windows"],
+    "related_cwe": ["CWE-426", "CWE-427"],
+    "related_capec": ["CAPEC-584"],
+    "requires_service": ["dll_search_path"],
+    "detection": "Мониторинг загрузки DLL из непроверенных путей, анализ цепочек выполнения процессов",
+    "mitigations": ["Включение SafeDllSearchMode", "Контроль путей загрузки", "AppLocker/WDAC", "Аудит бинарных файлов"]
+  },
+  {
+    "id": "T1098",
+    "name": "Account Manipulation",
+    "tactic": "Persistence",
+    "description": "Модификация существующих учётных записей: добавление прав, смена паролей, внедрение SSH-ключей",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-269"],
+    "related_capec": ["CAPEC-555"],
+    "requires_service": ["user_management_service"],
+    "detection": "Аудит изменений учётных записей, мониторинг добавления в группы администраторов или sudo",
+    "mitigations": ["MFA для привилегированных аккаунтов", "Контроль членства в группах", "Регулярный аудит учётных данных"]
+  },
+  {
+    "id": "T1564",
+    "name": "Hide Artifacts",
+    "tactic": "Defense Evasion",
+    "description": "Сокрытие вредоносных артефактов с помощью ADS, скрытых файлов/папок или модификации атрибутов",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-1006"],
+    "related_capec": ["CAPEC-553"],
+    "requires_service": ["file_system", "os_api"],
+    "detection": "Сканирование на наличие ADS, мониторинг скрытых атрибутов, поведенческий анализ EDR",
+    "mitigations": ["Регулярное сканирование файловой системы", "Запрет использования скрытых атрибутов", "EDR/XDR мониторинг"]
+  },
+  {
+    "id": "T1090",
+    "name": "Proxy",
+    "tactic": "Command and Control",
+    "description": "Использование прокси-серверов для перенаправления C2-трафика и сокрытия источника атаки",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-444"],
+    "related_capec": ["CAPEC-117"],
+    "requires_service": ["network", "proxy_service"],
+    "detection": "Анализ сетевых подключений, мониторинг нестандартных прокси, DPI и анализ User-Agent",
+    "mitigations": ["Блокировка неизвестных прокси", "Принудительное использование корпоративных шлюзов", "Фильтрация исходящего трафика"]
+  },
+  {
+    "id": "T1490",
+    "name": "Inhibit System Recovery",
+    "tactic": "Impact",
+    "description": "Удаление или отключение резервных копий и точек восстановления для затруднения восстановления после атаки",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-703"],
+    "related_capec": ["CAPEC-126"],
+    "requires_service": ["backup_service", "vss"],
+    "detection": "Мониторинг вызовов vssadmin, wbadmin, tmutil, удаление теневых копий или бэкапов",
+    "mitigations": ["Изоляция и защита бэкапов", "Ограничение прав на управление резервными копиями", "SIEM-оповещения на критические команды"]
+  },
+  {
+    "id": "T1056.001",
+    "name": "Input Capture: Keylogging",
+    "tactic": "Collection",
+    "description": "Перехват нажатий клавиш для кражи паролей, сообщений и других конфиденциальных данных",
+    "platforms": ["Windows", "macOS", "Linux"],
+    "related_cwe": ["CWE-358"],
+    "related_capec": ["CAPEC-567"],
+    "requires_service": ["os_api", "keyboard_driver"],
+    "detection": "Обнаружение установки хуков клавиатуры, мониторинг доступа к устройствам ввода",
+    "mitigations": ["Использование виртуальных клавиатур для критичных вводов", "Защита процессов от инъекций", "EDR-анализ поведения"]
+  },
+  {
+    "id": "T1124",
+    "name": "System Time Discovery",
+    "tactic": "Discovery",
+    "description": "Получение информации о системном времени для синхронизации атак или обхода механизмов логирования",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-200"],
+    "related_capec": ["CAPEC-312"],
+    "requires_service": ["os_api"],
+    "detection": "Логирование вызовов системных функций получения времени, мониторинг утилит (w32tm, date)",
+    "mitigations": ["Централизованное логирование (NTP)", "Аудит системных вызовов", "Корреляция событий по времени"]
+  },
+  {
+    "id": "T1531",
+    "name": "Account Access Removal",
+    "tactic": "Impact",
+    "description": "Блокировка или удаление учётных записей легитимных пользователей для нарушения доступа к ресурсам",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-288"],
+    "related_capec": ["CAPEC-126"],
+    "requires_service": ["user_management_service"],
+    "detection": "Мониторинг массовых блокировок/удалений учётных записей, оповещения SIEM",
+    "mitigations": ["Наличие резервных административных учётных записей", "MFA", "Контроль изменений в каталогах пользователей"]
+  },
+  {
+    "id": "T1573",
+    "name": "Encrypted Channel",
+    "tactic": "Command and Control",
+    "description": "Использование криптографических протоколов для шифрования C2-коммуникаций и сокрытия содержимого",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-319"],
+    "related_capec": ["CAPEC-117"],
+    "requires_service": ["cryptographic_library", "network"],
+    "detection": "Анализ сертификатов, мониторинг нестандартных шифрованных сессий, анализ JA3/JA3S-отпечатков",
+    "mitigations": ["SSL/TLS-инспекция (где применимо)", "Контроль исходящих соединений", "Поведенческий анализ сетевых сессий"]
+  },
+  {
+    "id": "T1112",
+    "name": "Modify Registry",
+    "tactic": "Defense Evasion",
+    "description": "Изменение записей реестра для сокрытия активности, изменения конфигурации или обеспечения автозапуска",
+    "platforms": ["Windows"],
+    "related_cwe": ["CWE-269"],
+    "related_capec": ["CAPEC-233"],
+    "requires_service": ["registry_api"],
+    "detection": "Мониторинг изменений критических веток реестра, аудит доступа, контроль целостности",
+    "mitigations": ["Контроль целостности реестра", "Ограничение прав на запись", "AppLocker/WDAC", "Аудит политик"]
+  },
+  {
+    "id": "T1008",
+    "name": "Fallback Channels",
+    "tactic": "Command and Control",
+    "description": "Использование резервных каналов связи при обнаружении или блокировке основного C2-канала",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-444"],
+    "related_capec": ["CAPEC-117"],
+    "requires_service": ["network", "alternate_protocol"],
+    "detection": "Выявление аномальных переключений протоколов, мониторинг резервных портов и доменов",
+    "mitigations": ["Блокировка неиспользуемых протоколов", "Сегментация сети", "Анализ сетевого поведения"]
+  },
+  {
+    "id": "T1484.001",
+    "name": "Group Policy Modification: Domain Policy Modification",
+    "tactic": "Defense Evasion",
+    "description": "Изменение политик домена для обхода защитных мер, отключения аудита или сохранения доступа",
+    "platforms": ["Windows"],
+    "related_cwe": ["CWE-269"],
+    "related_capec": ["CAPEC-233"],
+    "requires_service": ["active_directory", "gpo"],
+    "detection": "Аудит изменений GPO, мониторинг прав Domain Admins, SIEM-оповещения на критические модификации",
+    "mitigations": ["Ограничение прав на изменение политик", "Контроль изменений AD", "Регулярный аудит групповых политик"]
+  },
+  {
+    "id": "T1020",
+    "name": "Automated Exfiltration",
+    "tactic": "Exfiltration",
+    "description": "Автоматизация процесса вывода данных с использованием скриптов или встроенных системных утилит",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-319"],
+    "related_capec": ["CAPEC-117"],
+    "requires_service": ["scripting_engine", "network"],
+    "detection": "Мониторинг автоматизированных сетевых операций, анализ объёмов и частоты передачи данных",
+    "mitigations": ["DLP-системы", "Контроль исходящего трафика", "Ограничение использования скриптов"]
+  },
+  {
+    "id": "T1543",
+    "name": "Create or Modify System Process",
+    "tactic": "Persistence",
+    "description": "Создание или изменение системных служб/демонов для выполнения вредоносного кода под легитимным контекстом",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-269"],
+    "related_capec": ["CAPEC-233"],
+    "requires_service": ["service_manager"],
+    "detection": "Мониторинг создания новых служб, анализ путей запуска бинарных файлов, контроль прав доступа",
+    "mitigations": ["Ограничение прав на регистрацию служб", "Контроль целостности системных процессов", "Аудит конфигураций"]
+  },
+  {
+    "id": "T1057",
+    "name": "Process Discovery",
+    "tactic": "Discovery",
+    "description": "Получение списка запущенных процессов для анализа окружения и выявления защитных решений",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-200"],
+    "related_capec": ["CAPEC-312"],
+    "requires_service": ["os_api", "task_manager"],
+    "detection": "Логирование вызовов ps, tasklist, GetProcessList, мониторинг запросов к системным API",
+    "mitigations": ["Ограничение доступа к информации о процессах", "Аудит системных вызовов", "Контроль привилегий"]
+  },
+  {
+    "id": "T1562.001",
+    "name": "Impair Defenses: Disable or Modify Tools",
+    "tactic": "Defense Evasion",
+    "description": "Отключение или модификация средств защиты (антивирусы, EDR, файрволы, логирование) для обхода обнаружения",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-703"],
+    "related_capec": ["CAPEC-126"],
+    "requires_service": ["security_software"],
+    "detection": "Мониторинг остановки защитных служб, изменения конфигураций безопасности, отключение аудитов",
+    "mitigations": ["Защита процессов безопасности", "Контроль привилегий", "Централизованное управление защитами"]
+  },
+  {
+    "id": "T1030",
+    "name": "Data Transfer Size Limits",
+    "tactic": "Exfiltration",
+    "description": "Разбивка данных на мелкие части для обхода систем обнаружения аномальных объёмов передачи",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-319"],
+    "related_capec": ["CAPEC-117"],
+    "requires_service": ["network"],
+    "detection": "Анализ частоты и размера сетевых пакетов, корреляция множественных сессий передачи",
+    "mitigations": ["DPI", "Контроль объёмов передачи данных", "Поведенческий анализ сетевого трафика"]
+  },
+  {
+    "id": "T1583.001",
+    "name": "Acquire Infrastructure: Domains",
+    "tactic": "Resource Development",
+    "description": "Регистрация или покупка доменов для последующего использования в C2, фишинге или маскировке",
+    "platforms": ["Windows", "Linux", "macOS"],
+    "related_cwe": ["CWE-284"],
+    "related_capec": ["CAPEC-163"],
+    "requires_service": ["dns", "domain_registrar"],
+    "detection": "Мониторинг регистрации доменов, похожих на корпоративные, анализ WHOIS и DNS-запросов",
+    "mitigations": ["Блокировка новых/подозрительных доменов", "Мониторинг DNS-запросов", "Обучение сотрудников"]
   }
 ]

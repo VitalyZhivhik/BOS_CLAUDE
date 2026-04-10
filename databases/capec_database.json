@@ -161,106 +161,377 @@
     ]
   },
   {
-    "id": "CAPEC-66",
-    "name": "SQL-инъекция",
-    "description": "Атакующий внедряет SQL-код через пользовательский ввод для манипуляции БД",
-    "severity": "HIGH",
-    "related_cwe": ["CWE-89"],
-    "related_mitre": ["T1190"],
-    "prerequisites": ["database_running"],
-    "mitigations": ["Параметризованные запросы", "Валидация входных данных"]
-  },
-  {
-    "id": "CAPEC-475",
-    "name": "Атака на цепочку поставок (Supply Chain Compromise)",
-    "description": "Внедрение вредоносного кода в легитимную библиотеку или обновление до его установки пользователем.",
-    "severity": "CRITICAL",
-    "related_cwe": ["CWE-506", "CWE-287"],
-    "related_mitre": ["T1195"],
-    "prerequisites": ["vulnerable_dependency"],
-    "mitigations": ["Проверка подписей пакетов (Sigstore)", "Мониторинг зависимостей"]
-  },
-  {
-    "id": "CAPEC-112",
-    "name": "Кража аутентификационных данных через принудительный ответ",
-    "description": "Принуждение клиента (например, почтового) отправить NTLM хэши на сервер злоумышленника.",
-    "severity": "HIGH",
-    "related_cwe": ["CWE-288"],
-    "related_mitre": ["T1557"],
-    "prerequisites": ["windows_client"],
-    "mitigations": ["Блокировка исходящего трафика SMB", "Отключение NTLM"]
-  },
-  {
-    "id": "CAPEC-49",
-    "name": "Brute Force / Подбор пароля",
-    "description": "Систематический перебор паролей к службе",
+    "id": "CAPEC-16",
+    "name": "Атака по словарю",
+    "description": "Систематическая проверка паролей из заранее подготовленного списка для обхода аутентификации",
     "severity": "MEDIUM",
-    "related_cwe": ["CWE-307"],
+    "related_cwe": ["CWE-521"],
     "related_mitre": ["T1110"],
-    "prerequisites": ["service_exposed"],
-    "mitigations": ["Сложные пароли", "MFA", "Ограничение попыток (Fail2Ban)"]
+    "prerequisites": ["authentication_endpoint", "weak_password_policy"],
+    "mitigations": [
+      "Запрет простых паролей",
+      "Блокировка учётных записей",
+      "Многофакторная аутентификация",
+      "Мониторинг частоты запросов"
+    ]
   },
   {
-    "id": "CAPEC-66",
-    "name": "SQL-инъекция",
-    "description": "Атакующий внедряет SQL-код через пользовательский ввод для манипуляции базой данных.",
-    "severity": "HIGH",
-    "related_cwe": ["CWE-89"],
-    "related_mitre": ["T1190"],
-    "mitigations": ["Параметризованные запросы", "Валидация входа"]
+    "id": "CAPEC-23",
+    "name": "Кликджекинг",
+    "description": "Наложение невидимого интерфейса поверх легитимной веб-страницы для принуждения пользователя к нежелательным действиям",
+    "severity": "MEDIUM",
+    "related_cwe": ["CWE-1021"],
+    "related_mitre": ["T1189"],
+    "prerequisites": ["web_browser", "embeddable_ui"],
+    "mitigations": [
+      "Заголовок X-Frame-Options: DENY/SAMEORIGIN",
+      "CSP frame-ancestors",
+      "Атрибут SameSite для cookies"
+    ]
   },
   {
-    "id": "CAPEC-126",
-    "name": "Обход путей (Path Traversal)",
-    "description": "Использование спецсимволов ../ для выхода за пределы корневой папки веб-сервера и чтения файлов (например, /etc/passwd).",
-    "severity": "HIGH",
-    "related_cwe": ["CWE-22"],
-    "related_mitre": ["T1190"],
-    "mitigations": ["Нормализация путей", "Chroot-окружение для веб-сервера"]
-  },
-  {
-    "id": "CAPEC-100",
-    "name": "Переполнение буфера",
-    "description": "Отправка огромного массива данных, превышающего размер буфера, для перезаписи памяти и выполнения шелл-кода.",
+    "id": "CAPEC-30",
+    "name": "Внедрение кода через сторонние библиотеки",
+    "description": "Использование уязвимых или подменённых зависимостей для выполнения произвольного кода в контексте приложения",
     "severity": "CRITICAL",
-    "related_cwe": ["CWE-119"],
-    "related_mitre": ["T1210"],
-    "mitigations": ["ASLR / DEP", "Безопасные компиляторы"]
+    "related_cwe": ["CWE-937"],
+    "related_mitre": ["T1195"],
+    "prerequisites": ["package_manager", "external_dependency"],
+    "mitigations": [
+      "Проверка целостности зависимостей",
+      "Использование SBOM",
+      "Подпись пакетов",
+      "Изоляция зависимостей"
+    ]
   },
   {
-    "id": "CAPEC-540",
-    "name": "Сверхчтение памяти (Over-read)",
-    "description": "Отправка специально сформированного пакета, заставляющего сервис вернуть больше данных из памяти, чем нужно (утечка ключей).",
+    "id": "CAPEC-35",
+    "name": "Криптоанализ",
+    "description": "Использование математических методов или вычислительных мощностей для взлома шифрования или восстановления ключей",
     "severity": "HIGH",
-    "related_cwe": ["CWE-125"],
-    "related_mitre": ["T1552"],
-    "mitigations": ["Проверка длины пользовательских пакетов перед копированием памяти"]
+    "related_cwe": ["CWE-327"],
+    "related_mitre": ["T1557"],
+    "prerequisites": ["weak_crypto_implementation"],
+    "mitigations": [
+      "Использование сертифицированных алгоритмов",
+      "Регулярная ротация ключей",
+      "Аудит криптостойкости",
+      "Переход на квантово-устойчивые стандарты"
+    ]
   },
   {
-    "id": "CAPEC-586",
-    "name": "Внедрение объектов (Object Injection)",
-    "description": "Подсовывание серверу вредоносного сериализованного объекта, который выполнится при его десериализации (Java/PHP/Python).",
+    "id": "CAPEC-40",
+    "name": "Отравление DNS-кэша",
+    "description": "Подмена DNS-ответов для перенаправления легитимного трафика на вредоносные или фишинговые ресурсы",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-350"],
+    "related_mitre": ["T1557"],
+    "prerequisites": ["dns_service_accessible", "unencrypted_dns"],
+    "mitigations": [
+      "Внедрение DNSSEC",
+      "Валидация источников DNS",
+      "Использование DoH/DoT",
+      "Регулярная очистка кэша"
+    ]
+  },
+  {
+    "id": "CAPEC-45",
+    "name": "Использование эксплойт-китов",
+    "description": "Автоматизированный набор инструментов для сканирования, выбора и эксплуатации уязвимостей браузера или плагинов",
     "severity": "CRITICAL",
-    "related_cwe": ["CWE-502"],
+    "related_cwe": ["CWE-79", "CWE-119"],
+    "related_mitre": ["T1189", "T1203"],
+    "prerequisites": ["outdated_browser_plugins", "user_interaction"],
+    "mitigations": [
+      "Автоматическое обновление браузера",
+      "Отключение устаревших плагинов",
+      "Изоляция в песочнице",
+      "EDR/XDR мониторинг"
+    ]
+  },
+  {
+    "id": "CAPEC-50",
+    "name": "Атака через форматные строки",
+    "description": "Использование спецификаторов формата (printf, sprintf) для чтения/записи памяти и обхода защитных механизмов",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-134"],
+    "related_mitre": ["T1059"],
+    "prerequisites": ["unvalidated_format_string"],
+    "mitigations": [
+      "Использование безопасных функций вывода",
+      "Статический анализ кода",
+      "Компиляция с флагами защиты (-D_FORTIFY_SOURCE)",
+      "ASLR/DEP"
+    ]
+  },
+  {
+    "id": "CAPEC-56",
+    "name": "Манипуляция входными данными",
+    "description": "Изменение параметров запроса или полей формы для обхода бизнес-логики приложения или контроля доступа",
+    "severity": "MEDIUM",
+    "related_cwe": ["CWE-20"],
     "related_mitre": ["T1190"],
-    "mitigations": ["Валидация объектов", "Использование безопасных парсеров"]
+    "prerequisites": ["unvalidated_input", "complex_application_logic"],
+    "mitigations": [
+      "Строгая валидация на сервере",
+      "Белый список допустимых значений",
+      "Параметризация запросов",
+      "Логирование аномальных операций"
+    ]
+  },
+  {
+    "id": "CAPEC-60",
+    "name": "Вредоносная загрузка",
+    "description": "Побуждение пользователя скачать и запустить вредоносный файл под видом легитимного ПО или документа",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-494"],
+    "related_mitre": ["T1204"],
+    "prerequisites": ["user_interaction", "download_endpoint"],
+    "mitigations": [
+      "AppLocker / WDAC",
+      "Контроль целостности файлов",
+      "Обучение пользователей",
+      "Сканирование загрузок в песочнице"
+    ]
+  },
+  {
+    "id": "CAPEC-65",
+    "name": "Компрометация обновлений ПО",
+    "description": "Подмена легитимного обновления вредоносным пакетом для массовой доставки кода атакующего",
+    "severity": "CRITICAL",
+    "related_cwe": ["CWE-937"],
+    "related_mitre": ["T1195"],
+    "prerequisites": ["update_mechanism_unverified", "insecure_channel"],
+    "mitigations": [
+      "Подпись обновлений разработчиком",
+      "Проверка хэшей перед установкой",
+      "HTTPS для репозиториев",
+      "Изолированные тестовые среды"
+    ]
+  },
+  {
+    "id": "CAPEC-70",
+    "name": "Фишинговая атака",
+    "description": "Массовая рассылка поддельных сообщений для кражи учётных данных, финансовых данных или установки вредоноса",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-354"],
+    "related_mitre": ["T1566"],
+    "prerequisites": ["email_messaging_system", "user_interaction"],
+    "mitigations": [
+      "Внедрение DMARC/DKIM/SPF",
+      "Антифишинговые фильтры",
+      "Обучение сотрудников",
+      "Изоляция вложений"
+    ]
+  },
+  {
+    "id": "CAPEC-75",
+    "name": "Повышение привилегий через символические ссылки",
+    "description": "Создание symlink для перенаправления операций чтения/записи на критические системные файлы",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-61"],
+    "related_mitre": ["T1068"],
+    "prerequisites": ["writable_directory", "symlink_support"],
+    "mitigations": [
+      "Отключение следования за симлинками (nofollow)",
+      "Контроль прав доступа",
+      "Изоляция chroot/jail",
+      "Мониторинг изменений ФС"
+    ]
+  },
+  {
+    "id": "CAPEC-80",
+    "name": "Состояние гонки (Race Condition)",
+    "description": "Эксплуатация временного разрыва между проверкой условия и использованием ресурса для нарушения логики",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-367"],
+    "related_mitre": ["T1068"],
+    "prerequisites": ["shared_resource_access", "concurrent_execution"],
+    "mitigations": [
+      "Атомарные операции",
+      "Блокировки (mutex/semaphore)",
+      "Минимизация окна TOCTOU",
+      "Статический анализ конкурентности"
+    ]
+  },
+  {
+    "id": "CAPEC-85",
+    "name": "Обратная разработка",
+    "description": "Декомпиляция и анализ бинарных файлов для поиска уязвимостей, ключей или обхода механизмов защиты",
+    "severity": "MEDIUM",
+    "related_cwe": ["CWE-657"],
+    "related_mitre": ["T1027"],
+    "prerequisites": ["unprotected_binary", "debug_info_available"],
+    "mitigations": [
+      "Обфускация кода",
+      "Антиотладочные проверки",
+      "Защита от дампа памяти",
+      "Удаление отладочной информации"
+    ]
+  },
+  {
+    "id": "CAPEC-90",
+    "name": "Перехват сессии",
+    "description": "Кража или предсказание идентификатора сессии для выдачи себя за авторизованного пользователя",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-384"],
+    "related_mitre": ["T1078"],
+    "prerequisites": ["session_insecure_transmission", "weak_session_id"],
+    "mitigations": [
+      "Secure/HttpOnly флаги cookies",
+      "Перегенерация ID после входа",
+      "Привязка сессии к IP/User-Agent",
+      "Короткие таймауты неактивности"
+    ]
+  },
+  {
+    "id": "CAPEC-95",
+    "name": "Подделка цифровой подписи",
+    "description": "Использование украденных, скомпрометированных или сгенерированных сертификатов для маскировки вредоноса",
+    "severity": "CRITICAL",
+    "related_cwe": ["CWE-347"],
+    "related_mitre": ["T1553"],
+    "prerequisites": ["weak_certificate_validation", "trusted_ca"],
+    "mitigations": [
+      "Строгая проверка цепочек доверия",
+      "Проверка CRL/OCSP",
+      "Привязка сертификатов к домену",
+      "Мониторинг отозванных подписей"
+    ]
+  },
+  {
+    "id": "CAPEC-105",
+    "name": "Спуфинг IP/MAC-адреса",
+    "description": "Маскировка под доверенный сетевой узел для обхода фильтров, контроля доступа и систем мониторинга",
+    "severity": "MEDIUM",
+    "related_cwe": ["CWE-290"],
+    "related_mitre": ["T1557"],
+    "prerequisites": ["trust_based_on_address", "unswitched_network"],
+    "mitigations": [
+      "Сетевая аутентификация (802.1X)",
+      "Dynamic ARP Inspection",
+      "IP Source Guard",
+      "Сегментация и изоляция VLAN"
+    ]
+  },
+  {
+    "id": "CAPEC-110",
+    "name": "Тайминг-атака",
+    "description": "Измерение времени отклика системы для извлечения криптографических ключей, паролей или логики сравнения",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-385"],
+    "related_mitre": ["T1057"],
+    "prerequisites": ["timing_variations_exposed"],
+    "mitigations": [
+      "Алгоритмы с постоянным временем выполнения",
+      "Добавление случайных задержек",
+      "Маскирование операций сравнения",
+      "Аппаратная криптография"
+    ]
   },
   {
     "id": "CAPEC-115",
-    "name": "Обход аутентификации",
-    "description": "Использование уязвимостей логики входа или заводских учетных данных для получения доступа.",
-    "severity": "HIGH",
-    "related_cwe": ["CWE-1188"],
-    "related_mitre": ["T1078"],
-    "mitigations": ["Запрет дефолтных паролей", "Строгая политика паролей"]
+    "name": "Троянская программа",
+    "description": "Внедрение вредоносного функционала в легитимное ПО для скрытого управления системой или кражи данных",
+    "severity": "CRITICAL",
+    "related_cwe": ["CWE-506"],
+    "related_mitre": ["T1204"],
+    "prerequisites": ["software_supply_chain", "user_installation"],
+    "mitigations": [
+      "Контроль целостности бинарных файлов",
+      "Проверка цифровых подписей",
+      "Поведенческий анализ EDR",
+      "Минимальные привилегии запуска"
+    ]
   },
   {
-    "id": "CAPEC-49",
-    "name": "Подбор пароля по словарю",
-    "description": "Автоматизированная отправка тысяч логинов/паролей для удаленного доступа (SSH/FTP/RDP).",
+    "id": "CAPEC-120",
+    "name": "Несанкционированное выполнение команд",
+    "description": "Обход ограничений на запуск системных команд через уязвимости в интерпретаторах или оболочках",
+    "severity": "CRITICAL",
+    "related_cwe": ["CWE-78"],
+    "related_mitre": ["T1059"],
+    "prerequisites": ["command_execution_function", "unvalidated_input"],
+    "mitigations": [
+      "Отключение опасных функций (exec, eval)",
+      "Изоляция в песочнице",
+      "Принцип наименьших привилегий",
+      "Строгая фильтрация ввода"
+    ]
+  },
+  {
+    "id": "CAPEC-130",
+    "name": "Переполнение буфера через сеть",
+    "description": "Отправка специально сформированных сетевых пакетов для перезаписи стека/кучи и перехвата управления",
+    "severity": "CRITICAL",
+    "related_cwe": ["CWE-119"],
+    "related_mitre": ["T1210"],
+    "prerequisites": ["network_service_listening", "unpatched_binary"],
+    "mitigations": [
+      "DEP/ASLR",
+      "Фаззинг сетевого трафика",
+      "Своевременное обновление патчей",
+      "Сетевая сегментация"
+    ]
+  },
+  {
+    "id": "CAPEC-140",
+    "name": "Атака на веб-сервисы (SOAP/XML)",
+    "description": "Манипуляция XML-запросами для обхода логики API, инъекции вредоносных данных или отказа в обслуживании",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-611"],
+    "related_mitre": ["T1190"],
+    "prerequisites": ["soap_xml_endpoint"],
+    "mitigations": [
+      "Валидация схемы XSD",
+      "Отключение DTD и внешних сущностей",
+      "WAF для API",
+      "Ограничение размера полезной нагрузки"
+    ]
+  },
+  {
+    "id": "CAPEC-150",
+    "name": "XML-инъекция",
+    "description": "Внедрение вредоносных конструкций в XML-документы для изменения структуры данных или выполнения кода на сервере",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-91"],
+    "related_mitre": ["T1190"],
+    "prerequisites": ["xml_parser_vulnerable"],
+    "mitigations": [
+      "Парсеры с безопасным режимом",
+      "Валидация входных XML",
+      "Отключение внешних сущностей",
+      "Строгий контроль типов"
+    ]
+  },
+  {
+    "id": "CAPEC-160",
+    "name": "Постоянное отслеживание (Zombie Cookies)",
+    "description": "Восстановление удалённых cookies через скрытые механизмы хранения для непрерывного отслеживания пользователя",
     "severity": "MEDIUM",
-    "related_cwe": ["CWE-307"],
-    "related_mitre": ["T1110"],
-    "mitigations": ["Fail2Ban", "Блокировка IP-адресов после ошибок входа"]
+    "related_cwe": ["CWE-359"],
+    "related_mitre": ["T1056"],
+    "prerequisites": ["browser_storage_mechanisms"],
+    "mitigations": [
+      "Очистка всех типов хранилищ",
+      "Блокировка third-party cookies",
+      "Режим изолированного просмотра",
+      "Запрет скрытых API хранения"
+    ]
+  },
+  {
+    "id": "CAPEC-170",
+    "name": "Атака через побочные каналы",
+    "description": "Извлечение секретной информации через анализ энергопотребления, электромагнитного излучения или акустического шума",
+    "severity": "HIGH",
+    "related_cwe": ["CWE-203"],
+    "related_mitre": ["T1057"],
+    "prerequisites": ["physical_or_close_proximity"],
+    "mitigations": [
+      "Экранирование оборудования",
+      "Генерация маскирующего шума",
+      "Алгоритмы, устойчивые к side-channel",
+      "Аппаратные модули безопасности (HSM)"
+    ]
   }
 ]
