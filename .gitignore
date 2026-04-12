@@ -7,3 +7,7 @@ logs/
 /tools
 /reports
 /history
+build
+dist
+SecurityAttacker.spec
+SecurityServer.spec
