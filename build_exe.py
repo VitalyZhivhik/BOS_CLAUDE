@@ -74,6 +74,22 @@ def build(name, entry, extra_data=None, onefile=False):
             if os.path.exists(db_src) and not os.path.exists(db_dst):
                 shutil.copytree(db_src, db_dst)
                 print(f"[+] Базы данных скопированы")
+            # Копируем портативные инструменты (nmap и др.)
+
+            tools_src = os.path.join(PROJECT_DIR, "tools")
+
+            tools_dst = os.path.join(exe_dir, "tools")
+
+            if os.path.exists(tools_src) and not os.path.exists(tools_dst):
+
+                shutil.copytree(tools_src, tools_dst)
+
+                print(f"[+] Папка tools/ скопирована ({tools_dst})")
+
+            elif not os.path.exists(tools_src):
+
+                print(f"[!] Папка tools/ не найдена: {tools_src}")
+
             # Создаём папки
             for d in ["reports", "logs"]:
                 os.makedirs(os.path.join(exe_dir, d), exist_ok=True)
@@ -114,7 +130,12 @@ def main():
     if args.attacker or build_all:
         errors += build(
             "SecurityAttacker", "gui_attacker.py",
-            extra_data=[f"attacker{SEP}attacker"],
+            extra_data=[
+
+                f"attacker{SEP}attacker",
+
+            ],
+
             onefile=args.onefile
         )
 

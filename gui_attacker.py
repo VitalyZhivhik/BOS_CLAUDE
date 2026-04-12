@@ -39,9 +39,16 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt6.QtGui import QFont, QColor, QTextCursor, QIcon
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, PROJECT_DIR)
 
-HISTORY_DIR = os.path.join(PROJECT_DIR, "history")
+def get_app_dir() -> str:
+    """Возвращает папку с .exe (frozen) или папку скрипта (Python)."""
+    if getattr(sys, 'frozen', False):  # запущено из PyInstaller EXE
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+APP_DIR = get_app_dir()
+sys.path.insert(0, APP_DIR)
+HISTORY_DIR = os.path.join(APP_DIR, "history")
 os.makedirs(HISTORY_DIR, exist_ok=True)
 
 from common.config import (TARGET_SERVER_HOST, TARGET_SERVER_PORT,
@@ -49,6 +56,8 @@ from common.config import (TARGET_SERVER_HOST, TARGET_SERVER_PORT,
 from common.models import ScanResult, OpenPort, AttackVector
 from common.logger import get_attacker_logger, GUILogHandler
 from attacker.attacker_agent import AttackVectorGenerator, PortScanner
+
+
 
 logger = get_attacker_logger()
 
@@ -471,7 +480,7 @@ class NmapWorker(QThread):
         super().__init__()
         self.target = target
         self.open_ports = open_ports
-        portable_nmap  = os.path.join(PROJECT_DIR, "tools", "nmap.exe")
+        portable_nmap = os.path.join(APP_DIR, "tools", "nmap.exe")
         system_nmap_1  = r"C:\Program Files (x86)\Nmap\nmap.exe"
         system_nmap_2  = r"C:\Program Files\Nmap\nmap.exe"
         if os.path.exists(portable_nmap):
@@ -652,7 +661,7 @@ class AttackerGUI(QMainWindow):
         logger.info(_log_phase("АТАКУЮЩИЙ АГЕНТ ЗАПУЩЕН", "═"))
         logger.info(_log_result_line("Версия:", "2.0"))
         logger.info(_log_result_line("Время запуска:", datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        logger.info(_log_result_line("Директория:", PROJECT_DIR))
+        logger.info(_log_result_line("Директория:", APP_DIR))
         logger.info(_log_result_line("История:", HISTORY_DIR))
         logger.info("")
 
