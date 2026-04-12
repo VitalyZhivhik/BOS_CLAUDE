@@ -1,0 +1,243 @@
+[
+  {
+    "id": "DEF-001",
+    "attack_type": "remote_code_execution",
+    "cve_ids": ["CVE-2017-0144", "CVE-2019-0708", "CVE-2021-44228", "CVE-2021-34527"],
+    "name": "Патчинг и изоляция сервисов",
+    "description": "Применение критических обновлений безопасности и отключение неиспользуемых сервисов",
+    "tools": [
+      {
+        "name": "Windows Update / WSUS",
+        "description": "Централизованное управление обновлениями Windows",
+        "commands": [
+          "# Проверка и установка обновлений (PowerShell)",
+          "Install-WindowsUpdate -AcceptAll -AutoReboot",
+          "",
+          "# Проверка установленных KB",
+          "Get-HotFix | Sort-Object InstalledOn -Descending | Select -First 20",
+          "",
+          "# WSUS — настройка через GPO",
+          "gpedit.msc -> Computer Configuration -> Administrative Templates -> Windows Components -> Windows Update"
+        ]
+      },
+      {
+        "name": "Windows Firewall",
+        "description": "Блокировка уязвимых портов на уровне ОС",
+        "commands": [
+          "# Блокировка SMB (порт 445) — защита от EternalBlue",
+          "netsh advfirewall firewall add rule name='Block SMB' protocol=TCP dir=in localport=445 action=block",
+          "",
+          "# Отключение SMBv1",
+          "Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force",
+          "",
+          "# Блокировка RDP снаружи (только локальная сеть)",
+          "netsh advfirewall firewall add rule name='RDP Restrict' protocol=TCP dir=in localport=3389 remoteip=192.168.1.0/24 action=allow",
+          "netsh advfirewall firewall add rule name='RDP Block External' protocol=TCP dir=in localport=3389 action=block"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "Low",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-002",
+    "attack_type": "brute_force",
+    "cve_ids": ["CVE-GENERIC-BRUTEFORCE-RDP", "CVE-GENERIC-BRUTEFORCE-FTP", "CVE-GENERIC-BRUTEFORCE-SSH"],
+    "name": "Защита от перебора паролей",
+    "description": "Политики блокировки учётных записей, MFA и ограничение попыток входа",
+    "tools": [
+      {
+        "name": "Account Lockout Policy (GPO)",
+        "description": "Настройка блокировки учётных записей через групповые политики",
+        "commands": [
+          "# Настройка политики блокировки (PowerShell)",
+          "net accounts /lockoutthreshold:5 /lockoutwindow:30 /lockoutduration:30",
+          "",
+          "# Через secpol.msc:",
+          "# Account Policies -> Account Lockout Policy",
+          "# Account lockout threshold: 5",
+          "# Account lockout duration: 30 minutes",
+          "# Reset account lockout counter after: 30 minutes"
+        ]
+      },
+      {
+        "name": "Fail2Ban (для Linux-хостов)",
+        "description": "Автоматическая блокировка IP после неудачных попыток входа",
+        "commands": [
+          "# Установка Fail2Ban",
+          "sudo apt install fail2ban",
+          "",
+          "# Конфигурация /etc/fail2ban/jail.local",
+          "[sshd]",
+          "enabled = true",
+          "port = ssh",
+          "maxretry = 5",
+          "bantime = 3600",
+          "findtime = 600",
+          "",
+          "sudo systemctl enable fail2ban",
+          "sudo systemctl start fail2ban"
+        ]
+      },
+      {
+        "name": "NLA для RDP",
+        "description": "Включение Network Level Authentication для RDP",
+        "commands": [
+          "# Включение NLA через реестр",
+          "reg add 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' /v UserAuthentication /t REG_DWORD /d 1 /f",
+          "",
+          "# Через PowerShell",
+          "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -Name 'UserAuthentication' -Value 1"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-003",
+    "attack_type": "sql_injection",
+    "cve_ids": ["CVE-GENERIC-SQLI"],
+    "name": "Защита от SQL-инъекций",
+    "description": "Параметризованные запросы, WAF и принцип наименьших привилегий для БД",
+    "tools": [
+      {
+        "name": "ModSecurity WAF",
+        "description": "Web Application Firewall для блокировки SQL-инъекций",
+        "commands": [
+          "# Установка ModSecurity для Apache",
+          "sudo apt install libapache2-mod-security2",
+          "sudo a2enmod security2",
+          "",
+          "# Включение OWASP Core Rule Set",
+          "cd /etc/modsecurity",
+          "sudo cp modsecurity.conf-recommended modsecurity.conf",
+          "# Изменить: SecRuleEngine DetectionOnly -> SecRuleEngine On",
+          "",
+          "# Загрузка OWASP CRS",
+          "git clone https://github.com/coreruleset/coreruleset /etc/apache2/modsecurity-crs",
+          "sudo systemctl restart apache2"
+        ]
+      },
+      {
+        "name": "Ограничение привилегий БД",
+        "description": "Назначение минимальных прав пользователям БД",
+        "commands": [
+          "# MySQL — создание пользователя с минимальными правами",
+          "CREATE USER 'appuser'@'localhost' IDENTIFIED BY 'StrongPassword!';",
+          "GRANT SELECT, INSERT, UPDATE ON mydb.* TO 'appuser'@'localhost';",
+          "FLUSH PRIVILEGES;",
+          "",
+          "# PostgreSQL — ограничение прав",
+          "CREATE USER appuser WITH PASSWORD 'StrongPassword!';",
+          "GRANT CONNECT ON DATABASE mydb TO appuser;",
+          "GRANT USAGE ON SCHEMA public TO appuser;",
+          "GRANT SELECT ON ALL TABLES IN SCHEMA public TO appuser;"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-004",
+    "attack_type": "cross_site_scripting",
+    "cve_ids": ["CVE-GENERIC-XSS"],
+    "name": "Защита от XSS",
+    "description": "Content Security Policy, экранирование вывода и HTTP Security Headers",
+    "tools": [
+      {
+        "name": "HTTP Security Headers",
+        "description": "Настройка защитных HTTP заголовков",
+        "commands": [
+          "# Для Apache (.htaccess или конфиг)",
+          "Header always set X-XSS-Protection '1; mode=block'",
+          "Header always set X-Content-Type-Options 'nosniff'",
+          "Header always set X-Frame-Options 'DENY'",
+          "Header always set Content-Security-Policy \"default-src 'self'; script-src 'self'\"",
+          "Header always set Strict-Transport-Security 'max-age=31536000; includeSubDomains'",
+          "",
+          "# Для Nginx",
+          "add_header X-XSS-Protection '1; mode=block';",
+          "add_header X-Content-Type-Options 'nosniff';",
+          "add_header Content-Security-Policy \"default-src 'self'\";"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Low",
+    "effectiveness": "Medium"
+  },
+  {
+    "id": "DEF-005",
+    "attack_type": "privilege_escalation",
+    "cve_ids": ["CVE-2020-1472", "CVE-2021-34527", "CVE-2023-23397"],
+    "name": "Защита от повышения привилегий",
+    "description": "Принцип наименьших привилегий, защита LSA, Credential Guard",
+    "tools": [
+      {
+        "name": "LSA Protection",
+        "description": "Защита процесса LSASS от дампа учётных данных",
+        "commands": [
+          "# Включение LSA Protection через реестр",
+          "reg add 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa' /v RunAsPPL /t REG_DWORD /d 1 /f",
+          "",
+          "# Включение Credential Guard (через GPO)",
+          "# Computer Configuration -> Administrative Templates -> System -> Device Guard",
+          "# Turn On Virtualization Based Security: Enabled",
+          "# Credential Guard Configuration: Enabled with UEFI lock",
+          "",
+          "# Отключение WDigest (предотвращение хранения паролей в открытом виде)",
+          "reg add 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest' /v UseLogonCredential /t REG_DWORD /d 0 /f"
+        ]
+      },
+      {
+        "name": "Защита от Zerologon",
+        "description": "Применение патча MS-NRPC и мониторинг",
+        "commands": [
+          "# Применить патч KB4566123 (или более новый)",
+          "# Включить принудительный режим Secure Channel",
+          "reg add 'HKLM\\SYSTEM\\CurrentControlSet\\Services\\Netlogon\\Parameters' /v FullSecureChannelProtection /t REG_DWORD /d 1 /f",
+          "",
+          "# Мониторинг Event ID 5829 в Event Viewer",
+          "Get-WinEvent -FilterHashtable @{LogName='Security'; Id=5829} | Select -First 10"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-006",
+    "attack_type": "credential_dumping",
+    "cve_ids": ["CVE-2020-1472"],
+    "name": "Защита учётных данных",
+    "description": "Защита хранилища учётных данных от извлечения Mimikatz",
+    "tools": [
+      {
+        "name": "Windows Defender Credential Guard",
+        "description": "Аппаратная защита учётных данных через виртуализацию",
+        "commands": [
+          "# Проверка поддержки Credential Guard",
+          "msinfo32",
+          "",
+          "# Включение через PowerShell",
+          "$featureValue = (Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\DeviceGuard').EnableVirtualizationBasedSecurity",
+          "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa' -Name LsaCfgFlags -Value 1",
+          "",
+          "# Настройка через GPO:",
+          "# Computer Configuration -> Windows Settings -> Security Settings",
+          "# -> Local Policies -> Security Options",
+          "# -> 'Interactive logon: Do not display last user name': Enabled"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High"
+  }
+]
