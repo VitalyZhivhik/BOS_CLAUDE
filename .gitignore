@@ -11,3 +11,4 @@ SecurityAttacker.spec
 SecurityServer.spec
 dist
 build
+.vscode

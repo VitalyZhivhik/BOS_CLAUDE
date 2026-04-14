@@ -9,6 +9,7 @@
       5. Уязвимости и как их использовать (ПО + команды)
   - Полная дедупликация результатов
   - Интеграция AttackToolkit и ReportHistory
+  - Вкладка «Обнаруженное ПО» (показ сырых данных от сканера)
 """
 import sys, os, json, socket, threading, webbrowser
 from datetime import datetime
@@ -19,7 +20,7 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
     QFrame, QMessageBox, QStatusBar, QProgressBar, QFileDialog,
     QComboBox, QListWidget, QListWidgetItem, QSplitter,
-    QScrollArea, QDialog, QDialogButtonBox, QFormLayout, QLineEdit
+    QScrollArea, QDialog, QDialogButtonBox, QFormLayout, QLineEdit, QAbstractItemView
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QColor, QTextCursor
@@ -216,6 +217,7 @@ class ServerGUI(QMainWindow):
         # Правая панель с вкладками
         self.tabs = QTabWidget()
         self._build_system_tab()
+        self._build_software_tab() # НОВАЯ ВКЛАДКА
         self._build_vuln_tab()
         self._build_correlation_tab()
         self._build_attack_selector_tab()
@@ -343,6 +345,48 @@ class ServerGUI(QMainWindow):
         self.sys_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         stl.addWidget(self.sys_table)
         self.tabs.addTab(st, "🖥️ Система")
+
+    def _build_software_tab(self):
+        """Новая вкладка для реального ПО от сканера"""
+        st = QWidget()
+        stl = QVBoxLayout(st)
+        label = QLabel("Реестр программного обеспечения и открытых портов, найденных сканером на сервере:")
+        stl.addWidget(label)
+        
+        self.software_table = QTableWidget(0, 3)
+        self.software_table.setHorizontalHeaderLabels(["Тип", "Название / Компонент", "Порт / Версия"])
+        self.software_table.horizontalHeader().setStretchLastSection(True)
+        self.software_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        stl.addWidget(self.software_table)
+        self.tabs.addTab(st, "📦 Обнаруженное ПО")
+
+    def _update_software_tab(self, system_info):
+        """Заполнение вкладки реальным ПО"""
+        self.software_table.setRowCount(0)
+        row = 0
+        for port_info in getattr(system_info, 'open_ports', []):
+            self.software_table.insertRow(row)
+            self.software_table.setItem(row, 0, QTableWidgetItem("Сетевая служба"))
+            port_num = getattr(port_info, 'port', None)
+            if port_num is None and isinstance(port_info, dict):
+                port_num = port_info.get("port", "Неизвестно")
+            self.software_table.setItem(row, 1, QTableWidgetItem(f"Служба на порту {port_num}"))
+            self.software_table.setItem(row, 2, QTableWidgetItem(str(port_num)))
+            row += 1
+            
+        for sw in getattr(system_info, 'installed_software', []):
+            self.software_table.insertRow(row)
+            self.software_table.setItem(row, 0, QTableWidgetItem("Установленное ПО"))
+            sw_name = getattr(sw, 'name', None)
+            if sw_name is None and isinstance(sw, dict):
+                sw_name = sw.get("name", "Неизвестное ПО")
+            sw_version = getattr(sw, 'version', None)
+            if sw_version is None and isinstance(sw, dict):
+                sw_version = sw.get("version", "")
+            self.software_table.setItem(row, 1, QTableWidgetItem(str(sw_name)))
+            self.software_table.setItem(row, 2, QTableWidgetItem(str(sw_version)))
+            row += 1
+
     def _build_vuln_tab(self):
         vt = QWidget()
         vtl = QVBoxLayout(vt)
@@ -566,6 +610,9 @@ class ServerGUI(QMainWindow):
             self.sys_table.insertRow(r)
             self.sys_table.setItem(r, 0, QTableWidgetItem(str(p)))
             self.sys_table.setItem(r, 1, QTableWidgetItem(str(v)))
+            
+        self._update_software_tab(self.system_info) # Обновляем вкладку ПО
+        
         self.btn_analyze.setText("1. Анализ системы (выполнен)")
         self.btn_analyze.setEnabled(True)
         self.btn_load_db.setEnabled(True)
