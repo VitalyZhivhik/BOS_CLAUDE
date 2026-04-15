@@ -288,7 +288,7 @@ class ServerGUI(QMainWindow):
         """)
         
         left = QWidget()
-        left.setFixedWidth(360)  # Оптимальная ширина панели
+        left.setFixedWidth(265)  # Увеличенная ширина левой панели
         left.setStyleSheet("background: #121212;")
         ll = QVBoxLayout(left)
         ll.setSpacing(6)
@@ -490,6 +490,14 @@ class ServerGUI(QMainWindow):
         title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         title.setStyleSheet("color:#888;padding:6px 0;")
         stl.addWidget(title)
+        
+        # Панель управления Trivy
+        ctrl_layout = QHBoxLayout()
+        self.btn_load_trivy = QPushButton("📂 Загрузить отчёт из файла (История)")
+        self.btn_load_trivy.clicked.connect(self._load_trivy_report)
+        ctrl_layout.addWidget(self.btn_load_trivy)
+        ctrl_layout.addStretch()
+        stl.addLayout(ctrl_layout)
         
         # Статус
         self.trivy_status_label = QLabel("⚪ Trivy не запущен")
@@ -1178,6 +1186,84 @@ class ServerGUI(QMainWindow):
         self.btn_trivy_scan.setText("3б. Сканирование Trivy (ошибка)")
         self.btn_trivy_scan.setEnabled(True)
         QMessageBox.critical(self, "Ошибка Trivy", str(e))
+
+    def _load_trivy_report(self):
+        """Загрузка результатов Trivy из сохраненного JSON-файла."""
+        path, _ = QFileDialog.getOpenFileName(self, "Загрузить отчёт Trivy", PROJECT_DIR, "JSON Files (*.json)")
+        if not path:
+            return
+            
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                
+            # Проверка формата (поддержка сырого Trivy или нашего отформатированного)
+            vulns = data.get("vulnerabilities", [])
+            if not vulns and "Results" in data:
+                for res in data.get("Results", []):
+                    for v in res.get("Vulnerabilities", []):
+                        vulns.append({
+                            "vuln_id": v.get("VulnerabilityID", ""),
+                            "pkg_name": v.get("PkgName", ""),
+                            "installed_version": v.get("InstalledVersion", ""),
+                            "fixed_version": v.get("FixedVersion", ""),
+                            "severity": v.get("Severity", "UNKNOWN"),
+                            "title": v.get("Title", ""),
+                            "cwe_ids": v.get("CweIDs", [])
+                        })
+            
+            # Считаем статистику
+            crit = sum(1 for v in vulns if v.get("severity") == "CRITICAL")
+            high = sum(1 for v in vulns if v.get("severity") == "HIGH")
+            med = sum(1 for v in vulns if v.get("severity") == "MEDIUM")
+            low = sum(1 for v in vulns if v.get("severity") == "LOW")
+            
+            self.trivy_summary = {
+                "total_vulns": len(vulns),
+                "critical": crit,
+                "high": high,
+                "medium": med,
+                "low": low,
+                "scan_duration": "Загружено из истории"
+            }
+            
+            # Сохраняем в формат, понятный коррелятору
+            self.trivy_result = {"vulnerabilities": vulns}
+            
+            # Заполняем таблицу
+            self.trivy_table.setRowCount(0)
+            sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "UNKNOWN": 4, "INFO": 5}
+            sorted_vulns = sorted(vulns, key=lambda v: sev_order.get(v.get("severity", "UNKNOWN"), 4))
+            
+            for vuln in sorted_vulns:
+                row = self.trivy_table.rowCount()
+                self.trivy_table.insertRow(row)
+                self.trivy_table.setItem(row, 0, QTableWidgetItem(vuln.get("vuln_id", "")))
+                self.trivy_table.setItem(row, 1, QTableWidgetItem(vuln.get("pkg_name", "")))
+                self.trivy_table.setItem(row, 2, QTableWidgetItem(vuln.get("installed_version", "")))
+                
+                fixed = vuln.get("fixed_version", "")
+                fixed_item = QTableWidgetItem(fixed if fixed else "Нет исправления")
+                if not fixed: fixed_item.setForeground(QColor("#888"))
+                self.trivy_table.setItem(row, 3, fixed_item)
+                
+                sev = vuln.get("severity", "UNKNOWN")
+                sev_item = QTableWidgetItem(sev)
+                sev_color = {"CRITICAL": "#c44", "HIGH": "#a85", "MEDIUM": "#997", "LOW": "#696", "UNKNOWN": "#888", "INFO": "#668"}.get(sev, "#888")
+                sev_item.setForeground(QColor(sev_color))
+                self.trivy_table.setItem(row, 4, sev_item)
+                self.trivy_table.setItem(row, 5, QTableWidgetItem(vuln.get("title", "")[:200]))
+                
+                cwe = ", ".join(vuln.get("cwe_ids", [])[:3])
+                self.trivy_table.setItem(row, 6, QTableWidgetItem(f"CWE: {cwe}" if cwe else "—"))
+                
+            self._on_trivy_scan_done(self.trivy_summary) # Обновит UI и разблокирует сервер
+            self.trivy_status_label.setText(f"✅ Загружено из истории: {len(vulns)} уязвимостей")
+            
+        except Exception as e:
+            logger.error(f"Ошибка загрузки Trivy: {e}", exc_info=True)
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить файл:\n{e}")
+
     # ─────────────────────────────────────────
     #  HTTP Сервер
     # ─────────────────────────────────────────
@@ -1297,12 +1383,13 @@ class ServerGUI(QMainWindow):
                         "results_count": len(results),
                         "details": [
                             {
-                                "cve_id": r.cve_id,
-                                "attack_name": r.attack_name,
-                                "severity": r.severity,
-                                "feasibility": r.feasibility,
-                                "description": r.description,
-                                "recommendation": r.recommendation,
+                                "cve_id": str(r.cve_id) if r.cve_id else "",
+                                "attack_name": str(r.attack_name) if r.attack_name else "",
+                                # Фикс ошибки 500 (сериализация Enum)
+                                "severity": getattr(r.severity, 'name', str(r.severity)),
+                                "feasibility": getattr(r.feasibility, 'name', str(r.feasibility)),
+                                "description": str(r.description) if r.description else "",
+                                "recommendation": str(r.recommendation) if r.recommendation else "",
                             }
                             for r in results
                         ],

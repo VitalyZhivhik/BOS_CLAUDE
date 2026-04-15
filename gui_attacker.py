@@ -700,7 +700,7 @@ class AttackerGUI(QMainWindow):
         """)
         
         left = QWidget()
-        left.setFixedWidth(320)  # Оптимальная ширина панели
+        left.setFixedWidth(265)  # Увеличенная ширина левой панели
         left.setStyleSheet("background: #121212;")
         ll = QVBoxLayout(left)
         ll.setSpacing(6)
