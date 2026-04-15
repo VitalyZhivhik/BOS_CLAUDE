@@ -3,13 +3,14 @@
 Сопоставляет обнаруженные атакующим агентом векторы атак
 с реальной конфигурацией сервера и базами CVE/CWE/CAPEC/MITRE ATT&CK.
 Определяет реализуемость каждой атаки.
-НОВИНКА: Улучшенное логирование с временными метками для отслеживания медленных операций.
+НОВИНКА: Интеграция с Trivy для подтверждения уязвимостей.
 """
 
 import os
 import sys
 import time
 from dataclasses import asdict
+from typing import Optional
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -18,6 +19,8 @@ from common.models import (
     AttackFeasibility, Severity, AttackVector
 )
 from server.vulnerability_db import VulnerabilityDatabase
+from server.trivy_correlator import TrivyCorrelator
+from server.trivy_scanner import TrivyScanResult
 from common.logger import get_server_logger
 
 logger = get_server_logger()
@@ -26,9 +29,10 @@ logger = get_server_logger()
 class AttackCorrelator:
     """Движок корреляции атак с конфигурацией сервера."""
 
-    def __init__(self, system_info: SystemInfo, vuln_db: VulnerabilityDatabase):
+    def __init__(self, system_info: SystemInfo, vuln_db: VulnerabilityDatabase, trivy_result=None):
         self.system_info = system_info
         self.vuln_db = vuln_db
+        self.trivy_result = trivy_result  # Результаты сканирования Trivy
         self.results: list[VulnerabilityMatch] = []
         self.progress_callback = None  # Callback для прогресса
 
@@ -103,11 +107,28 @@ class AttackCorrelator:
         dedup_elapsed = time.time() - dedup_start
         logger.info(f"Дедупликация: {before_count} -> {len(self.results)} за {dedup_elapsed:.2f}s")
 
+        # 4. КОРРЕЛЯЦИЯ С TRIVY (если есть данные)
+        if self.trivy_result:
+            logger.info("[4/4] Корреляция с данными Trivy...")
+            self._report_progress(92, "Корреляция с Trivy...")
+            trivy_start = time.time()
+            trivy_enhanced = self._correlate_with_trivy(scan_result)
+            self.results = trivy_enhanced
+            trivy_elapsed = time.time() - trivy_start
+            logger.info(f"[4/4] Корреляция с Trivy завершена за {trivy_elapsed:.2f}s")
+        else:
+            logger.warning("[4/4] Данные Trivy отсутствуют - корреляция без подтверждения уязвимостей")
+            self._report_progress(92, "ВНИМАНИЕ: Trivy не запущен - корреляция без подтверждения")
+
         total_elapsed = time.time() - start_time
         self._report_progress(100, f"Корреляция завершена. Найдено {len(self.results)} уникальных результатов")
         logger.info("=" * 70)
         logger.info(f" КОРРЕЛЯЦИЯ ЗАВЕРШЕНА ЗА {total_elapsed:.2f} СЕК")
         logger.info(f" Уникальных результатов: {len(self.results)}")
+        if self.trivy_result:
+            logger.info(f" ✅ Trivy подтвердил уязвимости")
+        else:
+            logger.warning(f" ⚠️ Trivy НЕ запущен - реализуемость атак НЕ подтверждена!")
         logger.info("=" * 70)
         return self.results
 
@@ -523,6 +544,37 @@ class AttackCorrelator:
             unique.append(match)
             
         return unique
+
+    def _correlate_with_trivy(self, scan_result: ScanResult) -> list[VulnerabilityMatch]:
+        """
+        Корреляция результатов с данными Trivy.
+        Усиливает реализуемость атак если Trivy подтвердил уязвимость.
+        """
+        if not self.trivy_result:
+            return self.results
+        
+        logger.info("[TRIVY] Запуск корреляции с данными Trivy...")
+        
+        correlator = TrivyCorrelator()
+        
+        # Коррелируем Trivy с атаками атакующего
+        corr_result = correlator.correlate(
+            trivy_result=self.trivy_result,
+            attacker_vectors=scan_result.attack_vectors,
+            open_ports=self.system_info.open_ports,
+            existing_matches=self.results
+        )
+        
+        # Объединяем результаты
+        trivy_matches = correlator.get_enhanced_matches()
+        merged = correlator.merge_with_existing(self.results, trivy_matches)
+        
+        logger.info(f"[TRIVY] Корреляция завершена:")
+        logger.info(f"  - Совпадений с атаками: {corr_result.matched_with_attacks}")
+        logger.info(f"  - Усилено атак: {corr_result.enhanced_attacks}")
+        logger.info(f"  - Новых критических находок: {len(corr_result.new_critical_findings)}")
+        
+        return merged
 
     def get_summary(self) -> dict:
         """Сводка результатов корреляции."""

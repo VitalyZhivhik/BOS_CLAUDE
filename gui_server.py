@@ -35,6 +35,7 @@ from server.attack_correlator import AttackCorrelator
 from server.report_generator import ReportGenerator
 from server.attack_toolkit import AttackToolkit
 from server.report_history import ReportHistory, ReportRecord
+from server.scan_history import ScanHistory, ScanRecord
 from server.local_vuln_scanner import LocalVulnScanner, ScanReport
 logger = get_server_logger()
 # ─────────────────────────────────────────
@@ -208,6 +209,7 @@ class ServerGUI(QMainWindow):
         self.trivy_summary = None  # Результаты Trivy
         self.trivy_available = False  # Доступен ли Trivy
         self.report_history = ReportHistory(PROJECT_DIR)
+        self.scan_history = ScanHistory(PROJECT_DIR)
         self.http_server = None
         self.server_thread = None
         self.server_running = False
@@ -253,11 +255,44 @@ class ServerGUI(QMainWindow):
         self.setStatusBar(QStatusBar())
         self.statusBar().showMessage("Готов к работе")
     def _build_left_panel(self) -> QWidget:
+        # Создаём контейнер с скроллом для левой панели
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setStyleSheet("""
+            QScrollArea {
+                background: #121212;
+                border: none;
+            }
+            QScrollBar:vertical {
+                background: #121212;
+                width: 6px;
+                border: none;
+            }
+            QScrollBar::handle:vertical {
+                background: #444;
+                border-radius: 3px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #555;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+                border: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: #121212;
+            }
+        """)
+        
         left = QWidget()
-        left.setFixedWidth(420)  # Значительно увеличиваем ширину панели
+        left.setFixedWidth(360)  # Оптимальная ширина панели
+        left.setStyleSheet("background: #121212;")
         ll = QVBoxLayout(left)
-        ll.setSpacing(10)  # Увеличиваем отступы между элементами
-        ll.setContentsMargins(0, 0, 0, 0)
+        ll.setSpacing(6)
+        ll.setContentsMargins(4, 4, 4, 4)
         t = QLabel("СЕРВЕРНЫЙ АГЕНТ")
         t.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
         t.setStyleSheet("color:#999;padding:8px 0;letter-spacing:2px;")
@@ -289,33 +324,40 @@ class ServerGUI(QMainWindow):
         cl = QVBoxLayout(cg)
         cl.setSpacing(8)
         cl.setContentsMargins(8, 12, 8, 12)
-        
-        # Кнопки управления - увеличенные
-        btn_style = "QPushButton { padding: 12px 16px; font-size: 12px; min-height: 40px; }"
-        
+
+        # Кнопки управления - динамический размер
+        btn_style = """
+            QPushButton { 
+                padding: 10px 14px; 
+                font-size: 11px; 
+                min-height: 36px; 
+                text-align: center;
+            }
+        """
+
         self.btn_analyze = QPushButton("1. Анализ системы")
         self.btn_analyze.setStyleSheet(btn_style)
         self.btn_analyze.clicked.connect(self._start_analysis)
         cl.addWidget(self.btn_analyze)
-        
+
         self.btn_load_db = QPushButton("2. Загрузить базы CVE/CWE/CAPEC/MITRE")
         self.btn_load_db.setStyleSheet(btn_style)
         self.btn_load_db.setEnabled(False)
         self.btn_load_db.clicked.connect(self._load_databases)
         cl.addWidget(self.btn_load_db)
-        
+
         self.btn_load_toolkit = QPushButton("2б. Загрузить базу инструментов")
         self.btn_load_toolkit.setStyleSheet(btn_style)
         self.btn_load_toolkit.setEnabled(False)
         self.btn_load_toolkit.clicked.connect(self._load_toolkit)
         cl.addWidget(self.btn_load_toolkit)
-        
+
         self.btn_vuln_scan = QPushButton("3. Локальное сканирование уязвимостей")
         self.btn_vuln_scan.setStyleSheet(btn_style)
         self.btn_vuln_scan.setEnabled(False)
         self.btn_vuln_scan.clicked.connect(self._start_vuln_scan)
         cl.addWidget(self.btn_vuln_scan)
-        
+
         self.vuln_progress = QProgressBar()
         self.vuln_progress.setFixedHeight(20)
         self.vuln_progress.setVisible(False)
@@ -327,7 +369,7 @@ class ServerGUI(QMainWindow):
         self.btn_trivy_scan.setEnabled(False)
         self.btn_trivy_scan.clicked.connect(self._start_trivy_scan)
         cl.addWidget(self.btn_trivy_scan)
-        
+
         self.trivy_progress = QProgressBar()
         self.trivy_progress.setFixedHeight(20)
         self.trivy_progress.setVisible(False)
@@ -338,16 +380,16 @@ class ServerGUI(QMainWindow):
         self.btn_server.setEnabled(False)
         self.btn_server.clicked.connect(self._toggle_server)
         cl.addWidget(self.btn_server)
-        
+
         ll.addWidget(cg)
-        
+
         # Параметры - уменьшены
         pg = QGroupBox("Параметры")
         pg.setStyleSheet("QGroupBox { font-size: 11px; padding-top: 18px; }")
         pl = QVBoxLayout(pg)
         pl.setSpacing(4)
         pl.setContentsMargins(6, 10, 6, 8)
-        
+
         r = QHBoxLayout()
         r.addWidget(QLabel("Порт API:"))
         r.setSpacing(4)
@@ -357,39 +399,39 @@ class ServerGUI(QMainWindow):
         self.port_spin.setFixedHeight(24)
         r.addWidget(self.port_spin)
         pl.addLayout(r)
-        
+
         small_btn_style = "QPushButton { padding: 4px 10px; font-size: 10px; min-height: 24px; }"
         self.btn_check_port = QPushButton("Проверить порт")
         self.btn_check_port.setStyleSheet(small_btn_style)
         self.btn_check_port.clicked.connect(self._check_port_availability)
         pl.addWidget(self.btn_check_port)
-        
+
         self.port_status_label = QLabel("")
         self.port_status_label.setStyleSheet("font-size:9px;")
         self.port_status_label.setWordWrap(True)
         pl.addWidget(self.port_status_label)
         ll.addWidget(pg)
-        
+
         # Отчёт - уменьшены
         rg = QGroupBox("Отчёт")
         rg.setStyleSheet("QGroupBox { font-size: 11px; padding-top: 18px; }")
         rl = QVBoxLayout(rg)
         rl.setSpacing(4)
         rl.setContentsMargins(6, 10, 6, 8)
-        
+
         self.btn_open_report = QPushButton("Открыть последний отчёт")
         self.btn_open_report.setStyleSheet(small_btn_style)
         self.btn_open_report.setEnabled(False)
         self.btn_open_report.clicked.connect(self._open_report)
         rl.addWidget(self.btn_open_report)
-        
+
         self.btn_generate_manual = QPushButton("Сгенерировать отчёт вручную")
         self.btn_generate_manual.setStyleSheet(small_btn_style)
         self.btn_generate_manual.setEnabled(False)
         self.btn_generate_manual.setToolTip("Сгенерировать отчёт на основе выбранного вектора атаки")
         self.btn_generate_manual.clicked.connect(self._generate_manual_report)
         rl.addWidget(self.btn_generate_manual)
-        
+
         self.btn_export_log = QPushButton("Экспорт лога")
         self.btn_export_log.setStyleSheet(small_btn_style)
         self.btn_export_log.clicked.connect(self._export_log)
@@ -409,7 +451,9 @@ class ServerGUI(QMainWindow):
         self.lbl_history_stats.setStyleSheet("color:#666;font-size:11px;")
         sl.addWidget(self.lbl_history_stats)
         ll.addWidget(sf2)
-        return left
+        
+        scroll.setWidget(left)
+        return scroll
     def _build_system_tab(self):
         st = QWidget()
         stl = QVBoxLayout(st)
@@ -742,6 +786,18 @@ class ServerGUI(QMainWindow):
 
         self._update_software_tab(self.system_info) # Обновляем вкладку ПО
 
+        # Сохраняем результат сканирования в историю
+        import time
+        scan_start = time.time()
+        record = ScanHistory.from_system_info(
+            self.system_info, 
+            self.system_summary,
+            scan_duration=0.0,  # Время анализа не измеряется точно здесь
+            notes="Автоматическое сканирование системы"
+        )
+        self.scan_history.add_record(record)
+        self._update_stats()
+
         self.btn_analyze.setText("1. Анализ системы (выполнен)")
         self.btn_analyze.setEnabled(True)
         self.btn_load_db.setEnabled(True)
@@ -766,11 +822,8 @@ class ServerGUI(QMainWindow):
         self.btn_load_db.setText("2. Базы (загружены)")
         self.btn_load_db.setEnabled(True)
         self.btn_vuln_scan.setEnabled(True)
-        self.btn_server.setEnabled(True)
-        self.lbl_stats.setText(
-            f"CVE:{len(db.cve_db)} CWE:{len(db.cwe_db)} "
-            f"CAPEC:{len(db.capec_db)} MITRE:{len(db.mitre_db)}"
-        )
+        # НЕ разблокируем кнопку сервера здесь - ждём Trivy
+        self._update_stats()
     def _on_db_error(self, e):
         self.btn_load_db.setText("2. Загрузить базы CVE/CWE/CAPEC/MITRE")
         self.btn_load_db.setEnabled(True)
@@ -1031,10 +1084,18 @@ class ServerGUI(QMainWindow):
         # Сохраняем сводку
         self.trivy_summary = summary
         
+        # Сохраняем полный результат Trivy для корреляции
+        if hasattr(self, 'system_analyzer') and self.system_analyzer:
+            self.trivy_result = getattr(self.system_analyzer.system_info, 'trivy_scan_result', None)
+
         # Обновляем статус
         total = summary.get("total_vulns", 0)
         self.trivy_status_label.setText(f"✅ Сканирование завершено! Найдено {total} уязвимостей")
         self.trivy_status_label.setStyleSheet("color:#8a8;font-size:11px;padding:4px;")
+
+        # Разблокируем кнопку запуска сервера
+        if self.system_info and self.vuln_db:
+            self.btn_server.setEnabled(True)
         
         # Заполняем таблицу
         self.trivy_table.setRowCount(0)
@@ -1121,6 +1182,24 @@ class ServerGUI(QMainWindow):
     #  HTTP Сервер
     # ─────────────────────────────────────────
     def _toggle_server(self):
+        # Проверяем что Trivy был запущен
+        if not self.trivy_summary:
+            reply = QMessageBox.warning(
+                self,
+                "⚠️ Trivy не запущен",
+                "⚠️ Сканирование Trivy не было выполнено!\n\n"
+                "Без данных Trivy корреляция атак будет неполной:\n"
+                "• Реализуемость атак НЕ будет подтверждена\n"
+                "• Уязвимости ПО не будут учтены\n"
+                "• Отчёт будет менее точным\n\n"
+                "Рекомендуется выполнить сканирование Trivy перед запуском сервера.\n\n"
+                "Всё равно запустить сервер?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.No:
+                return
+        
         if self.server_running:
             self._stop_server()
         else:
@@ -1137,6 +1216,7 @@ class ServerGUI(QMainWindow):
         state.system_info = self.system_info
         state.system_summary = self.system_summary if isinstance(self.system_summary, dict) else {}
         state.vuln_db = self.vuln_db
+        state.trivy_result = getattr(self, 'trivy_result', None)  # Результаты Trivy
         state.ready = bool(self.system_info and self.vuln_db)
         state.on_client_connected = lambda ip: gui.client_connected_signal.emit(ip)
         state.on_analysis_complete = lambda s, p: gui.analysis_done_signal.emit(s, p)
@@ -1184,7 +1264,11 @@ class ServerGUI(QMainWindow):
                         if state.on_client_connected:
                             state.on_client_connected(ip)
                     sr = from_json_scan_result(scan_data)
-                    cor = AttackCorrelator(state.system_info, state.vuln_db)
+                    cor = AttackCorrelator(
+                        state.system_info, 
+                        state.vuln_db,
+                        trivy_result=state.trivy_result
+                    )
                     results = cor.correlate(sr)
                     summary = cor.get_summary()
                     # Сохраняем данные для генерации расширенного отчёта
@@ -1367,10 +1451,25 @@ class ServerGUI(QMainWindow):
         rd = os.path.join(PROJECT_DIR, "reports")
         self.report_history.sync_from_disk(rd)
         self._refresh_history_table()
+        self._update_stats()
+        
+    def _update_stats(self):
+        """Обновление общей статистики."""
         stats = self.report_history.stats
+        scan_stats = self.scan_history.stats
+        
+        stats_text = ""
+        if self.vuln_db:
+            stats_text = f"CVE:{len(self.vuln_db.cve_db)} CWE:{len(self.vuln_db.cwe_db)} CAPEC:{len(self.vuln_db.capec_db)}"
+        else:
+            stats_text = "Базы не загружены"
+        self.lbl_stats.setText(stats_text)
+        
         self.lbl_history_stats.setText(
             f"История: {stats['total']} отчётов "
-            f"({stats['critical_reports']} с CRITICAL)"
+            f"({stats['critical_reports']} с CRITICAL)\n"
+            f"Сканирования: {scan_stats['total']} | "
+            f"Хостов: {scan_stats['unique_hosts']}"
         )
     def _refresh_history(self):
         """Обновить историю отчётов."""

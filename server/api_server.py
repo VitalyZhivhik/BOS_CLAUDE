@@ -30,6 +30,7 @@ from server.system_analyzer import SystemAnalyzer
 from server.vulnerability_db import VulnerabilityDatabase
 from server.attack_correlator import AttackCorrelator
 from server.report_generator import ReportGenerator
+from server.trivy_scanner import TrivyScanResult
 
 logger = get_server_logger()
 
@@ -44,6 +45,7 @@ class ServerState:
         self.vuln_db = None
         self.toolkit = None           # AttackToolkit — для схем 3,4,5
         self.local_scan_report = None # ScanReport   — для схемы 3
+        self.trivy_result = None      # TrivyScanResult — для корреляции уязвимостей
         self.base_dir = ""
         self.ready = False
         self.connected_clients = []
@@ -194,7 +196,11 @@ class RequestHandler(BaseHTTPRequestHandler):
                 if state.on_correlation_progress:
                     state.on_correlation_progress(0, "Начало корреляции...")
 
-                correlator = AttackCorrelator(state.system_info, state.vuln_db)
+                correlator = AttackCorrelator(
+                    state.system_info, 
+                    state.vuln_db,
+                    trivy_result=state.trivy_result  # Передаём результаты Trivy
+                )
                 
                 # Устанавливаем callback для прогресса
                 def progress_callback(percent, message):

@@ -667,11 +667,44 @@ class AttackerGUI(QMainWindow):
         ml.setContentsMargins(8, 8, 8, 8)
 
         # ── Левая панель ──
+        # Создаём контейнер с скроллом для левой панели
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setStyleSheet("""
+            QScrollArea {
+                background: #121212;
+                border: none;
+            }
+            QScrollBar:vertical {
+                background: #121212;
+                width: 6px;
+                border: none;
+            }
+            QScrollBar::handle:vertical {
+                background: #444;
+                border-radius: 3px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #555;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+                border: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: #121212;
+            }
+        """)
+        
         left = QWidget()
-        left.setFixedWidth(380)  # Расширена панель
+        left.setFixedWidth(320)  # Оптимальная ширина панели
+        left.setStyleSheet("background: #121212;")
         ll = QVBoxLayout(left)
-        ll.setSpacing(8)
-        ll.setContentsMargins(0, 0, 0, 0)
+        ll.setSpacing(6)
+        ll.setContentsMargins(4, 4, 4, 4)
 
         t = QLabel("АТАКУЮЩИЙ АГЕНТ")
         t.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
@@ -700,20 +733,20 @@ class AttackerGUI(QMainWindow):
         tl = QVBoxLayout(tg)
         tl.setSpacing(6)
         tl.setContentsMargins(8, 12, 8, 10)
-        
+
         tl.addWidget(QLabel("IP-адрес сервера:"))
         self.target_input = QLineEdit(TARGET_SERVER_HOST)
         self.target_input.setFont(QFont("Consolas", 12))
         self.target_input.setFixedHeight(32)
         tl.addWidget(self.target_input)
-        
+
         tl.addWidget(QLabel("Порт API сервера:"))
         self.port_spin = QSpinBox()
         self.port_spin.setRange(1024, 65535)
         self.port_spin.setValue(TARGET_SERVER_PORT)
         self.port_spin.setFixedHeight(28)
         tl.addWidget(self.port_spin)
-        
+
         r = QHBoxLayout()
         r.setSpacing(6)
         r.addWidget(QLabel("Порты от:"))
@@ -729,7 +762,7 @@ class AttackerGUI(QMainWindow):
         self.pe_spin.setFixedHeight(28)
         r.addWidget(self.pe_spin)
         tl.addLayout(r)
-        
+
         self.chk_deep = QCheckBox("Глубокий фингерпринтинг")
         self.chk_deep.setChecked(True)
         tl.addWidget(self.chk_deep)
@@ -741,10 +774,17 @@ class AttackerGUI(QMainWindow):
         al = QVBoxLayout(ag)
         al.setSpacing(8)
         al.setContentsMargins(8, 12, 8, 10)
-        
-        # Кнопки действий - увеличенные
-        action_btn_style = "QPushButton { padding: 10px 14px; font-size: 11px; min-height: 36px; }"
-        
+
+        # Кнопки действий - динамический размер
+        action_btn_style = """
+            QPushButton { 
+                padding: 10px 14px; 
+                font-size: 11px; 
+                min-height: 36px; 
+                text-align: center;
+            }
+        """
+
         self.btn_check = QPushButton("1. Проверить связь с сервером")
         self.btn_check.setStyleSheet(action_btn_style)
         self.btn_check.clicked.connect(self._check_connection)
@@ -795,7 +835,7 @@ class AttackerGUI(QMainWindow):
         sep.setFrameShape(QFrame.Shape.HLine)
         sep.setStyleSheet("color:#333;")
         al.addWidget(sep)
-        
+
         small_btn_style = "QPushButton { padding: 6px 12px; font-size: 10px; min-height: 28px; }"
         self.btn_clear_vectors = QPushButton("🗑  Очистить таблицу векторов")
         self.btn_clear_vectors.setStyleSheet(small_btn_style)
@@ -822,7 +862,8 @@ class AttackerGUI(QMainWindow):
         sl.addWidget(self.lbl_stats)
         ll.addWidget(sf)
 
-        ml.addWidget(left)
+        scroll.setWidget(left)
+        ml.addWidget(scroll)
 
         # ── Правая часть — вкладки ──
         self.tabs = QTabWidget()
@@ -953,51 +994,10 @@ class AttackerGUI(QMainWindow):
         htl.addWidget(self.history_preview)
 
         self.tabs.addTab(ht, "📁 История")
-        
-        # Вкладка 4: Trivy (статус сканирования на сервере)
-        tr = QWidget()
-        trl = QVBoxLayout(tr)
-        
-        trivy_title = QLabel("🛡️ Статус сканирования Trivy на сервере")
-        trivy_title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
-        trivy_title.setStyleSheet("color:#888;padding:6px 0;")
-        trl.addWidget(trivy_title)
-        
-        trivy_hint = QLabel(
-            "💡 Trivy сканирует ПО сервера на уязвимости CVE/CWE/CAPEC.\n"
-            "Результаты используются для улучшения отчёта корреляции."
-        )
-        trivy_hint.setStyleSheet(
-            "background:#1a1e2a;border:1px solid #2a3a4a;border-radius:3px;"
-            "padding:6px;color:#6a8aaa;font-size:10px;"
-        )
-        trivy_hint.setWordWrap(True)
-        trl.addWidget(trivy_hint)
-        
-        self.trivy_server_status = QLabel("⚪ Trivy не запущен (ожидание данных от сервера)")
-        self.trivy_server_status.setStyleSheet("color:#666;font-size:11px;padding:4px;")
-        trl.addWidget(self.trivy_server_status)
-        
-        self.trivy_server_table = QTableWidget(0, 5)
-        self.trivy_server_table.setHorizontalHeaderLabels([
-            "CVE-ID", "ПО", "Версия", "Серьёзность", "Заголовок"
-        ])
-        self.trivy_server_table.horizontalHeader().setStretchLastSection(True)
-        self.trivy_server_table.setColumnWidth(0, 140)
-        self.trivy_server_table.setColumnWidth(1, 150)
-        self.trivy_server_table.setColumnWidth(2, 90)
-        self.trivy_server_table.setColumnWidth(3, 90)
-        self.trivy_server_table.verticalHeader().setVisible(False)
-        self.trivy_server_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        trl.addWidget(self.trivy_server_table)
-        
-        self.trivy_server_summary = QLabel("")
-        self.trivy_server_summary.setStyleSheet("color:#888;font-size:11px;padding:4px;")
-        self.trivy_server_summary.setWordWrap(True)
-        trl.addWidget(self.trivy_server_summary)
-        
-        self.tabs.addTab(tr, "🛡️ Trivy (Сервер)")
-        
+
+        # Вкладка Trivy УБРАНА - она не нужна атакующему агенту
+        # Trivy сканирует только серверную часть
+
         # Вкладка 5: Сканеры Лог (разделён на 2 части)
         nt = QWidget()
         ntl = QVBoxLayout(nt)
