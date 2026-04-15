@@ -49,8 +49,9 @@ QGroupBox {
 }
 QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 6px; color: #909090; }
 QPushButton {
-    padding: 8px 14px; border-radius: 3px; font-weight: 600; font-size: 11px;
+    padding: 10px 16px; border-radius: 4px; font-weight: 600; font-size: 11px;
     border: 1px solid #444; color: #d0d0d0; background: #252525;
+    min-height: 36px;
 }
 QPushButton:hover { background: #333; border-color: #555; }
 QPushButton:pressed { background: #1a1a1a; }
@@ -165,6 +166,26 @@ class ToolkitLoadWorker(QThread):
         except Exception as e:
             logger.error(f"Ошибка загрузки toolkit: {e}", exc_info=True)
             self.error.emit(str(e))
+
+class TrivyScanWorker(QThread):
+    finished = pyqtSignal(object)  # dict summary
+    progress = pyqtSignal(int, str)  # percent, message
+    error = pyqtSignal(str)
+    
+    def __init__(self, system_analyzer, trivy_path=""):
+        super().__init__()
+        self.system_analyzer = system_analyzer
+        self.trivy_path = trivy_path
+    
+    def run(self):
+        try:
+            self.progress.emit(0, "Запуск сканирования Trivy...")
+            result = self.system_analyzer.run_trivy_scan(self.trivy_path)
+            self.progress.emit(100, "Сканирование Trivy завершено")
+            self.finished.emit(result)
+        except Exception as e:
+            logger.error(f"Ошибка сканирования Trivy: {e}", exc_info=True)
+            self.error.emit(str(e))
 # ─────────────────────────────────────────
 #  Главное окно
 # ─────────────────────────────────────────
@@ -173,16 +194,19 @@ class ServerGUI(QMainWindow):
     client_connected_signal = pyqtSignal(str)
     analysis_done_signal = pyqtSignal(dict, str)
     update_results_signal = pyqtSignal(object)
+    correlation_progress_signal = pyqtSignal(int, str)  # Прогресс корреляции
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Security Assessment — Серверный агент v2.0")
-        self.setMinimumSize(1250, 800)
+        self.setMinimumSize(1600, 900)  # Увеличиваем размер окна для широкой панели
         # Состояние
         self.system_info = None
         self.system_summary = None
         self.vuln_db = None
         self.vuln_scan_report = None
         self.toolkit = None
+        self.trivy_summary = None  # Результаты Trivy
+        self.trivy_available = False  # Доступен ли Trivy
         self.report_history = ReportHistory(PROJECT_DIR)
         self.http_server = None
         self.server_thread = None
@@ -194,6 +218,7 @@ class ServerGUI(QMainWindow):
         self._build_ui()
         self.setStyleSheet(STYLE)
         self.update_results_signal.connect(self._update_results_table_slot)
+        self.correlation_progress_signal.connect(self._on_correlation_progress_update)
         gh = GUILogHandler(self._on_log_message)
         gh.setLevel(10)
         logger.addHandler(gh)
@@ -211,13 +236,14 @@ class ServerGUI(QMainWindow):
         ml = QHBoxLayout(central)
         ml.setSpacing(8)
         ml.setContentsMargins(8, 8, 8, 8)
-        # Левая панель управления
+        # Левая панель управления - значительно расширена
         left = self._build_left_panel()
         ml.addWidget(left)
-        # Правая панель с вкладками
+        # Правая панель с вкладками - уменьшена
         self.tabs = QTabWidget()
         self._build_system_tab()
         self._build_software_tab() # НОВАЯ ВКЛАДКА
+        self._build_trivy_tab()  # НОВАЯ ВКЛАДКА TRIVY
         self._build_vuln_tab()
         self._build_correlation_tab()
         self._build_attack_selector_tab()
@@ -228,18 +254,18 @@ class ServerGUI(QMainWindow):
         self.statusBar().showMessage("Готов к работе")
     def _build_left_panel(self) -> QWidget:
         left = QWidget()
-        left.setFixedWidth(300)
+        left.setFixedWidth(420)  # Значительно увеличиваем ширину панели
         ll = QVBoxLayout(left)
-        ll.setSpacing(6)
+        ll.setSpacing(10)  # Увеличиваем отступы между элементами
         ll.setContentsMargins(0, 0, 0, 0)
         t = QLabel("СЕРВЕРНЫЙ АГЕНТ")
-        t.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
-        t.setStyleSheet("color:#888;padding:6px 0;letter-spacing:2px;")
+        t.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        t.setStyleSheet("color:#999;padding:8px 0;letter-spacing:2px;")
         ll.addWidget(t)
         # Статус
         self.status_frame = QFrame()
         self.status_frame.setStyleSheet(
-            "background:#1a1a1a;border:1px solid #333;border-radius:4px;padding:8px;"
+            "background:#1e1e1e;border:1px solid #3a3a3a;border-radius:6px;padding:12px;"
         )
         sf = QVBoxLayout(self.status_frame)
         sf.setSpacing(4)
@@ -257,80 +283,130 @@ class ServerGUI(QMainWindow):
         self.port_display.setWordWrap(True)
         sf.addWidget(self.port_display)
         ll.addWidget(self.status_frame)
-        # Управление
+        # Управление - значительно увеличен
         cg = QGroupBox("Управление")
+        cg.setStyleSheet("QGroupBox { font-size: 13px; font-weight: bold; padding-top: 24px; }")
         cl = QVBoxLayout(cg)
-        cl.setSpacing(6)
+        cl.setSpacing(8)
+        cl.setContentsMargins(8, 12, 8, 12)
+        
+        # Кнопки управления - увеличенные
+        btn_style = "QPushButton { padding: 12px 16px; font-size: 12px; min-height: 40px; }"
+        
         self.btn_analyze = QPushButton("1. Анализ системы")
+        self.btn_analyze.setStyleSheet(btn_style)
         self.btn_analyze.clicked.connect(self._start_analysis)
         cl.addWidget(self.btn_analyze)
+        
         self.btn_load_db = QPushButton("2. Загрузить базы CVE/CWE/CAPEC/MITRE")
+        self.btn_load_db.setStyleSheet(btn_style)
         self.btn_load_db.setEnabled(False)
         self.btn_load_db.clicked.connect(self._load_databases)
         cl.addWidget(self.btn_load_db)
+        
         self.btn_load_toolkit = QPushButton("2б. Загрузить базу инструментов")
+        self.btn_load_toolkit.setStyleSheet(btn_style)
         self.btn_load_toolkit.setEnabled(False)
         self.btn_load_toolkit.clicked.connect(self._load_toolkit)
         cl.addWidget(self.btn_load_toolkit)
+        
         self.btn_vuln_scan = QPushButton("3. Локальное сканирование уязвимостей")
+        self.btn_vuln_scan.setStyleSheet(btn_style)
         self.btn_vuln_scan.setEnabled(False)
         self.btn_vuln_scan.clicked.connect(self._start_vuln_scan)
         cl.addWidget(self.btn_vuln_scan)
+        
         self.vuln_progress = QProgressBar()
-        self.vuln_progress.setFixedHeight(18)
+        self.vuln_progress.setFixedHeight(20)
         self.vuln_progress.setVisible(False)
         cl.addWidget(self.vuln_progress)
+
+        # Кнопка Trivy
+        self.btn_trivy_scan = QPushButton("3б. Сканирование Trivy (CVE/CWE/CAPEC)")
+        self.btn_trivy_scan.setStyleSheet(btn_style)
+        self.btn_trivy_scan.setEnabled(False)
+        self.btn_trivy_scan.clicked.connect(self._start_trivy_scan)
+        cl.addWidget(self.btn_trivy_scan)
+        
+        self.trivy_progress = QProgressBar()
+        self.trivy_progress.setFixedHeight(20)
+        self.trivy_progress.setVisible(False)
+        cl.addWidget(self.trivy_progress)
+
         self.btn_server = QPushButton("4. Запустить сервер")
+        self.btn_server.setStyleSheet(btn_style + "QPushButton { background: #2a4a2a; }")
         self.btn_server.setEnabled(False)
         self.btn_server.clicked.connect(self._toggle_server)
         cl.addWidget(self.btn_server)
+        
         ll.addWidget(cg)
-        # Параметры
+        
+        # Параметры - уменьшены
         pg = QGroupBox("Параметры")
+        pg.setStyleSheet("QGroupBox { font-size: 11px; padding-top: 18px; }")
         pl = QVBoxLayout(pg)
+        pl.setSpacing(4)
+        pl.setContentsMargins(6, 10, 6, 8)
+        
         r = QHBoxLayout()
         r.addWidget(QLabel("Порт API:"))
+        r.setSpacing(4)
         self.port_spin = QSpinBox()
         self.port_spin.setRange(1024, 65535)
         self.port_spin.setValue(SERVER_PORT)
+        self.port_spin.setFixedHeight(24)
         r.addWidget(self.port_spin)
         pl.addLayout(r)
+        
+        small_btn_style = "QPushButton { padding: 4px 10px; font-size: 10px; min-height: 24px; }"
         self.btn_check_port = QPushButton("Проверить порт")
+        self.btn_check_port.setStyleSheet(small_btn_style)
         self.btn_check_port.clicked.connect(self._check_port_availability)
         pl.addWidget(self.btn_check_port)
+        
         self.port_status_label = QLabel("")
-        self.port_status_label.setStyleSheet("font-size:10px;")
+        self.port_status_label.setStyleSheet("font-size:9px;")
         self.port_status_label.setWordWrap(True)
         pl.addWidget(self.port_status_label)
         ll.addWidget(pg)
-        # Отчёт
+        
+        # Отчёт - уменьшены
         rg = QGroupBox("Отчёт")
+        rg.setStyleSheet("QGroupBox { font-size: 11px; padding-top: 18px; }")
         rl = QVBoxLayout(rg)
+        rl.setSpacing(4)
+        rl.setContentsMargins(6, 10, 6, 8)
+        
         self.btn_open_report = QPushButton("Открыть последний отчёт")
+        self.btn_open_report.setStyleSheet(small_btn_style)
         self.btn_open_report.setEnabled(False)
         self.btn_open_report.clicked.connect(self._open_report)
         rl.addWidget(self.btn_open_report)
+        
         self.btn_generate_manual = QPushButton("Сгенерировать отчёт вручную")
+        self.btn_generate_manual.setStyleSheet(small_btn_style)
         self.btn_generate_manual.setEnabled(False)
         self.btn_generate_manual.setToolTip("Сгенерировать отчёт на основе выбранного вектора атаки")
         self.btn_generate_manual.clicked.connect(self._generate_manual_report)
         rl.addWidget(self.btn_generate_manual)
+        
         self.btn_export_log = QPushButton("Экспорт лога")
+        self.btn_export_log.setStyleSheet(small_btn_style)
         self.btn_export_log.clicked.connect(self._export_log)
         rl.addWidget(self.btn_export_log)
         ll.addWidget(rg)
         ll.addStretch()
         # Статистика
         sf2 = QFrame()
-        sf2.setStyleSheet("background:#1a1a1a;border:1px solid #333;border-radius:4px;padding:8px;")
+        sf2.setStyleSheet("background:#1e1e1e;border:1px solid #3a3a3a;border-radius:6px;padding:12px;")
         sl = QVBoxLayout(sf2)
-        sl.setSpacing(2)
+        sl.setSpacing(4)
         self.lbl_stats = QLabel("Статистика недоступна")
-        self.lbl_stats.setStyleSheet("color:#666;font-size:10px;")
+        self.lbl_stats.setStyleSheet("color:#777;font-size:11px;")
         self.lbl_stats.setWordWrap(True)
         sl.addWidget(self.lbl_stats)
         self.lbl_history_stats = QLabel("")
-        self.lbl_history_stats.setStyleSheet("color:#555;font-size:10px;")
+        self.lbl_history_stats.setStyleSheet("color:#666;font-size:11px;")
         sl.addWidget(self.lbl_history_stats)
         ll.addWidget(sf2)
         return left
@@ -352,13 +428,53 @@ class ServerGUI(QMainWindow):
         stl = QVBoxLayout(st)
         label = QLabel("Реестр программного обеспечения и открытых портов, найденных сканером на сервере:")
         stl.addWidget(label)
-        
+
         self.software_table = QTableWidget(0, 3)
         self.software_table.setHorizontalHeaderLabels(["Тип", "Название / Компонент", "Порт / Версия"])
         self.software_table.horizontalHeader().setStretchLastSection(True)
         self.software_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         stl.addWidget(self.software_table)
         self.tabs.addTab(st, "📦 Обнаруженное ПО")
+
+    def _build_trivy_tab(self):
+        """Вкладка для отображения результатов сканирования Trivy"""
+        st = QWidget()
+        stl = QVBoxLayout(st)
+        
+        # Заголовок
+        title = QLabel("🔍 Результаты сканирования Trivy (CVE/CWE/CAPEC)")
+        title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        title.setStyleSheet("color:#888;padding:6px 0;")
+        stl.addWidget(title)
+        
+        # Статус
+        self.trivy_status_label = QLabel("⚪ Trivy не запущен")
+        self.trivy_status_label.setStyleSheet("color:#666;font-size:11px;padding:4px;")
+        stl.addWidget(self.trivy_status_label)
+        
+        # Таблица уязвимостей
+        self.trivy_table = QTableWidget(0, 7)
+        self.trivy_table.setHorizontalHeaderLabels([
+            "CVE-ID", "ПО", "Версия", "Исправлено", "Серьёзность", "Заголовок", "CWE/CAPEC"
+        ])
+        self.trivy_table.horizontalHeader().setStretchLastSection(True)
+        self.trivy_table.setColumnWidth(0, 140)
+        self.trivy_table.setColumnWidth(1, 150)
+        self.trivy_table.setColumnWidth(2, 90)
+        self.trivy_table.setColumnWidth(3, 90)
+        self.trivy_table.setColumnWidth(4, 90)
+        self.trivy_table.setColumnWidth(5, 250)
+        self.trivy_table.verticalHeader().setVisible(False)
+        self.trivy_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        stl.addWidget(self.trivy_table)
+        
+        # Сводка
+        self.trivy_summary_label = QLabel("")
+        self.trivy_summary_label.setStyleSheet("color:#888;font-size:11px;padding:4px;")
+        self.trivy_summary_label.setWordWrap(True)
+        stl.addWidget(self.trivy_summary_label)
+        
+        self.tabs.addTab(st, "🛡️ Trivy")
 
     def _update_software_tab(self, system_info):
         """Заполнение вкладки реальным ПО"""
@@ -411,6 +527,18 @@ class ServerGUI(QMainWindow):
         info.setStyleSheet("color:#888;font-size:10px;padding:4px;")
         info.setWordWrap(True)
         rtl.addWidget(info)
+        
+        # Прогресс корреляции
+        self.correlation_progress_label = QLabel("⚪ Ожидание данных от атакующего...")
+        self.correlation_progress_label.setStyleSheet("color:#666;font-size:11px;padding:4px;")
+        rtl.addWidget(self.correlation_progress_label)
+        
+        self.correlation_progress_bar = QProgressBar()
+        self.correlation_progress_bar.setFixedHeight(20)
+        self.correlation_progress_bar.setVisible(False)
+        self.correlation_progress_bar.setValue(0)
+        rtl.addWidget(self.correlation_progress_bar)
+        
         self.results_table = QTableWidget(0, 5)
         self.results_table.setHorizontalHeaderLabels(["CVE", "Серьёзность", "Реализуемость", "Атака", "Описание"])
         self.results_table.horizontalHeader().setStretchLastSection(True)
@@ -591,6 +719,7 @@ class ServerGUI(QMainWindow):
     def _on_analysis_done(self, result):
         self.system_info = result["info"]
         self.system_summary = result["summary"]
+        self.system_analyzer = result["analyzer"]  # Сохраняем анализатор для Trivy
         self.sys_table.setRowCount(0)
         rows = [
             ("ОС", self.system_summary.get("os", "?")),
@@ -610,13 +739,14 @@ class ServerGUI(QMainWindow):
             self.sys_table.insertRow(r)
             self.sys_table.setItem(r, 0, QTableWidgetItem(str(p)))
             self.sys_table.setItem(r, 1, QTableWidgetItem(str(v)))
-            
+
         self._update_software_tab(self.system_info) # Обновляем вкладку ПО
-        
+
         self.btn_analyze.setText("1. Анализ системы (выполнен)")
         self.btn_analyze.setEnabled(True)
         self.btn_load_db.setEnabled(True)
         self.btn_load_toolkit.setEnabled(True)
+        self.btn_trivy_scan.setEnabled(True)  # Включаем кнопку Trivy
     def _on_analysis_error(self, e):
         self.btn_analyze.setText("1. Анализ системы")
         self.btn_analyze.setEnabled(True)
@@ -856,6 +986,137 @@ class ServerGUI(QMainWindow):
         self.btn_vuln_scan.setText("3. Локальное сканирование")
         self.btn_vuln_scan.setEnabled(True)
         QMessageBox.critical(self, "Ошибка", str(e))
+    
+    # ─────────────────────────────────────────
+    #  Trivy сканирование
+    # ─────────────────────────────────────────
+    def _start_trivy_scan(self):
+        """Запуск сканирования Trivy"""
+        if not self.system_info:
+            QMessageBox.warning(self, "Предупреждение", "Сначала выполните анализ системы!")
+            return
+        
+        self.btn_trivy_scan.setEnabled(False)
+        self.btn_trivy_scan.setText("Сканирование Trivy...")
+        self.trivy_progress.setVisible(True)
+        self.trivy_progress.setValue(0)
+        self.trivy_table.setRowCount(0)
+        self.trivy_status_label.setText("🔄 Сканирование Trivy...")
+        self.trivy_status_label.setStyleSheet("color:#a85;font-size:11px;padding:4px;")
+        
+        self.trivy_worker = TrivyScanWorker(self.system_analyzer if hasattr(self, 'system_analyzer') else None)
+        self.trivy_worker.finished.connect(self._on_trivy_scan_done)
+        self.trivy_worker.progress.connect(self._on_trivy_scan_progress)
+        self.trivy_worker.error.connect(self._on_trivy_scan_error)
+        self.trivy_worker.start()
+    
+    def _on_trivy_scan_progress(self, percent, message):
+        """Обновление прогресса Trivy"""
+        self.trivy_progress.setValue(percent)
+        self.trivy_progress.setFormat(f"{message} ({percent}%)")
+    
+    def _on_trivy_scan_done(self, summary):
+        """Обработка результатов Trivy"""
+        self.trivy_progress.setValue(100)
+        self.trivy_progress.setVisible(False)
+        
+        if summary.get("error"):
+            self.trivy_status_label.setText(f"❌ Ошибка: {summary['error']}")
+            self.trivy_status_label.setStyleSheet("color:#b55;font-size:11px;padding:4px;")
+            QMessageBox.warning(self, "Ошибка Trivy", f"Не удалось完成 сканирование:\n{summary['error']}")
+            self.btn_trivy_scan.setText("3б. Сканирование Trivy (ошибка)")
+            self.btn_trivy_scan.setEnabled(True)
+            return
+        
+        # Сохраняем сводку
+        self.trivy_summary = summary
+        
+        # Обновляем статус
+        total = summary.get("total_vulns", 0)
+        self.trivy_status_label.setText(f"✅ Сканирование завершено! Найдено {total} уязвимостей")
+        self.trivy_status_label.setStyleSheet("color:#8a8;font-size:11px;padding:4px;")
+        
+        # Заполняем таблицу
+        self.trivy_table.setRowCount(0)
+        
+        # Получаем уязвимости из system_info
+        if self.system_info and self.system_info.trivy_scan_result:
+            vulnerabilities = self.system_info.trivy_scan_result.get("vulnerabilities", [])
+            
+            # Сортируем по серьёзности
+            severity_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "UNKNOWN": 4, "INFO": 5}
+            sorted_vulns = sorted(vulnerabilities, key=lambda v: severity_order.get(v.get("severity", "UNKNOWN"), 4))
+            
+            for vuln in sorted_vulns:
+                row = self.trivy_table.rowCount()
+                self.trivy_table.insertRow(row)
+                
+                # CVE-ID
+                self.trivy_table.setItem(row, 0, QTableWidgetItem(vuln.get("vuln_id", "")))
+                
+                # ПО
+                self.trivy_table.setItem(row, 1, QTableWidgetItem(vuln.get("pkg_name", "")))
+                
+                # Версия
+                self.trivy_table.setItem(row, 2, QTableWidgetItem(vuln.get("installed_version", "")))
+                
+                # Исправлено
+                fixed = vuln.get("fixed_version", "")
+                fixed_item = QTableWidgetItem(fixed if fixed else "Нет исправления")
+                if not fixed:
+                    fixed_item.setForeground(QColor("#888"))
+                self.trivy_table.setItem(row, 3, fixed_item)
+                
+                # Серьёзность
+                sev = vuln.get("severity", "UNKNOWN")
+                sev_item = QTableWidgetItem(sev)
+                sev_color = {"CRITICAL": "#c44", "HIGH": "#a85", "MEDIUM": "#997", "LOW": "#696", "UNKNOWN": "#888", "INFO": "#668"}.get(sev, "#888")
+                sev_item.setForeground(QColor(sev_color))
+                self.trivy_table.setItem(row, 4, sev_item)
+                
+                # Заголовок
+                self.trivy_table.setItem(row, 5, QTableWidgetItem(vuln.get("title", "")[:200]))
+                
+                # CWE/CAPEC
+                cwe_capec = ""
+                cwe_ids = vuln.get("cwe_ids", [])
+                capec_ids = vuln.get("capec_ids", [])
+                if cwe_ids:
+                    cwe_capec += "CWE: " + ", ".join(cwe_ids[:3])
+                if capec_ids:
+                    if cwe_capec:
+                        cwe_capec += " | "
+                    cwe_capec += "CAPEC: " + ", ".join(capec_ids[:3])
+                self.trivy_table.setItem(row, 6, QTableWidgetItem(cwe_capec if cwe_capec else "—"))
+        
+        # Обновляем сводку
+        self.trivy_summary_label.setText(
+            f"Всего уязвимостей: {summary.get('total_vulns', 0)}  |  "
+            f"🔴 CRITICAL: {summary.get('critical', 0)}  |  "
+            f"🟠 HIGH: {summary.get('high', 0)}  |  "
+            f"🟡 MEDIUM: {summary.get('medium', 0)}  |  "
+            f"🟢 LOW: {summary.get('low', 0)}  |  "
+            f"Время: {summary.get('scan_duration', '?')}"
+        )
+        
+        self.btn_trivy_scan.setText("3б. Сканирование Trivy (выполнено)")
+        self.btn_trivy_scan.setEnabled(True)
+        
+        # Переключаемся на вкладку Trivy
+        # Находим индекс вкладки Trivy
+        for i in range(self.tabs.count()):
+            if "Trivy" in self.tabs.tabText(i):
+                self.tabs.setCurrentIndex(i)
+                break
+    
+    def _on_trivy_scan_error(self, e):
+        """Обработка ошибки Trivy"""
+        self.trivy_progress.setVisible(False)
+        self.trivy_status_label.setText(f"❌ Ошибка: {str(e)}")
+        self.trivy_status_label.setStyleSheet("color:#b55;font-size:11px;padding:4px;")
+        self.btn_trivy_scan.setText("3б. Сканирование Trivy (ошибка)")
+        self.btn_trivy_scan.setEnabled(True)
+        QMessageBox.critical(self, "Ошибка Trivy", str(e))
     # ─────────────────────────────────────────
     #  HTTP Сервер
     # ─────────────────────────────────────────
@@ -879,6 +1140,8 @@ class ServerGUI(QMainWindow):
         state.ready = bool(self.system_info and self.vuln_db)
         state.on_client_connected = lambda ip: gui.client_connected_signal.emit(ip)
         state.on_analysis_complete = lambda s, p: gui.analysis_done_signal.emit(s, p)
+        state.on_correlation_progress = lambda p, m: gui.correlation_progress_signal.emit(p, m)
+        
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
                 ip = self.client_address[0]
@@ -1022,6 +1285,20 @@ class ServerGUI(QMainWindow):
         self.last_report_path = path
         self.tabs.setCurrentIndex(2)  # Вкладка корреляции
         self.btn_open_report.setEnabled(True)
+    
+    def _on_correlation_progress_update(self, percent, message):
+        """Обновление прогресса корреляции из GUI потока."""
+        self.correlation_progress_label.setText(f"🔄 {message}")
+        self.correlation_progress_label.setStyleSheet("color:#a85;font-size:11px;padding:4px;")
+        self.correlation_progress_bar.setVisible(True)
+        self.correlation_progress_bar.setValue(percent)
+        self.correlation_progress_bar.setFormat(f"{message} ({percent}%)")
+        
+        if percent >= 100:
+            # Скрываем прогресс бар через 2 секунды после завершения
+            QTimer.singleShot(2000, lambda: self.correlation_progress_bar.setVisible(False))
+            self.correlation_progress_label.setText("✅ Корреляция завершена")
+            self.correlation_progress_label.setStyleSheet("color:#8a8;font-size:11px;padding:4px;")
     # ─────────────────────────────────────────
     #  Таблица корреляции
     # ─────────────────────────────────────────

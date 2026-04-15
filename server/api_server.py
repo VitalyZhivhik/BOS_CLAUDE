@@ -10,12 +10,14 @@ API сервера для приёма результатов сканирова
   - ✅ ИСПРАВЛЕНО: Передача toolkit, local_scan_report, attacker_scan_data в ReportGenerator
   - ✅ ИСПРАВЛЕНО: Дедупликация результатов (дубликаты в отчётах устранены)
   - ✅ НОВОЕ: Сохранение в историю отчётов через ReportHistory
+  - ✅ НОВОЕ: Шкала прогресса корреляции для отслеживания прогресса
 """
 
 import json
 import os
 import sys
 import threading
+import logging
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
@@ -47,6 +49,10 @@ class ServerState:
         self.connected_clients = []
         self.on_client_connected = None
         self.on_analysis_complete = None
+        # Прогресс корреляции
+        self.correlation_progress = 0  # 0-100
+        self.correlation_message = ""  # Текущее сообщение
+        self.on_correlation_progress = None  # Callback для GUI
 
 
 state = ServerState()
@@ -181,10 +187,32 @@ class RequestHandler(BaseHTTPRequestHandler):
 
                 scan_result = from_json_scan_result(scan_data)
 
-                # Корреляция
+                # Корреляция с прогрессом
+                logger.info(f"[HTTP-IN] Начинаем корреляцию...")
+                state.correlation_progress = 0
+                state.correlation_message = "Начало корреляции..."
+                if state.on_correlation_progress:
+                    state.on_correlation_progress(0, "Начало корреляции...")
+
                 correlator = AttackCorrelator(state.system_info, state.vuln_db)
+                
+                # Устанавливаем callback для прогресса
+                def progress_callback(percent, message):
+                    state.correlation_progress = percent
+                    state.correlation_message = message
+                    logger.info(f"[CORRELATION] {percent}% - {message}")
+                    if state.on_correlation_progress:
+                        state.on_correlation_progress(percent, message)
+                
+                correlator.set_progress_callback(progress_callback)
+                
                 results = correlator.correlate(scan_result)
                 summary = correlator.get_summary()
+
+                state.correlation_progress = 100
+                state.correlation_message = "Корреляция завершена"
+                if state.on_correlation_progress:
+                    state.on_correlation_progress(100, "Корреляция завершена")
 
                 # Генерация отчётов
                 reports_dir = os.path.join(state.base_dir, "reports")

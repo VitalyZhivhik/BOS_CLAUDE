@@ -2,6 +2,7 @@
 Модуль анализа системы сервера.
 Собирает информацию об ОС, ПО, сервисах.
 Включает встроенный сверхбыстрый OVAL-парсер (замена медленному OVALDI).
+НОВИНКА: Интеграция с Trivy для сканирования уязвимостей ПО.
 """
 
 import subprocess
@@ -16,6 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from common.models import SystemInfo, InstalledSoftware, SecurityMeasure, OpenPort
 from common.config import KNOWN_PORTS
 from common.logger import get_server_logger
+from server.trivy_scanner import TrivyScanner
 
 logger = get_server_logger()
 
@@ -158,10 +160,10 @@ class SystemAnalyzer:
     def _run_fast_fstec_scanner(self):
         """Сверхбыстрый парсер базы ФСТЭК на чистом Python (Замена OVALDI)."""
         logger.info("Интеграция: Запуск встроенного Python-сканера OVAL (ФСТЭК)...")
-        
+
         base_dir = os.path.dirname(os.path.dirname(__file__))
         tools_dir = os.path.join(base_dir, "tools")
-        
+
         # Ищем любой XML файл базы в папке tools
         definitions_path = None
         for root_dir, _, files in os.walk(tools_dir):
@@ -179,13 +181,13 @@ class SystemAnalyzer:
         try:
             self.progress_callback(70, "Анализ базы ФСТЭК в оперативной памяти (сверхбыстрый режим)...")
             logger.info(f"  Используется база: {definitions_path}")
-            
+
             # Подготавливаем списки установленного ПО для мгновенного поиска
             sw_list = [sw.name.lower() for sw in self.system_info.installed_software if sw.name and len(sw.name) > 3]
             os_info = f"{self.system_info.os_name} {self.system_info.os_version}".lower()
-            
+
             cve_list = []
-            
+
             # Используем iterparse: он читает файл потоково, не перегружая оперативную память!
             context = ET.iterparse(definitions_path, events=('end',))
             for event, elem in context:
@@ -200,11 +202,11 @@ class SystemAnalyzer:
                             ref_id = child.get('ref_id')
                             if ref_id and (ref_id.startswith('CVE') or ref_id.startswith('BDU')):
                                 refs.append(ref_id)
-                    
+
                     if title and refs:
                         t_lower = title.lower()
                         matched = False
-                        
+
                         # Проверяем уязвимости самой ОС
                         if "windows 10" in t_lower and "windows 10" in os_info:
                             matched = True
@@ -214,16 +216,16 @@ class SystemAnalyzer:
                                 if sw in t_lower:
                                     matched = True
                                     break
-                        
+
                         if matched:
                             cve_list.extend(refs)
-                            
+
                     # Очищаем узел из памяти для поддержания высокой скорости
                     elem.clear()
 
             # Убираем дубликаты
             cve_list = list(set(cve_list))
-            
+
             self.system_info.security_measures.append(
                 SecurityMeasure(
                     name="Встроенный OVAL-сканер",
@@ -232,7 +234,7 @@ class SystemAnalyzer:
                     details=f"База: ФСТЭК. Найдено потенциальных уязвимостей локального ПО: {len(cve_list)}"
                 )
             )
-            
+
             self.progress_callback(95, f"Успешно! Найдено {len(cve_list)} совпадений в базе.")
             logger.info(f"  [+] Встроенный сканер завершил работу за пару секунд. Найдено совпадений: {len(cve_list)}")
 
@@ -240,8 +242,79 @@ class SystemAnalyzer:
             logger.error(f"  [!] Ошибка встроенного сканера: {e}")
             self.progress_callback(95, "Ошибка при чтении базы данных.")
 
+    def run_trivy_scan(self, trivy_path: str = "") -> dict:
+        """
+        Запускает сканирование Trivy и сохраняет результаты в system_info.
+        
+        Args:
+            trivy_path: Путь к исполняемому файлу Trivy
+            
+        Returns:
+            dict: Сводка результатов сканирования
+        """
+        logger.info("=" * 60)
+        logger.info(" TRIVY: ЗАПУСК СКАНИРОВАНИЯ УЯЗВИМОСТЕЙ")
+        logger.info("=" * 60)
+        
+        self.progress_callback(0, "Инициализация Trivy...")
+        
+        try:
+            scanner = TrivyScanner(
+                trivy_path=trivy_path,
+                progress_callback=self.progress_callback
+            )
+            
+            if not scanner.is_available():
+                logger.warning("[TRIVY] Trivy недоступен или не найден")
+                self.progress_callback(100, "Trivy недоступен")
+                return {"error": "Trivy не найден или недоступен"}
+            
+            # Запускаем сканирование
+            scan_result = scanner.scan_local_system(security_checks=False)
+            
+            # Сохраняем результаты в system_info
+            self.system_info.trivy_scan_result = {
+                "vulnerabilities": [
+                    {
+                        "vuln_id": v.vuln_id,
+                        "pkg_name": v.pkg_name,
+                        "installed_version": v.installed_version,
+                        "fixed_version": v.fixed_version,
+                        "severity": v.severity,
+                        "title": v.title,
+                        "description": v.description[:300],
+                        "cwe_ids": v.cwe_ids,
+                        "capec_ids": v.capec_ids,
+                    }
+                    for v in scan_result.vulnerabilities
+                ],
+                "summary": scanner.get_summary()
+            }
+            
+            # Добавляем информацию о сканировании в security_measures
+            summary = scanner.get_summary()
+            if not summary.get("error"):
+                self.system_info.security_measures.append(
+                    SecurityMeasure(
+                        name="Trivy Scanner",
+                        category="vulnerability_scanner",
+                        status="active",
+                        details=f"Найдено уязвимостей: {summary.get('total_vulns', 0)} "
+                                f"(CRITICAL: {summary.get('critical', 0)}, "
+                                f"HIGH: {summary.get('high', 0)})"
+                    )
+                )
+            
+            logger.info(f"[TRIVY] Сканирование завершено. Найдено {summary.get('total_vulns', 0)} уязвимостей")
+            return summary
+            
+        except Exception as e:
+            logger.error(f"[TRIVY] Ошибка сканирования: {e}", exc_info=True)
+            self.progress_callback(100, f"Ошибка Trivy: {str(e)}")
+            return {"error": str(e)}
+
     def get_summary(self) -> dict:
-        return {
+        summary = {
             "os": f"{self.system_info.os_name} {self.system_info.os_version}",
             "hostname": self.system_info.hostname,
             "ip_addresses": self.system_info.ip_addresses,
@@ -262,3 +335,23 @@ class SystemAnalyzer:
                 for m in self.system_info.security_measures
             ]
         }
+        
+        # Добавляем информацию о Trivy если есть результаты
+        if self.system_info.trivy_scan_result:
+            trivy_summary = self.system_info.trivy_scan_result.get("summary", {})
+            summary["trivy_scan"] = {
+                "completed": True,
+                "total_vulns": trivy_summary.get("total_vulns", 0),
+                "critical": trivy_summary.get("critical", 0),
+                "high": trivy_summary.get("high", 0),
+                "medium": trivy_summary.get("medium", 0),
+                "low": trivy_summary.get("low", 0),
+                "scan_duration": trivy_summary.get("scan_duration", ""),
+            }
+        else:
+            summary["trivy_scan"] = {
+                "completed": False,
+                "total_vulns": 0,
+            }
+        
+        return summary

@@ -12,3 +12,4 @@ SecurityServer.spec
 dist
 build
 .vscode
+.qwen

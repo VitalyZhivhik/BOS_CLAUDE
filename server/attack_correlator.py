@@ -3,10 +3,12 @@
 Сопоставляет обнаруженные атакующим агентом векторы атак
 с реальной конфигурацией сервера и базами CVE/CWE/CAPEC/MITRE ATT&CK.
 Определяет реализуемость каждой атаки.
+НОВИНКА: Улучшенное логирование с временными метками для отслеживания медленных операций.
 """
 
 import os
 import sys
+import time
 from dataclasses import asdict
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -16,6 +18,9 @@ from common.models import (
     AttackFeasibility, Severity, AttackVector
 )
 from server.vulnerability_db import VulnerabilityDatabase
+from common.logger import get_server_logger
+
+logger = get_server_logger()
 
 
 class AttackCorrelator:
@@ -25,31 +30,85 @@ class AttackCorrelator:
         self.system_info = system_info
         self.vuln_db = vuln_db
         self.results: list[VulnerabilityMatch] = []
+        self.progress_callback = None  # Callback для прогресса
+
+    def set_progress_callback(self, callback):
+        """Устанавливает callback для отслеживания прогресса."""
+        self.progress_callback = callback
+    
+    def _report_progress(self, percent: int, message: str):
+        """Отправляет прогресс через callback."""
+        if self.progress_callback:
+            self.progress_callback(percent, message)
 
     def correlate(self, scan_result: ScanResult) -> list[VulnerabilityMatch]:
         """Основной метод корреляции."""
-        print("\n[*] Начинаем корреляцию атак с конфигурацией сервера...")
+        start_time = time.time()
+        logger.info("=" * 70)
+        logger.info(" НАЧАЛО КОРРЕЛЯЦИИ АТАК С КОНФИГУРАЦИЕЙ СЕРВЕРА")
+        logger.info("=" * 70)
+        
+        self._report_progress(0, "Начало корреляции атак...")
         self.results = []
 
         # 1. Анализ каждого вектора атаки от атакующего агента
-        for av in scan_result.attack_vectors:
+        total_vectors = len(scan_result.attack_vectors)
+        logger.info(f"[1/3] Векторов атак для анализа: {total_vectors}")
+        self._report_progress(5, f"Анализ {total_vectors} векторов атак...")
+        
+        vector_start = time.time()
+        for i, av in enumerate(scan_result.attack_vectors, 1):
             if isinstance(av, dict):
                 av = AttackVector(**av)
+            
+            # Прогресс: 5-50% для анализа векторов
+            percent = 5 + int((i / total_vectors) * 45) if total_vectors > 0 else 5
+            self._report_progress(percent, f"Анализ вектора {i}/{total_vectors}...")
+            
+            # Логируем каждые 10 векторов для отслеживания прогресса
+            if i % 10 == 0 or i == total_vectors:
+                elapsed = time.time() - vector_start
+                logger.info(f"  [{i}/{total_vectors}] Векторов обработано ({elapsed:.2f}s)...")
+            
             matches = self._analyze_attack_vector(av)
             self.results.extend(matches)
+        
+        vector_elapsed = time.time() - vector_start
+        logger.info(f"[1/3] Завершено: {len(self.results)} результатов за {vector_elapsed:.2f}s")
 
         # 2. Дополнительно: анализ на основе открытых портов и CVE
+        logger.info("[2/3] Анализ уязвимостей по портам...")
+        self._report_progress(55, "Анализ уязвимостей по портам...")
+        port_start = time.time()
         port_based = self._analyze_port_based_vulnerabilities(scan_result)
         self.results.extend(port_based)
+        port_elapsed = time.time() - port_start
+        logger.info(f"[2/3] Завершено: +{len(port_based)} результатов за {port_elapsed:.2f}s")
 
         # 3. Анализ на основе установленного ПО и известных CVE
+        logger.info("[3/3] Анализ уязвимостей установленного ПО...")
+        self._report_progress(75, "Анализ уязвимостей установленного ПО...")
+        sw_start = time.time()
         sw_based = self._analyze_software_vulnerabilities()
         self.results.extend(sw_based)
+        sw_elapsed = time.time() - sw_start
+        logger.info(f"[3/3] Завершено: +{len(sw_based)} результатов за {sw_elapsed:.2f}s")
 
         # Убираем дубликаты (Умная агрегация)
+        logger.info("Дедупликация результатов...")
+        self._report_progress(90, "Дедупликация результатов...")
+        dedup_start = time.time()
+        before_count = len(self.results)
         self.results = self._deduplicate(self.results)
+        dedup_elapsed = time.time() - dedup_start
+        logger.info(f"Дедупликация: {before_count} -> {len(self.results)} за {dedup_elapsed:.2f}s")
 
-        print(f"[+] Корреляция завершена. Уникальных результатов (после агрегации): {len(self.results)}")
+        total_elapsed = time.time() - start_time
+        self._report_progress(100, f"Корреляция завершена. Найдено {len(self.results)} уникальных результатов")
+        logger.info("=" * 70)
+        logger.info(f" КОРРЕЛЯЦИЯ ЗАВЕРШЕНА ЗА {total_elapsed:.2f} СЕК")
+        logger.info(f" Уникальных результатов: {len(self.results)}")
+        logger.info("=" * 70)
         return self.results
 
     def _analyze_attack_vector(self, av: AttackVector) -> list[VulnerabilityMatch]:
