@@ -203,9 +203,15 @@ class ReportHistory:
                 dt = datetime.strptime(ts_str, "%Y%m%d_%H%M%S")
                 timestamp = dt.isoformat()
                 report_id = ts_str
-            except Exception:
-                timestamp = datetime.now().isoformat()
+            except ValueError:
+                # Fallback to file modification time if name format is wrong
+                try:
+                    mtime = os.path.getmtime(html_path)
+                    timestamp = datetime.fromtimestamp(mtime).isoformat()
+                except OSError:
+                    timestamp = datetime.now().isoformat()
                 report_id = fname.replace(".html", "")
+
             record = ReportRecord(
                 report_id=report_id,
                 timestamp=timestamp,
@@ -214,25 +220,28 @@ class ReportHistory:
             )
             # Читаем метаданные из JSON если он есть
             if os.path.exists(json_path):
-                with open(json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                server_info = data.get("server_info", {})
-                record.hostname = server_info.get("hostname", "")
-                record.os_name = server_info.get("os", "")
-                results = data.get("results", [])
-                record.total_vulnerabilities = len(results)
-                record.feasible_count = sum(1 for r in results if r.get("feasibility") == "РЕАЛИЗУЕМА")
-                record.not_feasible_count = sum(1 for r in results if r.get("feasibility") == "НЕ РЕАЛИЗУЕМА")
-                record.critical_count = sum(1 for r in results if r.get("severity") == "CRITICAL")
-                record.high_count = sum(1 for r in results if r.get("severity") == "HIGH")
-                record.medium_count = sum(1 for r in results if r.get("severity") == "MEDIUM")
-                record.low_count = sum(1 for r in results if r.get("severity") == "LOW")
-                summary = data.get("summary", {})
-                record.target_ip = summary.get("target_ip", "")
-                record.scanner_ip = summary.get("scanner_ip", "")
+                try:
+                    with open(json_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    server_info = data.get("server_info", {})
+                    record.hostname = server_info.get("hostname", "")
+                    record.os_name = server_info.get("os", "")
+                    results = data.get("results", [])
+                    record.total_vulnerabilities = len(results)
+                    record.feasible_count = sum(1 for r in results if r.get("feasibility") == "РЕАЛИЗУЕМА")
+                    record.not_feasible_count = sum(1 for r in results if r.get("feasibility") == "НЕ РЕАЛИЗУЕМА")
+                    record.critical_count = sum(1 for r in results if r.get("severity") == "CRITICAL")
+                    record.high_count = sum(1 for r in results if r.get("severity") == "HIGH")
+                    record.medium_count = sum(1 for r in results if r.get("severity") == "MEDIUM")
+                    record.low_count = sum(1 for r in results if r.get("severity") == "LOW")
+                    summary = data.get("summary", {})
+                    record.target_ip = summary.get("target_ip", "")
+                    record.scanner_ip = summary.get("scanner_ip", "")
+                except (json.JSONDecodeError, KeyError) as e:
+                    logger.warning(f"[HISTORY] Ошибка чтения JSON для отчёта {html_path}: {e}")
             return record
         except Exception as e:
-            logger.warning(f"[HISTORY] Не удалось прочитать отчёт {html_path}: {e}")
+            logger.error(f"[HISTORY] Критическая ошибка при построении записи для {html_path}: {e}", exc_info=True)
             return None
     @property
     def total_count(self) -> int:

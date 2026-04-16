@@ -11,6 +11,8 @@ import platform
 import os
 import sys
 import xml.etree.ElementTree as ET
+import json
+from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -305,6 +307,18 @@ class SystemAnalyzer:
                     )
                 )
             
+            # Сохраняем историю сканирования Trivy в папку data
+            try:
+                data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+                os.makedirs(data_dir, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                save_path = os.path.join(data_dir, f"trivy_scan_{timestamp}.json")
+                with open(save_path, "w", encoding="utf-8") as f:
+                    json.dump(self.system_info.trivy_scan_result, f, ensure_ascii=False, indent=4)
+                logger.info(f"Успех: История Trivy успешно сохранена в файл {save_path}")
+            except Exception as save_err:
+                logger.error(f"Ошибка при сохранении истории Trivy: {save_err}")
+
             logger.info(f"[TRIVY] Сканирование завершено. Найдено {summary.get('total_vulns', 0)} уязвимостей")
             return summary
             

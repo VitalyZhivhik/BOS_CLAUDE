@@ -498,5 +498,105 @@
     "mitigation": "Централизованная проверка прав на каждом запросе, явные проверки ownership, тестирование на IDOR",
     "requires_technology": ["web_application", "api", "backend_service"],
     "detection_methods": ["dynamic_analysis", "access_testing", "code_review"]
+  },
+  {
+    "id": "CWE-1321",
+    "name": "Неправильный контроль модификации атрибутов прототипа объекта",
+    "description": "Приложение допускает изменение атрибутов прототипа объекта, что может привести к загрязнению прототипа и удалённому выполнению кода",
+    "category": "prototype_pollution",
+    "related_capec": ["CAPEC-159"],
+    "mitigation": "Глубокое клонирование объектов, валидация JSON-схем, использование Object.freeze() для прототипов",
+    "requires_technology": ["javascript", "nodejs", "web_application"],
+    "detection_methods": ["static_analysis", "dynamic_analysis", "code_review"]
+  },
+  {
+    "id": "CWE-506",
+    "name": "Встроенный вредоносный компонент",
+    "description": "В приложение или его зависимости встроен вредоносный код (бэкдор)",
+    "category": "supply_chain",
+    "related_capec": ["CAPEC-151", "CAPEC-437"],
+    "mitigation": "Проверка зависимостей, использование SBOM, аудит кода, проверка подписей",
+    "requires_technology": ["any_application"],
+    "detection_methods": ["static_analysis", "supply_chain_scanning", "binary_analysis"]
+  },
+  {
+    "id": "CWE-362",
+    "name": "Состояние гонки (Race Condition)",
+    "description": "Программа выполняет операции в небезопасной последовательности, позволяя атакующему изменить поведение",
+    "category": "race_condition",
+    "related_capec": ["CAPEC-29"],
+    "mitigation": "Атомарные операции, блокировки, транзакции, минимизация критических секций",
+    "requires_technology": ["any_application"],
+    "detection_methods": ["static_analysis", "concurrency_testing", "fuzzing"]
+  },
+  {
+    "id": "CWE-116",
+    "name": "Неправильное кодирование или экранирование вывода",
+    "description": "Приложение не кодирует или не экранирует вывод, что может привести к инъекционным атакам",
+    "category": "output_encoding",
+    "related_capec": ["CAPEC-126", "CAPEC-71"],
+    "mitigation": "Использование безопасных API вывода, экранирование специальных символов, Content Security Policy",
+    "requires_technology": ["web_application"],
+    "detection_methods": ["static_analysis", "dynamic_analysis", "penetration_testing"]
+  },
+  {
+    "id": "CWE-94",
+    "name": "Внедрение кода (Code Injection)",
+    "description": "Неправильная нейтрализация специального кода, что позволяет атакующему выполнять произвольные команды в контексте приложения",
+    "category": "injection",
+    "related_capec": ["CAPEC-88", "CAPEC-234"],
+    "mitigation": "Белый список входных данных, изоляция песочницами, отключение опасных функций eval/exec",
+    "requires_technology": ["web_application", "scripting_engine"],
+    "detection_methods": ["static_analysis", "dynamic_analysis", "runtime_monitoring"]
+  },
+  {
+    "id": "CWE-1321",
+    "name": "Загрязнение прототипа (Prototype Pollution)",
+    "description": "Атакующий может изменять атрибуты прототипа объекта JavaScript, что приводит к изменению логики приложения и RCE",
+    "category": "injection",
+    "related_capec": ["CAPEC-159", "CAPEC-586"],
+    "mitigation": "Использование Object.freeze(), глубокое клонирование, валидация JSON-схем, запрет __proto__",
+    "requires_technology": ["javascript", "nodejs", "web_application"],
+    "detection_methods": ["static_analysis", "dynamic_analysis", "code_review"]
+  },
+  {
+    "id": "CWE-1357",
+    "name": "Небезопасная десериализация в React Server Components",
+    "description": "Некорректная обработка сериализованных данных в React Server Components приводит к удалённому выполнению кода",
+    "category": "data_integrity",
+    "related_capec": ["CAPEC-586", "CAPEC-88"],
+    "mitigation": "Обновление Next.js, отключение небезопасных сериализаторов, валидация входных данных",
+    "requires_technology": ["nextjs", "react_server_components"],
+    "detection_methods": ["dependency_scanning", "dynamic_analysis"]
+  },
+  {
+    "id": "CWE-1394",
+    "name": "Неправильная проверка прав в CI/CD пайплайнах",
+    "description": "Отсутствие авторизации при запуске CI/CD заданий позволяет неавторизованным пользователям выполнять произвольный код",
+    "category": "access_control",
+    "related_capec": ["CAPEC-115", "CAPEC-88"],
+    "mitigation": "Обязательная авторизация для всех триггеров, минимальные права для раннеров, изоляция пайплайнов",
+    "requires_technology": ["gitlab", "github_actions", "ci_cd_system"],
+    "detection_methods": ["configuration_audit", "log_analysis"]
+  },
+  {
+    "id": "CWE-1415",
+    "name": "Неправильная обработка HTTP/2 фреймов",
+    "description": "Ошибки в обработке HTTP/2 протокола приводят к отказу в обслуживании или удалённому выполнению кода",
+    "category": "network_security",
+    "related_capec": ["CAPEC-125", "CAPEC-100"],
+    "mitigation": "Обновление веб-серверов, ограничение количества потоков, валидация размеров фреймов",
+    "requires_technology": ["web_server", "http2"],
+    "detection_methods": ["fuzzing", "network_monitoring"]
+  },
+  {
+    "id": "CWE-506",
+    "name": "Встроенный вредоносный код",
+    "description": "Приложение или его зависимости содержат преднамеренно встроенный бэкдор или вредоносную функциональность",
+    "category": "supply_chain",
+    "related_capec": ["CAPEC-151", "CAPEC-437"],
+    "mitigation": "Проверка зависимостей, использование SBOM, аудит кода, проверка подписей пакетов",
+    "requires_technology": ["any_application", "package_manager"],
+    "detection_methods": ["supply_chain_scanning", "binary_analysis", "behavioral_analysis"]
   }
 ]

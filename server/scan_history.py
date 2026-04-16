@@ -172,7 +172,7 @@ class ScanHistory:
     def add_record(self, record: ScanRecord):
         """Добавление новой записи в историю."""
         # Создаем файл для новой записи
-        filename = f"scan_{record.scan_id}.json"
+        filename = f"{record.scan_id}.json"
         filepath = os.path.join(self._history_dir, filename)
 
         try:

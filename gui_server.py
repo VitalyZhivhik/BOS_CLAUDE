@@ -246,6 +246,7 @@ class ServerGUI(QMainWindow):
         self._build_system_tab()
         self._build_software_tab() # НОВАЯ ВКЛАДКА
         self._build_trivy_tab()  # НОВАЯ ВКЛАДКА TRIVY
+        self._build_trivy_history_tab()  # НОВАЯ ВКЛАДКА ИСТОРИИ TRIVY
         self._build_vuln_tab()
         self._build_correlation_tab()
         self._build_attack_selector_tab()
@@ -527,6 +528,38 @@ class ServerGUI(QMainWindow):
         stl.addWidget(self.trivy_summary_label)
         
         self.tabs.addTab(st, "🛡️ Trivy")
+
+    def _build_trivy_history_tab(self):
+        """Вкладка истории сканирований Trivy"""
+        tht = QWidget()
+        thtl = QVBoxLayout(tht)
+        
+        title = QLabel("📂 История сканирований Trivy")
+        title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        title.setStyleSheet("color:#888;padding:6px 0;")
+        thtl.addWidget(title)
+        
+        ctrl = QHBoxLayout()
+        self.btn_refresh_trivy_hist = QPushButton("🔄 Обновить")
+        self.btn_refresh_trivy_hist.clicked.connect(self._refresh_trivy_history)
+        ctrl.addWidget(self.btn_refresh_trivy_hist)
+        
+        self.btn_load_trivy_hist = QPushButton("📥 Подгрузить выбранное сканирование")
+        self.btn_load_trivy_hist.clicked.connect(self._load_selected_trivy_history)
+        self.btn_load_trivy_hist.setEnabled(False)
+        ctrl.addWidget(self.btn_load_trivy_hist)
+        ctrl.addStretch()
+        thtl.addLayout(ctrl)
+        
+        self.trivy_hist_table = QTableWidget(0, 4)
+        self.trivy_hist_table.setHorizontalHeaderLabels(["Дата и Время", "Уязвимостей", "Критических", "Файл"])
+        self.trivy_hist_table.horizontalHeader().setStretchLastSection(True)
+        self.trivy_hist_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.trivy_hist_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.trivy_hist_table.itemSelectionChanged.connect(lambda: self.btn_load_trivy_hist.setEnabled(bool(self.trivy_hist_table.selectedItems())))
+        thtl.addWidget(self.trivy_hist_table)
+        
+        self.tabs.addTab(tht, "📜 История Trivy")
 
     def _update_software_tab(self, system_info):
         """Заполнение вкладки реальным ПО"""
@@ -1192,7 +1225,45 @@ class ServerGUI(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, "Загрузить отчёт Trivy", PROJECT_DIR, "JSON Files (*.json)")
         if not path:
             return
-            
+        self._process_trivy_file(path)
+
+    def _refresh_trivy_history(self):
+        """Обновляет таблицу истории Trivy из папки data"""
+        self.trivy_hist_table.setRowCount(0)
+        data_dir = os.path.join(PROJECT_DIR, "data")
+        if not os.path.exists(data_dir):
+            return
+        for fname in sorted(os.listdir(data_dir), reverse=True):
+            if fname.startswith("trivy_scan_") and fname.endswith(".json"):
+                fpath = os.path.join(data_dir, fname)
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    summary = data.get("summary", {})
+                    total = summary.get("total_vulns", 0)
+                    crit = summary.get("critical", 0)
+                    date_part = fname.replace("trivy_scan_", "").replace(".json", "")
+                    row = self.trivy_hist_table.rowCount()
+                    self.trivy_hist_table.insertRow(row)
+                    self.trivy_hist_table.setItem(row, 0, QTableWidgetItem(date_part))
+                    self.trivy_hist_table.setItem(row, 1, QTableWidgetItem(str(total)))
+                    self.trivy_hist_table.setItem(row, 2, QTableWidgetItem(str(crit)))
+                    file_item = QTableWidgetItem(fname)
+                    file_item.setData(Qt.ItemDataRole.UserRole, fpath)
+                    self.trivy_hist_table.setItem(row, 3, file_item)
+                except Exception as e:
+                    logger.error(f"Ошибка чтения файла истории Trivy {fname}: {e}")
+
+    def _load_selected_trivy_history(self):
+        """Загрузка отчета Trivy выбранного в таблице истории"""
+        row = self.trivy_hist_table.currentRow()
+        if row < 0: return
+        fpath = self.trivy_hist_table.item(row, 3).data(Qt.ItemDataRole.UserRole)
+        if not fpath or not os.path.exists(fpath): return
+        self._process_trivy_file(fpath)
+
+    def _process_trivy_file(self, path):
+        """Общая логика парсинга JSON от Trivy и заполнения интерфейса"""
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -1259,6 +1330,9 @@ class ServerGUI(QMainWindow):
                 
             self._on_trivy_scan_done(self.trivy_summary) # Обновит UI и разблокирует сервер
             self.trivy_status_label.setText(f"✅ Загружено из истории: {len(vulns)} уязвимостей")
+            
+            # Принудительно разблокируем кнопку запуска сервера после подгрузки
+            self.btn_server.setEnabled(True)
             
         except Exception as e:
             logger.error(f"Ошибка загрузки Trivy: {e}", exc_info=True)
@@ -1538,6 +1612,7 @@ class ServerGUI(QMainWindow):
         rd = os.path.join(PROJECT_DIR, "reports")
         self.report_history.sync_from_disk(rd)
         self._refresh_history_table()
+        self._refresh_trivy_history()
         self._update_stats()
         
     def _update_stats(self):

@@ -457,5 +457,302 @@
     "priority": "HIGH",
     "effort": "Medium",
     "effectiveness": "High"
+  },
+  {
+    "id": "DEF-012",
+    "attack_type": "remote_code_execution",
+    "cve_ids": ["CVE-2025-55182", "CVE-2024-23897"],
+    "name": "Защита от RCE через десериализацию",
+    "description": "Меры защиты от уязвимостей удалённого выполнения кода через десериализацию",
+    "tools": [
+      {
+        "name": "Jenkins Security",
+        "description": "Защита Jenkins от CVE-2024-23897",
+        "commands": [
+          "# Отключение CLI через системные свойства",
+          "# Добавить в jenkins.model.Jenkins.location-frontend:",
+          "JENKINS_CLI_DISABLED=true",
+          "",
+          "# Или использовать groovy вместо CLI",
+          "# Удалить CLI WAR файлы:",
+          "rm $JENKINS_HOME/war/*.jar",
+          "",
+          "# Ограничение через CSRF",
+          "Manage Jenkins -> Security -> CSRF Protection -> Enable"
+        ]
+      },
+      {
+        "name": "React/Next.js Security",
+        "description": "Защита от React2Shell (CVE-2025-55182)",
+        "commands": [
+          "# Обновление React до версии 19.0.1 или выше",
+          "npm install react@^19.0.1 react-dom@^19.0.1",
+          "",
+          "# Обновление Next.js до безопасной версии:",
+          "npm install next@^15.0.5",
+          "",
+          "# Для Next.js 14.x:",
+          "npm install next@^14.2.25",
+          "",
+          "# Проверка версий",
+          "npm list react next"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "Low",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-013",
+    "attack_type": "authentication_bypass",
+    "cve_ids": ["CVE-2024-1709", "CVE-2024-0204"],
+    "name": "Защита от обхода аутентификации",
+    "description": "Меры защиты от уязвимостей обхода аутентификации",
+    "tools": [
+      {
+        "name": "ConnectWise ScreenConnect Security",
+        "description": "Защита ScreenConnect от CVE-2024-1709",
+        "commands": [
+          "# Обновление до версии 23.9.8 или выше",
+          "# Загрузить с официального сайта:",
+          "https://www.connectwise.com/software",
+          "",
+          "# Проверка версии через UI:",
+          "# Help -> About ScreenConnect",
+          "",
+          "# После обновления проверить:",
+          "curl -k 'https://<TARGET>/Home.aspx?InstallType=Add'"
+        ]
+      },
+      {
+        "name": "Fortra GoAnywhere Security",
+        "description": "Защита GoAnywhere от CVE-2024-0204",
+        "commands": [
+          "# Обновление до версии 7.4.0 или выше",
+          "# Загрузить патч:",
+          "https://support.fortra.com/",
+          "",
+          "# Включить MFA",
+          "Administration -> Users -> Enable Two-Factor Authentication",
+          "",
+          "# Ограничить IP адреса",
+          "Administration -> Security -> IP Whitelist"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-014",
+    "attack_type": "privilege_escalation",
+    "cve_ids": ["CVE-2024-3094"],
+    "name": "Защита от supply chain атак",
+    "description": "Защита от компрометации зависимостей и supply chain атак",
+    "tools": [
+      {
+        "name": "XZ Utils Detection & Remediation",
+        "description": "Обнаружение и устранение бэкдора в XZ Utils",
+        "commands": [
+          "# Проверка версии",
+          "xz --version",
+          "",
+          "# Если 5.6.0 или 5.6.1 - уязвим!",
+          "",
+          "# Откат до безопасной версии (Ubuntu/Debian)",
+          "sudo apt install xz-utils=5.2.5-2ubuntu2",
+          "",
+          "# Или через manually:",
+          "wget http://archive.ubuntu.com/ubuntu/pool/main/x/xz-utils/xz-utils_5.2.5-2ubuntu2_amd64.deb",
+          "sudo dpkg -i xz-utils_5.2.5-2ubuntu2_amd64.deb",
+          "",
+          "# Проверка через SSH (должен работать)",
+          "ssh -v localhost"
+        ]
+      },
+      {
+        "name": "SBOM Generation",
+        "description": "Генерация Software Bill of Materials для мониторинга зависимостей",
+        "commands": [
+          "# Установка Syft",
+          "curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin",
+          "",
+          "# Генерация SBOM",
+          "syft your-project.tar.gz -o json > sbom.json",
+          "",
+          "# Использование Grype для сканирования уязвимостей",
+          "curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin",
+          "grype sbom:sbom.json"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-015",
+    "attack_type": "remote_code_execution",
+    "cve_ids": ["CVE-2024-3400", "CVE-2024-21887"],
+    "name": "Защита сетевого оборудования",
+    "description": "Защита от уязвимостей в сетевом оборудовании",
+    "tools": [
+      {
+        "name": "Palo Alto PAN-OS Updates",
+        "description": "Обновление PAN-OS от уязвимостей GlobalProtect",
+        "commands": [
+          "# Проверка версии PAN-OS",
+          "show system info",
+          "",
+          "# Обновление до версии 10.2.9-h2, 11.0.4-h2 или выше",
+          "# Через Web UI:",
+          "# Device -> Dynamic Updates -> Check Now",
+          "",
+          "# Отключение GlobalProtect если не используется",
+          "# Network -> GlobalProtect -> Portals -> Disable",
+          "",
+          "# Ограничение доступа к GlobalProtect",
+          "# Network -> GlobalProtect -> Clients -> Add IP Range"
+        ]
+      },
+      {
+        "name": "Ivanti Connect Secure Updates",
+        "description": "Обновление Ivanti от множественных уязвимостей",
+        "commands": [
+          "# Обновление до версии 22.5R2 или выше",
+          "# Скачать с:",
+          "https://downloads.ivanti.com/",
+          "",
+          "# Проверка версии:",
+          "show version",
+          "",
+          "# Мониторинг подозрительной активности:",
+          "show audit-log | last 50"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-016",
+    "attack_type": "denial_of_service",
+    "cve_ids": ["CVE-2024-6387"],
+    "name": "Защита SSH от DoS",
+    "description": "Защита от уязвимости RegreSSHion в OpenSSH",
+    "tools": [
+      {
+        "name": "OpenSSH Hardening",
+        "description": "Защита OpenSSH от CVE-2024-6387",
+        "commands": [
+          "# Обновление OpenSSH до версии 9.8p1 или выше",
+          "",
+          "# Ubuntu/Debian:",
+          "sudo apt update && sudo apt install openssh-server",
+          "",
+          "# Проверка версии",
+          "sshd -V",
+          "",
+          "# Включение Rate Limiting",
+          "MaxAuthTries 3",
+          "MaxSessions 10",
+          "",
+          "# Включение Fail2Ban",
+          "sudo apt install fail2ban"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "Medium"
+  },
+  {
+    "id": "DEF-017",
+    "attack_type": "vulnerability_assessment",
+    "cve_ids": [],
+    "name": "Автоматическое сканирование уязвимостей",
+    "description": "Регулярное сканирование для обнаружения уязвимостей",
+    "tools": [
+      {
+        "name": "Trivy",
+        "description": "Сканер уязвимостей для контейнеров и инфраструктуры",
+        "commands": [
+          "# Установка Trivy",
+          "wget https://github.com/aquasecurity/trivy/releases/download/v0.55.0/trivy_0.55.0_Linux-64bit.tar.gz",
+          "tar -xzf trivy_0.55.0_Linux-64bit.tar.gz",
+          "mv trivy /usr/local/bin/",
+          "",
+          "# Сканирование образа",
+          "trivy image <image_name>",
+          "",
+          "# Сканирование файловой системы",
+          "trivy fs /path/to/project",
+          "",
+          "# Сканирование с JSON выводом",
+          "trivy image --format json --output results.json <image_name>"
+        ]
+      },
+      {
+        "name": "Grype",
+        "description": "Сканер уязвимостей в контейнерах",
+        "commands": [
+          "# Установка Grype",
+          "curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin",
+          "",
+          "# Сканирование образа",
+          "grype <image_name>",
+          "",
+          "# Сканирование директории",
+          "grype dir:./myproject",
+          "",
+          "# Проверка CVE",
+          "grype <image_name> -c CVE-2024-3094"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "Medium"
+  },
+  {
+    "id": "DEF-018",
+    "attack_type": "file_upload",
+    "cve_ids": ["CVE-2025-46191"],
+    "name": "Защита от загрузки вредоносных файлов",
+    "description": "Защита веб-приложений от загрузки опасных файлов",
+    "tools": [
+      {
+        "name": "File Upload Security",
+        "description": "Проверка и валидация загружаемых файлов",
+        "commands": [
+          "# Проверка MIME типа",
+          "file --mime-type uploaded_file",
+          "",
+          "# Проверка Magic Numbers",
+          "xxd uploaded_file | head -1",
+          "",
+          "# Переименование файлов",
+          "# Использовать UUID для имен файлов:",
+          "import uuid",
+          "filename = f\"{uuid.uuid4()}.{extension}\"",
+          "",
+          "# Запрет выполнения в директории загрузок",
+          "# Nginx:",
+          "location /uploads {",
+          "  nonexistent;",
+          "}",
+          "",
+          "# Apache .htaccess:",
+          "Options -ExecCGI",
+          "RemoveHandler cgi-script .php .pl .py .cgi"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High"
   }
 ]
