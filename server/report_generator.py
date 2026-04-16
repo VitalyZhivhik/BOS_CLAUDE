@@ -84,6 +84,34 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .modal-body p { line-height: 1.5; font-size: 14px; background: #0d1117; padding: 12px; border-radius: 6px; border: 1px solid var(--border); }
         .rec-box { border-left: 4px solid #238636 !important; }
         .attack-box { border-left: 4px solid #d29922 !important; background: rgba(210, 153, 34, 0.05) !important; font-family: monospace;}
+
+        /* Перечни CVE/CWE/CAPEC/ПО */
+        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .summary-panel { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 15px; }
+        .summary-panel h3 { color: #fff; font-size: 13px; margin: 0 0 10px 0; border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
+        .summary-panel .count-badge { float: right; background: var(--accent); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+        .summary-list { max-height: 250px; overflow-y: auto; }
+        .summary-list::-webkit-scrollbar { width: 4px; }
+        .summary-list::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+        .summary-item { padding: 5px 8px; border-bottom: 1px solid #21262d; font-size: 12px; font-family: "Consolas", monospace; color: #8b949e; transition: background 0.15s; }
+        .summary-item:hover { background: #161b22; color: #c9d1d9; }
+        .summary-item .sw-ver { color: #484f58; font-size: 11px; }
+
+        /* Раздел атак и защиты */
+        .atk-def-item { margin-bottom: 15px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+        .atk-def-header { padding: 12px 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.15s; }
+        .atk-def-header:hover { background: #1f2428; }
+        .atk-def-body { display: none; padding: 15px; border-top: 1px solid var(--border); background: #0d1117; }
+        .atk-section { border-left: 4px solid #d29922; padding: 12px 15px; margin: 8px 0; background: rgba(210,153,34,0.03); border-radius: 0 6px 6px 0; }
+        .def-section { border-left: 4px solid #238636; padding: 12px 15px; margin: 8px 0; background: rgba(35,134,54,0.03); border-radius: 0 6px 6px 0; }
+        .cmd-block { background: #010409; color: #e6edf3; padding: 12px; border-radius: 4px; font-family: "Consolas", monospace; font-size: 12px; overflow-x: auto; white-space: pre-wrap; margin: 8px 0; border: 1px solid #21262d; line-height: 1.6; }
+        .cmd-comment { color: #484f58; }
+        .cmd-highlight { color: #d29922; }
+        .tool-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-right: 6px; }
+        .tool-atk { background: rgba(210,153,34,0.15); color: #e3b341; border: 1px solid #d29922; }
+        .tool-def { background: rgba(35,134,54,0.15); color: #3fb950; border: 1px solid #238636; }
+
+        @media (max-width: 1000px) { .summary-grid { grid-template-columns: repeat(2, 1fr); } }
     </style>
 </head>
 <body>
@@ -95,6 +123,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div class="stat-box" style="border-top: 3px solid #da3633;"><div class="title">Реализуемые (КРИТИЧНО)</div><div class="num" id="st-real" style="color: #ff7b72;">0</div></div>
             <div class="stat-box" style="border-top: 3px solid #d29922;"><div class="title">Частично реализуемые (ПРОВЕРИТЬ)</div><div class="num" id="st-part" style="color: #e3b341;">0</div></div>
             <div class="stat-box" style="border-top: 3px solid #238636;"><div class="title">Не реализуемые (ЗАБЛОКИРОВАНО)</div><div class="num" id="st-noreal" style="color: #3fb950;">0</div></div>
+        </div>
+
+        <!-- ПЕРЕЧНИ CVE / CWE / CAPEC / ПО -->
+        <div class="card">
+            <div class="header-flex">
+                <div>
+                    <h2 style="margin:0; border:none;">📑 Перечни обнаруженных идентификаторов</h2>
+                    <p style="margin: 5px 0 0 0; font-size: 13px; color: #8b949e;">Полные реестры уникальных CVE, CWE, CAPEC и программного обеспечения, выявленных в ходе анализа.</p>
+                </div>
+                <button class="btn-toggle" onclick="toggleSummary()">📑 Развернуть перечни</button>
+            </div>
+            <div id="summary-container" style="display:none;">
+                <div class="summary-grid" id="summary-grid"></div>
+            </div>
         </div>
 
         <div class="card" style="border-left: 4px solid #da3633;">
@@ -177,6 +219,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </tbody>
             </table>
         </div>
+
+        <!-- РАЗДЕЛ: РЕАЛИЗУЕМЫЕ АТАКИ И ЗАЩИТА -->
+        <div class="card" style="border-left: 4px solid #d29922;">
+            <div class="header-flex">
+                <div>
+                    <h2 style="margin:0; border:none;">⚔️ Реализуемые атаки и меры противодействия</h2>
+                    <p style="margin: 5px 0 0 0; font-size: 13px; color: #8b949e;">Детальные инструкции по воспроизведению атак (Red Team) и рекомендации по защите (Blue Team) с конкретными командами.</p>
+                </div>
+                <button class="btn-toggle btn-orange" onclick="toggleAtkDef()">⚔️ Развернуть раздел</button>
+            </div>
+            <div id="atk-def-container" style="display:none;">
+                <div id="atk-def-list"></div>
+            </div>
+        </div>
     </div>
 
     <div id="infoModal" class="modal">
@@ -191,6 +247,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         var reportData = __REPORT_DATA__;
         var rawCveData = __RAW_CVE_DATA__;
         var sysData = __SYS_DATA__;
+        var summaryData = __SUMMARY_DATA__;
+        var atkDefData = __ATK_DEF_DATA__;
         var network = null;
         var detailsMap = {};
 
@@ -198,6 +256,138 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             populateFilters();
             applyFilters();
             renderRawCveTable();
+            renderSummaryPanels();
+            renderAtkDefSection();
+        }
+
+        function renderSummaryPanels() {
+            var grid = document.getElementById("summary-grid");
+            if (!summaryData) return;
+            var panels = [
+                {title: "📋 CVE (уязвимости)", items: summaryData.cves || [], color: "#da3633", prefix: ""},
+                {title: "🐛 CWE (классы слабостей)", items: summaryData.cwes || [], color: "#d29922", prefix: ""},
+                {title: "🥷 CAPEC (векторы атак)", items: summaryData.capecs || [], color: "#58a6ff", prefix: ""},
+                {title: "📦 ПО (программное обеспечение)", items: summaryData.software || [], color: "#3fb950", prefix: ""}
+            ];
+            var html = "";
+            panels.forEach(function(p) {
+                html += '<div class="summary-panel" style="border-top: 3px solid ' + p.color + ';">';
+                html += '<h3>' + p.title + ' <span class="count-badge">' + p.items.length + '</span></h3>';
+                html += '<div class="summary-list">';
+                p.items.forEach(function(item) {
+                    if (typeof item === "object") {
+                        html += '<div class="summary-item">' + (item.id || item.name || "") + (item.desc ? ' <span class="sw-ver">— ' + item.desc + '</span>' : '') + '</div>';
+                    } else {
+                        html += '<div class="summary-item">' + item + '</div>';
+                    }
+                });
+                if (p.items.length === 0) html += '<div class="summary-item" style="color:#484f58;">Нет данных</div>';
+                html += '</div></div>';
+            });
+            grid.innerHTML = html;
+        }
+
+        function toggleSummary() {
+            var el = document.getElementById("summary-container");
+            el.style.display = el.style.display === "none" ? "block" : "none";
+        }
+
+        function renderAtkDefSection() {
+            var list = document.getElementById("atk-def-list");
+            if (!atkDefData || atkDefData.length === 0) {
+                list.innerHTML = '<p style="color:#484f58;text-align:center;padding:20px;">Нет данных об атаках и защите. Загрузите базу инструментов.</p>';
+                return;
+            }
+            var html = "";
+            atkDefData.forEach(function(item, idx) {
+                var feasClass = item.feas === "РЕАЛИЗУЕМА" ? "real" : (item.feas.includes("ЧАСТИЧНО") ? "part-real" : "noreal");
+                var sevClass = getSevClass(item.sev);
+                html += '<div class="atk-def-item">';
+                html += '<div class="atk-def-header" onclick="toggleAtkDefItem(' + idx + ')" style="background:#161b22;">';
+                html += '<div><span class="badge ' + sevClass + '" style="margin-right:8px;">' + item.sev + '</span>';
+                html += '<span class="badge ' + feasClass + '" style="margin-right:8px;">' + item.feas + '</span>';
+                html += '<strong style="color:#fff;">' + item.sw + '</strong>';
+                html += ' <span style="color:#8b949e;"> — ' + item.capec + ' (' + item.cve_short + ')</span></div>';
+                html += '<span style="color:#58a6ff;font-size:12px;">▼ Раскрыть</span>';
+                html += '</div>';
+                html += '<div class="atk-def-body" id="atk-def-body-' + idx + '">';
+
+                // Атака
+                html += '<div class="atk-section">';
+                html += '<h4 style="color:#e3b341;margin:0 0 10px 0;">🥷 Red Team: Как атаковать</h4>';
+                if (item.attack_tools && item.attack_tools.length > 0) {
+                    item.attack_tools.forEach(function(tool) {
+                        html += '<div style="margin-bottom:12px;">';
+                        html += '<span class="tool-badge tool-atk">' + tool.name + '</span>';
+                        if (tool.skill) html += '<span style="color:#8b949e;font-size:11px;"> Уровень: ' + tool.skill + '</span>';
+                        if (tool.desc) html += '<p style="font-size:12px;color:#8b949e;margin:6px 0;">' + tool.desc + '</p>';
+                        if (tool.commands && tool.commands.length > 0) {
+                            html += '<div class="cmd-block">';
+                            tool.commands.forEach(function(cmd) {
+                                if (cmd.startsWith("#") || cmd.startsWith("//")) {
+                                    html += '<span class="cmd-comment">' + cmd + '</span>\\n';
+                                } else if (cmd.trim() === "") {
+                                    html += '\\n';
+                                } else {
+                                    html += '<span class="cmd-highlight">' + cmd + '</span>\\n';
+                                }
+                            });
+                            html += '</div>';
+                        }
+                        html += '</div>';
+                    });
+                } else {
+                    html += '<p style="color:#484f58;font-size:12px;">Инструменты атаки не найдены в базе данных.</p>';
+                }
+                html += '</div>';
+
+                // Защита
+                html += '<div class="def-section">';
+                html += '<h4 style="color:#3fb950;margin:0 0 10px 0;">🛡️ Blue Team: Как защититься</h4>';
+                if (item.defense_tools && item.defense_tools.length > 0) {
+                    item.defense_tools.forEach(function(tool) {
+                        html += '<div style="margin-bottom:12px;">';
+                        html += '<span class="tool-badge tool-def">' + tool.name + '</span>';
+                        if (tool.priority) html += '<span style="color:#8b949e;font-size:11px;"> Приоритет: ' + tool.priority + '</span>';
+                        if (tool.desc) html += '<p style="font-size:12px;color:#8b949e;margin:6px 0;">' + tool.desc + '</p>';
+                        if (tool.commands && tool.commands.length > 0) {
+                            html += '<div class="cmd-block">';
+                            tool.commands.forEach(function(cmd) {
+                                if (cmd.startsWith("#") || cmd.startsWith("//")) {
+                                    html += '<span class="cmd-comment">' + cmd + '</span>\\n';
+                                } else if (cmd.trim() === "") {
+                                    html += '\\n';
+                                } else {
+                                    html += cmd + '\\n';
+                                }
+                            });
+                            html += '</div>';
+                        }
+                        html += '</div>';
+                    });
+                } else {
+                    html += '<p style="color:#484f58;font-size:12px;">Меры защиты не найдены в базе данных.</p>';
+                }
+                if (item.recommendation) {
+                    html += '<div style="margin-top:10px;padding:10px;background:#0d1117;border-radius:4px;border:1px solid #30363d;border-left:4px solid #238636;">';
+                    html += '<strong style="color:#3fb950;font-size:12px;">Рекомендация системы:</strong><br>';
+                    html += '<span style="font-size:12px;">' + item.recommendation.replace(/\\n/g, "<br>") + '</span>';
+                    html += '</div>';
+                }
+                html += '</div>';
+
+                html += '</div></div>';
+            });
+            list.innerHTML = html;
+        }
+
+        function toggleAtkDef() {
+            var el = document.getElementById("atk-def-container");
+            el.style.display = el.style.display === "none" ? "block" : "none";
+        }
+        function toggleAtkDefItem(idx) {
+            var el = document.getElementById("atk-def-body-" + idx);
+            el.style.display = el.style.display === "none" || el.style.display === "" ? "block" : "none";
         }
 
         function renderRawCveTable() {
@@ -539,24 +729,89 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 class SoftwareEnricher:
     """
     Продвинутый алгоритм сопоставления CVE/Вектора с реально установленным ПО на сервере.
+    Использует данные Trivy для точной идентификации ПО.
     """
-    def __init__(self, system_info, cve_db, capec_db):
-        self.installed_software = system_info.get('installed_software', [])
-        self.open_ports = system_info.get('open_ports', [])
+    def __init__(self, system_info, cve_db, capec_db, trivy_result=None):
+        # system_info может быть dict или SystemInfo объект
+        if isinstance(system_info, dict):
+            self.installed_software = system_info.get('installed_software', [])
+            self.open_ports = system_info.get('open_ports', [])
+        else:
+            # Если это SystemInfo объект
+            self.installed_software = getattr(system_info, 'installed_software', [])
+            self.open_ports = getattr(system_info, 'open_ports', [])
+
         self.cve_db = cve_db if isinstance(cve_db, dict) else {}
         self.capec_db = capec_db if isinstance(capec_db, dict) else {}
+
+        # Строим карту CVE -> ПО из данных Trivy
+        self.trivy_cve_map = {}  # {CVE-ID: {pkg_name, installed_version, cwe_ids, capec_ids}}
+        if trivy_result:
+            self._build_trivy_map(trivy_result)
+
+    def _build_trivy_map(self, trivy_result):
+        """Строит карту CVE->ПО из данных Trivy (поддерживает dict и TrivyScanResult)."""
+        vulns = []
+        if isinstance(trivy_result, dict):
+            vulns = trivy_result.get('vulnerabilities', [])
+            # Поддержка сырого формата Trivy
+            if not vulns and 'Results' in trivy_result:
+                for res in trivy_result.get('Results', []):
+                    for v in res.get('Vulnerabilities', []):
+                        vulns.append({
+                            'vuln_id': v.get('VulnerabilityID', ''),
+                            'pkg_name': v.get('PkgName', ''),
+                            'installed_version': v.get('InstalledVersion', ''),
+                            'cwe_ids': v.get('CweIDs', []),
+                            'capec_ids': v.get('CapecIDs', []),
+                        })
+        elif hasattr(trivy_result, 'vulnerabilities'):
+            vulns = trivy_result.vulnerabilities
+
+        for v in vulns:
+            if isinstance(v, dict):
+                vuln_id = v.get('vuln_id', '')
+                pkg_name = v.get('pkg_name', '')
+                inst_ver = v.get('installed_version', '')
+                cwe_ids = v.get('cwe_ids', [])
+                capec_ids = v.get('capec_ids', [])
+            else:
+                vuln_id = getattr(v, 'vuln_id', '')
+                pkg_name = getattr(v, 'pkg_name', '')
+                inst_ver = getattr(v, 'installed_version', '')
+                cwe_ids = getattr(v, 'cwe_ids', [])
+                capec_ids = getattr(v, 'capec_ids', [])
+
+            if vuln_id and pkg_name:
+                self.trivy_cve_map[vuln_id] = {
+                    'pkg_name': pkg_name,
+                    'installed_version': inst_ver,
+                    'cwe_ids': cwe_ids or [],
+                    'capec_ids': capec_ids or [],
+                }
 
     def identify_real_software(self, record, port_str):
         cve_id = getattr(record, 'cve_id', '')
         capec_id = getattr(record, 'capec_id', '')
         fallback_sw = getattr(record, 'target_software', '').strip()
 
+        # 0. ПЕРВЫЙ ПРИОРИТЕТ: Данные из Trivy (самый надежный источник)
+        if cve_id and self.trivy_cve_map:
+            for single_cve in cve_id.split(','):
+                single_cve = single_cve.strip()
+                if single_cve in self.trivy_cve_map:
+                    trivy_info = self.trivy_cve_map[single_cve]
+                    pkg = trivy_info['pkg_name']
+                    ver = trivy_info.get('installed_version', '')
+                    if pkg:
+                        return f"{pkg} {ver}".strip() if ver else pkg
+
         # 1. Поиск точного совпадения по тексту CVE
         matched_sw = self._search_in_installed_software(cve_id, capec_id)
         if matched_sw:
             return matched_sw
 
-        # 2. Если сканер OVAL передал явное имя и это не заглушка — верим ему
+        # 2. Если сканер передал явное имя и это не заглушка — верим ему
         ignore_list = ["", "unknown", "n/a", "none", "локальный", "служба ос", "os component"]
         if fallback_sw and fallback_sw.lower() not in ignore_list:
             if "microsoft" in fallback_sw.lower() and "windows" in fallback_sw.lower():
@@ -571,7 +826,7 @@ class SoftwareEnricher:
         # 4. Фоллбэк
         if "Локальный" not in str(port_str):
             return f"Неидентифицированная служба (Порт {port_str})"
-            
+
         return "Неидентифицированный системный компонент"
 
     def _search_in_installed_software(self, cve_id, capec_id):
@@ -628,20 +883,48 @@ class SoftwareEnricher:
 
 
 class ReportGenerator:
-    def __init__(self, system_summary, correlation_results, summary, toolkit=None, **kwargs):
+    def __init__(self, system_summary, correlation_results, summary, toolkit=None, trivy_result=None, **kwargs):
         self.system_summary = system_summary
         self.summary = summary
         self.toolkit = toolkit
-        
+        self.trivy_result = trivy_result
+
         self.tools_db = self._load_local_db("databases/tools_database.json")
         self.cwe_db = self._load_local_db("databases/cwe_database.json")
         self.capec_db = self._load_local_db("databases/capec_database.json")
         self.cve_db = self._load_local_db("databases/cve_database.json")
-        
+        self.defense_db = self._load_local_db("databases/defense_database.json")
+
         self.raw_results = correlation_results
-        
-        # Инициализируем обогатитель ПО
-        self.sw_enricher = SoftwareEnricher(self.system_summary, self.cve_db, self.capec_db)
+
+        # Инициализируем обогатитель ПО с данными Trivy
+        # SoftwareEnricher ожидает system_info с полными данными, а не summary
+        # Создаем подходящую структуру данных
+        system_info_for_enricher = {
+            'installed_software': [],  # Пока пустой, но можем заполнить из других источников
+            'open_ports': [],  # Аналогично
+        }
+
+        # Если trivy_result содержит информацию о ПО, используем её
+        if trivy_result and isinstance(trivy_result, dict):
+            vulnerabilities = trivy_result.get('vulnerabilities', [])
+            # Извлекаем уникальные пакеты из Trivy результатов
+            sw_set = set()
+            for v in vulnerabilities:
+                if isinstance(v, dict):
+                    pkg = v.get('pkg_name', '').strip()
+                    if pkg and pkg not in sw_set:
+                        sw_set.add(pkg)
+                        system_info_for_enricher['installed_software'].append({
+                            'name': pkg,
+                            'version': v.get('installed_version', ''),
+                            'publisher': 'Detected by Trivy'
+                        })
+
+        self.sw_enricher = SoftwareEnricher(
+            system_info_for_enricher, self.cve_db, self.capec_db,
+            trivy_result=trivy_result
+        )
 
         groups = {}
         for r in correlation_results:
@@ -719,6 +1002,181 @@ class ReportGenerator:
         if any('НЕ РЕАЛИЗУЕМА' == f for f in valid): return 'НЕ РЕАЛИЗУЕМА'
         return 'UNKNOWN'
 
+    def _build_summary_data(self, js_data, raw_js_data):
+        """Строит данные для перечней CVE, CWE, CAPEC, ПО."""
+        all_cves = set()
+        all_cwes = set()
+        all_capecs = set()
+        all_software = {}  # name -> version
+
+        # Из агрегированных данных
+        for item in js_data:
+            # CVEs
+            for cve in item.get('cve', '').split(', '):
+                cve = cve.strip()
+                if cve and cve != 'Нет CVE' and cve != 'N/A':
+                    all_cves.add(cve)
+            # CWE
+            cwe = item.get('cwe', '')
+            if cwe and cwe != 'CWE-Неизвестно' and cwe != 'Нет CWE':
+                for c in cwe.split(', '):
+                    c = c.strip()
+                    if c: all_cwes.add(c)
+            # CAPEC
+            capec = item.get('capec', '')
+            if capec and capec != 'CAPEC-Неизвестно' and capec != 'Нет CAPEC':
+                for c in capec.split(', '):
+                    c = c.strip()
+                    if c: all_capecs.add(c)
+            # ПО
+            sw = item.get('sw', '')
+            if sw and 'Неидентифицированн' not in sw:
+                all_software[sw] = item.get('port', '')
+
+        # Из сырых данных
+        for item in raw_js_data:
+            cve = item.get('cve', '')
+            if cve and cve != 'N/A':
+                all_cves.add(cve)
+            sw = item.get('sw', '')
+            if sw and 'Неидентифицированн' not in sw:
+                all_software[sw] = item.get('port', '')
+
+        # Из данных Trivy (если есть)
+        if self.trivy_result:
+            vulns = []
+            if isinstance(self.trivy_result, dict):
+                vulns = self.trivy_result.get('vulnerabilities', [])
+            elif hasattr(self.trivy_result, 'vulnerabilities'):
+                vulns = self.trivy_result.vulnerabilities
+
+            for v in vulns:
+                if isinstance(v, dict):
+                    vid = v.get('vuln_id', '')
+                    pkg = v.get('pkg_name', '')
+                    ver = v.get('installed_version', '')
+                    cwes = v.get('cwe_ids', [])
+                    capecs = v.get('capec_ids', [])
+                else:
+                    vid = getattr(v, 'vuln_id', '')
+                    pkg = getattr(v, 'pkg_name', '')
+                    ver = getattr(v, 'installed_version', '')
+                    cwes = getattr(v, 'cwe_ids', [])
+                    capecs = getattr(v, 'capec_ids', [])
+
+                if vid: all_cves.add(vid)
+                if pkg: all_software[f"{pkg} {ver}".strip()] = ''
+                for c in (cwes or []): all_cwes.add(c)
+                for c in (capecs or []): all_capecs.add(c)
+
+        # Форматируем для JS
+        cve_list = sorted(list(all_cves))
+        cwe_list = []
+        for c in sorted(list(all_cwes)):
+            desc = self._get_cwe_description(c)
+            cwe_list.append({"id": c, "desc": desc[:80] + "..." if len(desc) > 80 else desc})
+
+        capec_list = []
+        capac_db = self.capec_db
+        for c in sorted(list(all_capecs)):
+            desc = ""
+            if isinstance(capac_db, dict) and c in capac_db:
+                desc = capac_db[c].get('description', '')[:80]
+            elif isinstance(capac_db, list):
+                for item in capac_db:
+                    if item.get('id') == c or item.get('capec_id') == c:
+                        desc = item.get('description', '')[:80]
+                        break
+            capec_list.append({"id": c, "desc": desc})
+
+        sw_list = []
+        for name, port in sorted(all_software.items()):
+            sw_list.append({"id": name, "desc": f"Порт: {port}" if port else ""})
+
+        return {
+            "cves": cve_list,
+            "cwes": cwe_list,
+            "capecs": capec_list,
+            "software": sw_list,
+        }
+
+    def _build_atk_def_data(self, js_data):
+        """Строит данные для раздела атак и защиты."""
+        atk_def_list = []
+
+        for item in js_data:
+            cves_str = item.get('cve', '')
+            cve_list = [c.strip() for c in cves_str.split(',') if c.strip() and c.strip() != 'Нет CVE']
+
+            attack_tools = []
+            defense_tools = []
+
+            if self.toolkit:
+                # Ищем инструменты атаки по CVE
+                for cve_id in cve_list[:5]:  # Ограничиваем для производительности
+                    tools = self.toolkit.get_attack_commands(cve_id)
+                    for tool in tools:
+                        attack_tools.append({
+                            "name": tool.get('tool_name', ''),
+                            "desc": tool.get('description', ''),
+                            "skill": tool.get('skill_level', ''),
+                            "commands": tool.get('commands', []),
+                        })
+
+                    defenses = self.toolkit.get_defense_tools(cve_id)
+                    for d in defenses:
+                        defense_tools.append({
+                            "name": d.get('tool_name', ''),
+                            "desc": d.get('defense_description', d.get('tool_description', '')),
+                            "priority": d.get('priority', ''),
+                            "commands": d.get('commands', []),
+                        })
+
+            # Если нет инструментов из toolkit, ищем в локальных БД
+            if not attack_tools and isinstance(self.tools_db, list):
+                for cve_id in cve_list[:5]:
+                    for tool in self.tools_db:
+                        if cve_id in tool.get('applicable_cve', []):
+                            cmds = tool.get('commands', {}).get(cve_id, [])
+                            if not cmds:
+                                cmds = tool.get('commands', {}).get('default', [])
+                            attack_tools.append({
+                                "name": tool.get('name', ''),
+                                "desc": tool.get('description', ''),
+                                "skill": tool.get('skill_level', ''),
+                                "commands": cmds,
+                            })
+
+            if not defense_tools and isinstance(self.defense_db, list):
+                for cve_id in cve_list[:5]:
+                    for defense in self.defense_db:
+                        if cve_id in defense.get('cve_ids', []):
+                            for dt in defense.get('tools', []):
+                                defense_tools.append({
+                                    "name": dt.get('name', ''),
+                                    "desc": dt.get('description', ''),
+                                    "priority": defense.get('priority', ''),
+                                    "commands": dt.get('commands', []),
+                                })
+
+            cve_short = cve_list[0] if cve_list else 'N/A'
+            if len(cve_list) > 1:
+                cve_short += f" +{len(cve_list)-1}"
+
+            atk_def_list.append({
+                "sw": item.get('sw', ''),
+                "capec": item.get('capec', ''),
+                "cwe": item.get('cwe', ''),
+                "cve_short": cve_short,
+                "sev": item.get('sev', 'INFO'),
+                "feas": item.get('feas', 'UNKNOWN'),
+                "recommendation": item.get('rec', ''),
+                "attack_tools": attack_tools,
+                "defense_tools": defense_tools,
+            })
+
+        return atk_def_list
+
     def generate_json(self, filepath):
         pass
 
@@ -781,20 +1239,20 @@ class ReportGenerator:
         for r in self.raw_results:
             cve_str = getattr(r, 'cve_id', 'N/A')
             cve_list = [c.strip() for c in cve_str.split(',')] if cve_str else ["N/A"]
-            
+
             port_raw = getattr(r, 'target_port', None)
             if port_raw in (None, "None", "null", "", 0, "0"):
                 port = "Локальный"
             else:
                 port = str(port_raw)
-                
+
             # ИСПОЛЬЗУЕМ НОВЫЙ АЛГОРИТМ ДЛЯ СЫРЫХ ДАННЫХ
             real_sw = self.sw_enricher.identify_real_software(r, port)
-            
+
             for single_cve in cve_list:
-                if single_cve == "N/A" and len(cve_list) > 1: 
+                if single_cve == "N/A" and len(cve_list) > 1:
                     continue
-                    
+
                 raw_js_data.append({
                     "cve": single_cve,
                     "sev": getattr(r, 'severity', 'INFO'),
@@ -802,6 +1260,12 @@ class ReportGenerator:
                     "port": port,
                     "capec": getattr(r, 'capec_id', 'N/A')
                 })
+
+        # 3. Готовим данные для перечней CVE/CWE/CAPEC/ПО
+        summary_data = self._build_summary_data(js_data, raw_js_data)
+
+        # 4. Готовим данные для раздела атак и защиты
+        atk_def_data = self._build_atk_def_data(js_data)
             
         sys_data = {
             "hostname": self.system_summary.get('hostname', 'Целевой Сервер'),
@@ -814,6 +1278,8 @@ class ReportGenerator:
             html = HTML_TEMPLATE.replace('__REPORT_DATA__', json.dumps(js_data, ensure_ascii=False))
             html = html.replace('__RAW_CVE_DATA__', json.dumps(raw_js_data, ensure_ascii=False))
             html = html.replace('__SYS_DATA__', json.dumps(sys_data, ensure_ascii=False))
+            html = html.replace('__SUMMARY_DATA__', json.dumps(summary_data, ensure_ascii=False))
+            html = html.replace('__ATK_DEF_DATA__', json.dumps(atk_def_data, ensure_ascii=False))
             f.write(html)
-            
+
         return filepath

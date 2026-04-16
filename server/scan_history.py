@@ -17,7 +17,8 @@ from common.models import SystemInfo, OpenPort, InstalledSoftware, SecurityMeasu
 
 logger = get_server_logger()
 
-SCAN_HISTORY_FILE = "data/scan_history.json"
+SCAN_HISTORY_DIR = "data/scan_history"
+SCAN_HISTORY_PATTERN = "scan_*.json"
 
 
 @dataclass
@@ -134,40 +135,56 @@ class ScanHistory:
 
     def __init__(self, base_dir: str = ""):
         self.base_dir = base_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self._history_path = os.path.join(self.base_dir, SCAN_HISTORY_FILE)
+        self._history_dir = os.path.join(self.base_dir, SCAN_HISTORY_DIR)
         self._records: List[ScanRecord] = []
+        self._record_files: Dict[str, str] = {}  # scan_id -> filepath
         self._load()
 
     def _load(self):
-        """Загрузка истории из файла."""
-        os.makedirs(os.path.dirname(self._history_path), exist_ok=True)
-        if not os.path.exists(self._history_path):
-            self._records = []
-            return
-        try:
-            with open(self._history_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            self._records = [ScanRecord.from_dict(d) for d in data]
-            logger.info(f"[SCAN HISTORY] Загружено {len(self._records)} записей из истории")
-        except Exception as e:
-            logger.error(f"[SCAN HISTORY] Ошибка загрузки истории: {e}")
-            self._records = []
+        """Загрузка истории из файлов в директории."""
+        os.makedirs(self._history_dir, exist_ok=True)
+
+        import glob
+        pattern = os.path.join(self._history_dir, SCAN_HISTORY_PATTERN)
+        files = glob.glob(pattern)
+
+        self._records = []
+        self._record_files = {}
+
+        for filepath in files:
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                record = ScanRecord.from_dict(data)
+                self._records.append(record)
+                self._record_files[record.scan_id] = filepath
+            except Exception as e:
+                logger.warning(f"[SCAN HISTORY] Ошибка загрузки файла {filepath}: {e}")
+
+        # Сортировка по времени (новые первыми)
+        self._records.sort(key=lambda r: r.timestamp, reverse=True)
+        logger.info(f"[SCAN HISTORY] Загружено {len(self._records)} записей из {len(files)} файлов")
 
     def _save(self):
-        """Сохранение истории в файл."""
-        try:
-            os.makedirs(os.path.dirname(self._history_path), exist_ok=True)
-            with open(self._history_path, "w", encoding="utf-8") as f:
-                json.dump([r.to_dict() for r in self._records], f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            logger.error(f"[SCAN HISTORY] Ошибка сохранения истории: {e}")
+        """Этот метод больше не используется - каждая запись сохраняется в отдельный файл."""
+        pass
 
     def add_record(self, record: ScanRecord):
         """Добавление новой записи в историю."""
-        # Вставляем в начало (новые записи первые)
-        self._records.insert(0, record)
-        self._save()
-        logger.info(f"[SCAN HISTORY] Добавлена запись: {record.scan_id} ({record.timestamp})")
+        # Создаем файл для новой записи
+        filename = f"scan_{record.scan_id}.json"
+        filepath = os.path.join(self._history_dir, filename)
+
+        try:
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(record.to_dict(), f, ensure_ascii=False, indent=2)
+
+            # Добавляем в память
+            self._records.insert(0, record)
+            self._record_files[record.scan_id] = filepath
+            logger.info(f"[SCAN HISTORY] Создана новая запись: {record.scan_id} в файле {filename}")
+        except Exception as e:
+            logger.error(f"[SCAN HISTORY] Ошибка сохранения записи {record.scan_id}: {e}")
 
     def get_all(self) -> List[ScanRecord]:
         """Получение всех записей."""
@@ -189,13 +206,47 @@ class ScanHistory:
         return [r for r in self._records if r.hostname == hostname]
 
     def delete_record(self, scan_id: str) -> bool:
-        """Удаление записи из истории."""
-        before = len(self._records)
-        self._records = [r for r in self._records if r.scan_id != scan_id]
-        if len(self._records) < before:
-            self._save()
-            return True
+        """Удалить запись по ID."""
+        if scan_id in self._record_files:
+            filepath = self._record_files[scan_id]
+            try:
+                # Удаляем файл
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+
+                # Удаляем из памяти
+                self._records = [r for r in self._records if r.scan_id != scan_id]
+                del self._record_files[scan_id]
+
+                logger.info(f"[SCAN_HISTORY] Удалена запись {scan_id} и файл {filepath}")
+                return True
+            except Exception as e:
+                logger.error(f"[SCAN_HISTORY] Ошибка удаления файла {filepath}: {e}")
+                return False
         return False
+
+    def update_record(self, scan_id: str, updated_record: ScanRecord) -> bool:
+        """Обновить запись по ID."""
+        if scan_id in self._record_files:
+            filepath = self._record_files[scan_id]
+            try:
+                with open(filepath, "w", encoding="utf-8") as f:
+                    json.dump(updated_record.to_dict(), f, ensure_ascii=False, indent=2)
+
+                # Обновляем в памяти
+                for i, r in enumerate(self._records):
+                    if r.scan_id == scan_id:
+                        self._records[i] = updated_record
+                        break
+
+                logger.info(f"[SCAN_HISTORY] Обновлена запись {scan_id} с Trivy данными: {len(updated_record.trivy_scan_result.get('vulnerabilities', []))} уязвимостей")
+                return True
+            except Exception as e:
+                logger.error(f"[SCAN_HISTORY] Ошибка обновления файла {filepath}: {e}")
+                return False
+        else:
+            logger.warning(f"[SCAN_HISTORY] Файл для записи {scan_id} не найден")
+            return False
 
     def is_scan_available(self, hostname: str = "") -> bool:
         """Проверка, есть ли сканирование для данного хоста."""

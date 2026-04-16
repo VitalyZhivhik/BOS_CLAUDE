@@ -239,5 +239,223 @@
     "priority": "HIGH",
     "effort": "Medium",
     "effectiveness": "High"
+  },
+  {
+    "id": "DEF-007",
+    "attack_type": "remote_code_execution",
+    "cve_ids": ["CVE-2021-44228"],
+    "name": "Защита от Log4Shell и подобных уязвимостей",
+    "description": "Комплексная защита от уязвимостей десериализации в Java-приложениях",
+    "tools": [
+      {
+        "name": "Java Security Manager",
+        "description": "Включение Security Manager для ограничения привилегий Java-приложений",
+        "commands": [
+          "# Запуск Java с Security Manager",
+          "java -Djava.security.manager -Djava.security.policy=java.policy MyApp",
+          "",
+          "# Создание политики безопасности (java.policy)",
+          "grant {",
+          "  permission java.net.SocketPermission \"*:80\", \"connect,resolve\";",
+          "  permission java.io.FilePermission \"${user.home}/-\", \"read\";",
+          "};"
+        ]
+      },
+      {
+        "name": "JVM Hardening",
+        "description": "Параметры JVM для защиты от JNDI-инъекций",
+        "commands": [
+          "# Блокировка JNDI LDAP",
+          "java -Dlog4j2.formatMsgNoLookups=true -Dcom.sun.jndi.ldap.object.trustURLCodebase=false MyApp",
+          "",
+          "# Отключение удалённого class loading",
+          "java -Djava.rmi.server.useCodebaseOnly=true MyApp"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-008",
+    "attack_type": "sql_injection",
+    "cve_ids": [],
+    "name": "Web Application Firewall (WAF)",
+    "description": "Многоуровневая защита веб-приложений от инъекций и других атак",
+    "tools": [
+      {
+        "name": "OWASP ModSecurity Core Rule Set",
+        "description": "Комплексное правило защиты для ModSecurity",
+        "commands": [
+          "# Установка OWASP CRS для Nginx",
+          "sudo apt install nginx-mod-http-modsecurity",
+          "sudo cp /etc/modsecurity/modsecurity.conf-recommended /etc/modsecurity/modsecurity.conf",
+          "sudo sed -i 's/SecRuleEngine DetectionOnly/SecRuleEngine On/' /etc/modsecurity/modsecurity.conf",
+          "",
+          "# Загрузка OWASP CRS",
+          "cd /etc/nginx/modsec",
+          "wget https://github.com/coreruleset/coreruleset/archive/v4.0.0.tar.gz",
+          "tar -xzf v4.0.0.tar.gz",
+          "cp coreruleset-4.0.0/crs-setup.conf.example coreruleset-4.0.0/crs-setup.conf",
+          "",
+          "# Включение в конфигурации Nginx",
+          "modsecurity on;",
+          "modsecurity_rules_file /etc/nginx/modsec/main.conf;"
+        ]
+      },
+      {
+        "name": "Cloudflare WAF",
+        "description": "Облачный WAF с машинным обучением",
+        "commands": [
+          "# Настройка через веб-интерфейс Cloudflare",
+          "# 1. Зарегистрировать домен",
+          "# 2. Включить WAF в разделе Security",
+          "# 3. Настроить правила защиты от SQL-инъекций",
+          "# 4. Включить Bot Management",
+          "",
+          "# Правила Cloudflare WAF:",
+          "# - SQL Injection Protection: Enabled",
+          "# - XSS Protection: Enabled",
+          "# - Rate Limiting: Custom rules"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-009",
+    "attack_type": "credential_dumping",
+    "cve_ids": [],
+    "name": "Endpoint Detection and Response (EDR)",
+    "description": "Комплексная защита от кражи учётных данных и пост-эксплуатации",
+    "tools": [
+      {
+        "name": "Microsoft Defender for Endpoint",
+        "description": "Интегрированная защита от киберугроз Microsoft",
+        "commands": [
+          "# Проверка статуса Defender",
+          "Get-MpComputerStatus | Select RealTimeProtectionEnabled,AntivirusEnabled",
+          "",
+          "# Включение расширенной защиты",
+          "Set-MpPreference -EnableControlledFolderAccess Enabled",
+          "Set-MpPreference -PUAProtection Enabled",
+          "",
+          "# Настройка правил ASR (Attack Surface Reduction)",
+          "Set-MpPreference -AttackSurfaceReductionRules_Ids 75668c1f-73b5-4cf0-bb93-3ecf5cb7cc84 -AttackSurfaceReductionRules_Actions Enabled",
+          "Set-MpPreference -AttackSurfaceReductionRules_Ids 3b576869-a4ec-4529-8536-b80a7769e899 -AttackSurfaceReductionRules_Actions Enabled"
+        ]
+      },
+      {
+        "name": "Sysmon + ELK Stack",
+        "description": "Расширенное логирование и анализ системных событий",
+        "commands": [
+          "# Установка Sysmon",
+          "sysmon.exe -i sysmonconfig.xml",
+          "",
+          "# Конфигурация Sysmon для логирования процессов",
+          "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+          "<Sysmon schemaversion=\"4.30\">",
+          "  <EventFiltering>",
+          "    <ProcessCreate onmatch=\"include\" />",
+          "    <NetworkConnect onmatch=\"include\" />",
+          "  </EventFiltering>",
+          "</Sysmon>",
+          "",
+          "# Отправка логов в ELK Stack",
+          "winlogbeat.exe setup -e"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-010",
+    "attack_type": "man_in_the_middle",
+    "cve_ids": [],
+    "name": "Network Security Controls",
+    "description": "Защита от атак man-in-the-middle и сетевых атак",
+    "tools": [
+      {
+        "name": "Certificate Pinning",
+        "description": "Привязка сертификатов для предотвращения MITM-атак",
+        "commands": [
+          "# HTTP Public Key Pinning (HPKP) заголовок",
+          "add_header Public-Key-Pins 'pin-sha256=\"<CERT_HASH>\"; max-age=2592000; includeSubDomains' always;",
+          "",
+          "# Certificate Transparency monitoring",
+          "openssl s_client -connect example.com:443 -servername example.com -verify_hostname example.com",
+          "",
+          "# Проверка в Certificate Transparency логах",
+          "curl -s https://crt.sh/?q=example.com | head -20"
+        ]
+      },
+      {
+        "name": "DNSSEC + DNSCrypt",
+        "description": "Защита DNS от отравления и подмены",
+        "commands": [
+          "# Включение DNSSEC в resolv.conf",
+          "options edns0",
+          "options trust-ad",
+          "",
+          "# Установка DNSCrypt",
+          "sudo apt install dnscrypt-proxy",
+          "sudo systemctl enable dnscrypt-proxy",
+          "sudo systemctl start dnscrypt-proxy",
+          "",
+          "# Проверка DNSSEC",
+          "dig +dnssec example.com"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "Medium"
+  },
+  {
+    "id": "DEF-011",
+    "attack_type": "privilege_escalation",
+    "cve_ids": [],
+    "name": "Principle of Least Privilege",
+    "description": "Минимизация привилегий пользователей и служб",
+    "tools": [
+      {
+        "name": "Windows User Rights Assignment",
+        "description": "Ограничение прав пользователей в Windows",
+        "commands": [
+          "# Удаление пользователей из группы Administrators (PowerShell)",
+          "Remove-LocalGroupMember -Group 'Administrators' -Member 'user1'",
+          "",
+          "# Ограничение прав на запуск служб",
+          "sc.exe sdset ServiceName D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)",
+          "",
+          "# Отключение SeDebugPrivilege для обычных пользователей",
+          "secedit /export /cfg c:\\temp\\security.cfg",
+          "# Редактировать файл и применить:",
+          "secedit /configure /db c:\\temp\\secedit.sdb /cfg c:\\temp\\security.cfg"
+        ]
+      },
+      {
+        "name": "Linux sudo restrictions",
+        "description": "Ограничение использования sudo в Linux",
+        "commands": [
+          "# Ограничение команд для пользователя в /etc/sudoers",
+          "user1 ALL=(ALL) NOPASSWD: /usr/bin/systemctl status apache2, /usr/bin/journalctl",
+          "",
+          "# Требование TTY для sudo",
+          "Defaults requiretty",
+          "",
+          "# Ограничение по времени сессии sudo",
+          "Defaults timestamp_timeout=15"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High"
   }
 ]

