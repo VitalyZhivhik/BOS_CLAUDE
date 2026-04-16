@@ -108,6 +108,7 @@ class VulnerabilityMatch:
     feasibility: str = AttackFeasibility.REQUIRES_ANALYSIS.value
     reason: str = ""
     recommendation: str = ""
+    target_software: str = ""
 
 
 def to_json(obj):

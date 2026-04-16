@@ -120,6 +120,21 @@ class AttackCorrelator:
             logger.warning("[4/4] Данные Trivy отсутствуют - корреляция без подтверждения уязвимостей")
             self._report_progress(92, "ВНИМАНИЕ: Trivy не запущен - корреляция без подтверждения")
 
+        # Присвоение обнаруженного ПО к уязвимостям
+        if self.trivy_result:
+            trivy_vulns = self.trivy_result.get("vulnerabilities", []) if isinstance(self.trivy_result, dict) else getattr(self.trivy_result, "vulnerabilities", [])
+            software_map = {}
+            for v in trivy_vulns:
+                v_id = v.get("vuln_id") if isinstance(v, dict) else getattr(v, "vuln_id", "")
+                pkg = v.get("pkg_name") if isinstance(v, dict) else getattr(v, "pkg_name", "")
+                ver = v.get("installed_version") if isinstance(v, dict) else getattr(v, "installed_version", "")
+                if v_id and pkg:
+                    software_map[v_id] = f"{pkg} v.{ver}" if ver else pkg
+            
+            for match in self.results:
+                if match.cve_id and match.cve_id in software_map:
+                    match.target_software = software_map[match.cve_id]
+
         total_elapsed = time.time() - start_time
         self._report_progress(100, f"Корреляция завершена. Найдено {len(self.results)} уникальных результатов")
         logger.info("=" * 70)
@@ -526,6 +541,8 @@ class AttackCorrelator:
                     existing_match.description = r.description
                     existing_match.reason = r.reason
                     existing_match.recommendation = r.recommendation
+            if hasattr(r, 'target_software') and r.target_software:
+                existing_match.target_software = r.target_software
 
         unique = []
         for g in groups.values():

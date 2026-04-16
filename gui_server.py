@@ -1269,7 +1269,7 @@ class ServerGUI(QMainWindow):
                 data = json.load(f)
                 
             # Проверка формата (поддержка сырого Trivy или нашего отформатированного)
-            vulns = data.get("vulnerabilities", [])
+            vulns = data.get("vulnerabilities") or []
             if not vulns and "Results" in data:
                 for res in data.get("Results", []):
                     for v in res.get("Vulnerabilities", []):
@@ -1279,8 +1279,8 @@ class ServerGUI(QMainWindow):
                             "installed_version": v.get("InstalledVersion", ""),
                             "fixed_version": v.get("FixedVersion", ""),
                             "severity": v.get("Severity", "UNKNOWN"),
-                            "title": v.get("Title", ""),
-                            "cwe_ids": v.get("CweIDs", [])
+                            "title": v.get("Title", "") or "Без названия",
+                            "cwe_ids": v.get("CweIDs") or []
                         })
             
             # Считаем статистику
@@ -1314,7 +1314,7 @@ class ServerGUI(QMainWindow):
                 self.trivy_table.setItem(row, 2, QTableWidgetItem(vuln.get("installed_version", "")))
                 
                 fixed = vuln.get("fixed_version", "")
-                fixed_item = QTableWidgetItem(fixed if fixed else "Нет исправления")
+                fixed_item = QTableWidgetItem(str(fixed) if fixed else "Нет исправления")
                 if not fixed: fixed_item.setForeground(QColor("#888"))
                 self.trivy_table.setItem(row, 3, fixed_item)
                 
@@ -1323,13 +1323,29 @@ class ServerGUI(QMainWindow):
                 sev_color = {"CRITICAL": "#c44", "HIGH": "#a85", "MEDIUM": "#997", "LOW": "#696", "UNKNOWN": "#888", "INFO": "#668"}.get(sev, "#888")
                 sev_item.setForeground(QColor(sev_color))
                 self.trivy_table.setItem(row, 4, sev_item)
-                self.trivy_table.setItem(row, 5, QTableWidgetItem(vuln.get("title", "")[:200]))
+                self.trivy_table.setItem(row, 5, QTableWidgetItem(str(vuln.get("title", ""))[:200]))
                 
-                cwe = ", ".join(vuln.get("cwe_ids", [])[:3])
+                cwe_list = vuln.get("cwe_ids") or []
+                cwe = ", ".join(cwe_list[:3])
                 self.trivy_table.setItem(row, 6, QTableWidgetItem(f"CWE: {cwe}" if cwe else "—"))
                 
-            self._on_trivy_scan_done(self.trivy_summary) # Обновит UI и разблокирует сервер
+            # Обновляем сводку и переключаем вкладку напрямую, без вызова _on_trivy_scan_done
+            self.trivy_summary_label.setText(
+                f"Всего уязвимостей: {self.trivy_summary.get('total_vulns', 0)}  |  "
+                f"🔴 CRITICAL: {self.trivy_summary.get('critical', 0)}  |  "
+                f"🟠 HIGH: {self.trivy_summary.get('high', 0)}  |  "
+                f"🟡 MEDIUM: {self.trivy_summary.get('medium', 0)}  |  "
+                f"🟢 LOW: {self.trivy_summary.get('low', 0)}  |  "
+                f"Время: {self.trivy_summary.get('scan_duration', '?')}"
+            )
+            for i in range(self.tabs.count()):
+                if "Trivy" in self.tabs.tabText(i):
+                    self.tabs.setCurrentIndex(i)
+                    break
+                    
             self.trivy_status_label.setText(f"✅ Загружено из истории: {len(vulns)} уязвимостей")
+            self.btn_trivy_scan.setText("3б. Сканирование Trivy (загружено из истории)")
+            self.btn_trivy_scan.setEnabled(True)
             
             # Принудительно разблокируем кнопку запуска сервера после подгрузки
             self.btn_server.setEnabled(True)
