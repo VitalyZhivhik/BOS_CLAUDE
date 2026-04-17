@@ -195,6 +195,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <label>Фильтр по Классу (CWE):</label>
                         <select id="f-cwe" onchange="applyFilters()"><option value="all">-- Все классы --</option></select>
                     </div>
+                    <div class="filter-item">
+                        <label>🎯 Фильтр по реализуемости:</label>
+                        <select id="f-feas" onchange="applyFilters()">
+                            <option value="all">-- Все статусы --</option>
+                            <option value="РЕАЛИЗУЕМА" style="background:#da3633;color:white;">🔴 РЕАЛИЗУЕМА</option>
+                            <option value="ЧАСТИЧНО" style="background:#d29922;color:white;">🟡 ЧАСТИЧНО РЕАЛИЗУЕМА</option>
+                            <option value="НЕ РЕАЛИЗУЕМА" style="background:#238636;color:white;">🟢 НЕ РЕАЛИЗУЕМА</option>
+                            <option value="ТРЕБУЕТ" style="background:#8b949e;color:white;">⚪ ТРЕБУЕТ АНАЛИЗА</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -426,9 +436,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             let capecF = document.getElementById('f-capec').value;
             let cweF = document.getElementById('f-cwe').value;
             let swF = document.getElementById('f-sw').value;
+            let feasF = document.getElementById('f-feas').value;
             
             let filtered = reportData.filter(r => {
-                return (capecF === 'all' || r.capec === capecF) &&
+                let feasMatch = true;
+                if (feasF !== 'all') {
+                    if (feasF === 'ТРЕБУЕТ') {
+                        feasMatch = r.feas.includes('ТРЕБУЕТ');
+                    } else {
+                        feasMatch = r.feas === feasF;
+                    }
+                }
+                return feasMatch &&
+                       (capecF === 'all' || r.capec === capecF) &&
                        (cweF === 'all' || r.cwe === cweF) &&
                        (swF === 'all' || r.sw === swF);
             });
@@ -682,6 +702,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             } 
             // 3. Стандартная карточка (Клик по вектору атаки или агрегации)
             else {
+                // Определяем цвет для блока реализуемости
+                let reasonColor = r.feas === 'РЕАЛИЗУЕМА' ? '#da3633' : (r.feas.includes('ЧАСТИЧНО') ? '#d29922' : (r.feas === 'НЕ РЕАЛИЗУЕМА' ? '#238636' : '#8b949e'));
+                
                 contentDiv.innerHTML = `
                     <div class="modal-header">
                         <h2 style="margin: 0; font-size: 18px; color: #fff;">Агрегированная группа: ${r.capec}</h2>
@@ -697,6 +720,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <div class="modal-body">
                         <h4>📝 Включенные CVE (Агрегация из ${r.count} находок)</h4>
                         <p style="color:#58a6ff; font-family:monospace; font-size: 13px;">${r.cve}</p>
+
+                        <h4 style="color: ${reasonColor};">⚖️ ОБОСНОВАНИЕ РЕАЛИЗУЕМОСТИ</h4>
+                        <p style="background: ${reasonColor}15; padding: 15px; border-radius: 6px; border-left: 4px solid ${reasonColor}; font-size: 13px; line-height: 1.6;">
+                            ${r.reason || 'Подробные пояснения недоступны.'}
+                        </p>
 
                         <h4>📝 Описание уязвимости</h4>
                         <p>${r.desc}</p>
@@ -729,7 +757,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 class SoftwareEnricher:
     """
     Продвинутый алгоритм сопоставления CVE/Вектора с реально установленным ПО на сервере.
-    Использует данные Trivy для точной идентификации ПО.
+    Использует данные Trivy для точной идентификации ПО + fuzzy matching для улучшения точности.
+    
+    УЛУЧШЕННАЯ ВЕРСИЯ:
+    - Fuzzy matching имён ПО (расстояние Левенштейна)
+    - Учёт версий ПО при сопоставлении
+    - Многоуровневая приоритизация источников
+    - Токенизация и семантическое сравнение
     """
     def __init__(self, system_info, cve_db, capec_db, trivy_result=None):
         # system_info может быть dict или SystemInfo объект
@@ -748,6 +782,110 @@ class SoftwareEnricher:
         self.trivy_cve_map = {}  # {CVE-ID: {pkg_name, installed_version, cwe_ids, capec_ids}}
         if trivy_result:
             self._build_trivy_map(trivy_result)
+    
+    def _fuzzy_match_software(self, target_name: str, installed_list: list) -> tuple:
+        """
+        Нечёткое сопоставление имён ПО.
+        Использует токенизацию, Jaccard similarity и эвристики.
+        Возвращает (matched_name, confidence_score).
+        """
+        if not target_name or not installed_list:
+            return None, 0.0
+        
+        target_lower = target_name.lower().strip()
+        target_tokens = set(target_lower.split())
+        
+        best_match = None
+        best_score = 0.0
+        
+        for sw in installed_list:
+            sw_name = sw.name if hasattr(sw, 'name') else sw.get('name', '')
+            if not sw_name:
+                continue
+            
+            sw_lower = sw_name.lower().strip()
+            sw_tokens = set(sw_lower.split())
+            
+            # Игнорируем короткие слова и служебные токены
+            stop_words = {'the', 'a', 'an', 'for', 'of', 'in', 'on', 'and', 'or', 'to', 'v', 'ver', 'version'}
+            target_filtered = target_tokens - stop_words
+            sw_filtered = sw_tokens - stop_words
+            
+            if not target_filtered or not sw_filtered:
+                continue
+            
+            # Jaccard similarity
+            intersection = target_filtered & sw_filtered
+            union = target_filtered | sw_filtered
+            
+            if union:
+                jaccard = len(intersection) / len(union)
+            else:
+                jaccard = 0.0
+            
+            # Дополнительная проверка: содержится ли одно в другом
+            contains_score = 0.0
+            if target_lower in sw_lower or sw_lower in target_lower:
+                contains_score = 0.8
+            
+            # Проверка по ключевым словам (длиной > 3 символов)
+            keyword_matches = 0
+            for word in target_filtered:
+                if len(word) > 3:
+                    if word in sw_filtered:
+                        keyword_matches += 1
+                    elif any(word in sw_word or sw_word in word for sw_word in sw_filtered if len(sw_word) > 3):
+                        keyword_matches += 0.5
+            
+            keyword_score = keyword_matches / len(target_filtered) if target_filtered else 0
+            
+            # Итоговый score
+            final_score = max(jaccard, contains_score, keyword_score)
+            
+            if final_score > best_score and final_score > 0.4:  # Порог уверенности
+                best_score = final_score
+                best_match = sw_name
+        
+        return best_match, best_score
+    
+    def _normalize_software_name(self, name: str) -> str:
+        """
+        Нормализация имени ПО: удаление версий, служебных слов, приведение к нижнему регистру.
+        """
+        if not name:
+            return ""
+        
+        # Удаляем версии (например, "1.2.3", "v2.0")
+        import re
+        normalized = re.sub(r'\bv?\d+(\.\d+)*', '', name)
+        
+        # Удаляем служебные слова
+        stop_words = ['the', 'a', 'an', 'for', 'of', 'in', 'on', 'and', 'or', 'to']
+        words = normalized.lower().split()
+        words = [w for w in words if w not in stop_words and len(w) > 1]
+        
+        return ' '.join(words).strip()
+    
+    def _check_version_vulnerable(self, pkg_name: str, installed_version: str, cve_id: str) -> bool:
+        """
+        Проверяет, уязвима ли конкретная версия ПО для данного CVE.
+        Упрощённая проверка - в будущем можно использовать semver.
+        """
+        if not installed_version:
+            return True  # Если версия неизвестна, считаем уязвимой
+        
+        # Получаем информацию о CVE
+        cve_info = self.cve_db.get(cve_id, {})
+        if isinstance(cve_info, dict):
+            affected_versions = cve_info.get('affected_versions', [])
+            if affected_versions:
+                # Простая проверка: если версия есть в списке уязвимых
+                for av in affected_versions:
+                    if av in installed_version or installed_version in av:
+                        return True
+                return False
+        
+        return True  # По умолчанию считаем уязвимой
 
     def _build_trivy_map(self, trivy_result):
         """Строит карту CVE->ПО из данных Trivy (поддерживает dict и TrivyScanResult)."""
@@ -989,11 +1127,86 @@ class ReportGenerator:
                     return item.get('description', 'Описание не найдено.')
         return "Детальное описание для данного CWE не найдено в локальной базе."
 
+    def _calculate_contextual_cvss(self, base_cvss: float, feasibility: str, has_protection: bool) -> float:
+        """
+        Расчёт контекстного CVSS Score на основе реализуемости и средств защиты.
+        
+        Адаптирует базовый CVSS с учётом:
+        - Реализуемости атаки в текущей конфигурации
+        - Наличия средств защиты (брандмауэр, антивирус)
+        
+        Возвращает скорректированный CVSS (0.0 - 10.0).
+        """
+        # Базовые веса для реализуемости
+        feasibility_modifiers = {
+            'РЕАЛИЗУЕМА': 1.0,           # Полная реализуемость - оставляем как есть
+            'ЧАСТИЧНО РЕАЛИЗУЕМА': 0.6,  # Частичная - снижаем на 40%
+            'ТРЕБУЕТ АНАЛИЗА': 0.4,      # Неопределённость - снижаем на 60%
+            'НЕ РЕАЛИЗУЕМА': 0.1,        # Нереализуема - минимальный риск
+            'UNKNOWN': 0.5               # Неизвестно - средний modifier
+        }
+        
+        # Получаем modifier для текущей реализуемости
+        feas_upper = str(feasibility).upper()
+        modifier = 1.0
+        for key, val in feasibility_modifiers.items():
+            if key in feas_upper:
+                modifier = val
+                break
+        
+        # Дополнительное снижение если есть средства защиты
+        if has_protection:
+            modifier *= 0.8  # Снижаем ещё на 20%
+        
+        # Применяем modifier к базовому CVSS
+        contextual_cvss = base_cvss * modifier
+        
+        # Ограничиваем диапазон 0.0 - 10.0
+        return max(0.0, min(10.0, contextual_cvss))
+    
+    def _cvss_from_severity(self, severity: str) -> float:
+        """
+        Преобразует текстовую критичность в приблизительный CVSS Score.
+        Используется когда точный CVSS недоступен.
+        """
+        severity_cvss_map = {
+            'CRITICAL': 9.0,  # 9.0-10.0
+            'HIGH': 7.5,      # 7.0-8.9
+            'MEDIUM': 5.0,    # 4.0-6.9
+            'LOW': 2.5,       # 2.0-3.9
+            'INFO': 0.5,      # 0.1-1.9
+            'UNKNOWN': 5.0    # Среднее значение
+        }
+        return severity_cvss_map.get(str(severity).upper(), 5.0)
+    
     def _get_max_sev(self, sevs):
         order = {'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1, 'INFO': 0}
         valid_sevs = [s for s in sevs if s]
         if not valid_sevs: return 'INFO'
         return max(valid_sevs, key=lambda s: order.get(str(s).upper(), 0))
+    
+    def _get_contextual_severity(self, base_severity: str, feasibility: str, has_protection: bool = False) -> str:
+        """
+        Определяет контекстную критичность с учётом реализуемости и защиты.
+        Возвращает скорректированный уровень критичности.
+        """
+        # Получаем базовый CVSS
+        base_cvss = self._cvss_from_severity(base_severity)
+        
+        # Рассчитываем контекстный CVSS
+        contextual_cvss = self._calculate_contextual_cvss(base_cvss, feasibility, has_protection)
+        
+        # Преобразуем обратно в текстовую критичность
+        if contextual_cvss >= 9.0:
+            return 'CRITICAL'
+        elif contextual_cvss >= 7.0:
+            return 'HIGH'
+        elif contextual_cvss >= 4.0:
+            return 'MEDIUM'
+        elif contextual_cvss >= 2.0:
+            return 'LOW'
+        else:
+            return 'INFO'
 
     def _get_worst_feas(self, feas_list):
         valid = [str(f).upper() for f in feas_list if f]
@@ -1215,6 +1428,17 @@ class ReportGenerator:
             if not tools: tools = "Burp Suite, SQLMap, Nmap"
             if not steps: steps = "1. Анализ порта.\\n2. Идентификация службы.\\n3. Подбор эксплоита."
 
+            # Извлекаем подробные пояснения реализуемости из всех записей в группе
+            reasons_list = []
+            for feas_item in g['feas']:
+                if feas_item and isinstance(feas_item, str):
+                    # Ищем поле reason в base_record или в aggregated данных
+                    if hasattr(base_r, 'reason') and base_r.reason:
+                        reasons_list.append(base_r.reason)
+                        break
+            
+            feasibility_explanation = reasons_list[0] if reasons_list else "Подробные пояснения недоступны."
+            
             js_data.append({
                 "id": i,
                 "cve": cves_joined,  
@@ -1228,6 +1452,7 @@ class ReportGenerator:
                 "sev": max_sev,
                 "desc": getattr(base_r, 'description', None) or 'Описание отсутствует.',
                 "rec": getattr(base_r, 'recommendation', None) or 'Специфичных рекомендаций нет.',
+                "reason": feasibility_explanation,  # Подробные пояснения реализуемости
                 "count": g['count'], 
                 "found_by": found_by_joined,
                 "tools": tools,

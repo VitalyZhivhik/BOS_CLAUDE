@@ -213,10 +213,161 @@ class AttackCorrelator:
 
         return matches
 
+    def _check_trivy_vulnerability(self, cve_id: str) -> tuple:
+        """
+        Проверяет уязвимость через данные Trivy.
+        Возвращает (confirmed: bool, details: str, severity: str).
+        """
+        if not self.trivy_result:
+            return False, "Trivy не запущен - подтверждение уязвимости недоступно", "UNKNOWN"
+        
+        # Преобразуем trivy_result в список уязвимостей
+        vulns = []
+        if isinstance(self.trivy_result, dict):
+            vulns = self.trivy_result.get("vulnerabilities", [])
+        elif hasattr(self.trivy_result, "vulnerabilities"):
+            vulns = self.trivy_result.vulnerabilities
+        
+        for vuln in vulns:
+            vuln_id = vuln.get("vuln_id") if isinstance(vuln, dict) else getattr(vuln, "vuln_id", "")
+            
+            if vuln_id and vuln_id.upper() == cve_id.upper():
+                severity = vuln.get("severity", "UNKNOWN") if isinstance(vuln, dict) else getattr(vuln, "severity", "UNKNOWN")
+                pkg_name = vuln.get("pkg_name", "") if isinstance(vuln, dict) else getattr(vuln, "pkg_name", "")
+                installed_version = vuln.get("installed_version", "") if isinstance(vuln, dict) else getattr(vuln, "installed_version", "")
+                fixed_version = vuln.get("fixed_version", "") if isinstance(vuln, dict) else getattr(vuln, "fixed_version", "")
+                
+                details = (
+                    f"✅ Trivy ПОДТВЕРДИЛ уязвимость {cve_id} в ПО '{pkg_name}' "
+                    f"(версия {installed_version})."
+                )
+                if fixed_version:
+                    details += f" Доступно исправление: {fixed_version}."
+                
+                return True, details, severity
+        
+        return False, f"Trivy не обнаружил уязвимость {cve_id} в установленном ПО", "UNKNOWN"
+
+    def _calculate_feasibility_score(self, cve: dict, av: AttackVector, reasons: list, protection_notes: list) -> tuple:
+        """
+        Многофакторная оценка реализуемости атаки.
+        Возвращает (score: int, max_score: int, feasibility: AttackFeasibility, reason: str).
+        
+        Факторы:
+        - Сетевая доступность (25 баллов)
+        - Подтверждение Trivy (30 баллов)
+        - Уязвимая версия ПО (20 баллов)
+        - Отсутствие патчей (15 баллов)
+        - Слабые средства защиты (10 баллов)
+        """
+        score = 0
+        max_score = 100
+        score_details = []
+        
+        # Фактор 1: Сетевая доступность (25 баллов)
+        required_ports = cve.get("requires_port", [])
+        open_port_nums = set()
+        if isinstance(self.system_info.open_ports, list):
+            for p in self.system_info.open_ports:
+                if hasattr(p, 'port'):
+                    open_port_nums.add(p.port)
+                elif isinstance(p, dict):
+                    open_port_nums.add(p.get("port", 0))
+        
+        if required_ports:
+            # Если есть конкретные требуемые порты - проверяем их
+            matched_ports = [p for p in required_ports if p in open_port_nums]
+            if matched_ports:
+                port_score = min(25, len(matched_ports) / len(required_ports) * 25)
+                score += port_score
+                score_details.append(f"Порты открыты: {matched_ports}")
+        else:
+            # Если нет специфичных портов, но атака требует сетевого доступа
+            attack_type = cve.get("attack_type", "")
+            if attack_type in ["sql_injection", "cross_site_scripting", "remote_code_execution"]:
+                # Проверяем наличие веб-портов
+                web_ports = {80, 443, 8080, 8443}
+                if web_ports.intersection(open_port_nums):
+                    score += 20
+                    score_details.append("Веб-порты открыты")
+        
+        # Фактор 2: Подтверждение Trivy (30 баллов)
+        cve_id = cve.get("id", "")
+        trivy_confirmed, trivy_details, trivy_severity = self._check_trivy_vulnerability(cve_id)
+        
+        if trivy_confirmed:
+            if trivy_severity in ["CRITICAL", "HIGH"]:
+                score += 30
+                score_details.append("Trivy подтвердил (критично)")
+            elif trivy_severity == "MEDIUM":
+                score += 20
+                score_details.append("Trivy подтвердил (средне)")
+            else:
+                score += 10
+                score_details.append("Trivy подтвердил (низко)")
+        
+        # Фактор 3: Уязвимое ПО обнаружено (20 баллов)
+        sw_names_lower = set()
+        if isinstance(self.system_info.installed_software, list):
+            for sw in self.system_info.installed_software:
+                if hasattr(sw, 'name'):
+                    sw_names_lower.add(sw.name.lower())
+                elif isinstance(sw, dict):
+                    sw_names_lower.add(sw.get("name", "").lower())
+        
+        affected_software = cve.get("affected_software", [])
+        vulnerable_sw_found = False
+        for sw_name in affected_software:
+            sw_lower = sw_name.lower()
+            if any(sw_lower in installed for installed in sw_names_lower):
+                vulnerable_sw_found = True
+                break
+        
+        if vulnerable_sw_found:
+            score += 20
+            score_details.append("Уязвимое ПО обнаружено")
+        
+        # Фактор 4: Отсутствие патчей/обновлений (15 баллов)
+        if not self.system_info.updates_installed:
+            score += 15
+            score_details.append("Обновления не установлены")
+        
+        # Фактор 5: Слабые средства защиты (10 баллов)
+        if not self.system_info.firewall_active:
+            score += 5
+            score_details.append("Брандмауэр отключён")
+        if not self.system_info.antivirus_active:
+            score += 5
+            score_details.append("Антивирус отключён")
+        
+        # Определяем реализуемость на основе score (СНИЖЕННЫЕ ПОРОГИ для большей реалистичности)
+        if score >= 70:
+            feasibility = AttackFeasibility.FEASIBLE
+        elif score >= 40:
+            feasibility = AttackFeasibility.PARTIALLY_FEASIBLE
+        elif score >= 15:
+            feasibility = AttackFeasibility.REQUIRES_ANALYSIS
+        else:
+            feasibility = AttackFeasibility.NOT_FEASIBLE
+        
+        reason_text = ". ".join(score_details)
+        if protection_notes:
+            reason_text += ". Защита: " + "; ".join(protection_notes)
+        if trivy_confirmed:
+            reason_text += ". " + trivy_details
+        
+        return score, max_score, feasibility, reason_text
+
     def _evaluate_feasibility(self, cve: dict, av: AttackVector) -> tuple:
         """
         Оценка реализуемости атаки на основе конфигурации сервера.
         Это ключевая логика — сопоставление «что нашёл атакующий» с «что реально есть на сервере».
+        
+        УЛУЧШЕННАЯ ВЕРСИЯ: Использует многофакторную оценку с учётом:
+        - Сетевой доступности
+        - Подтверждения Trivy
+        - Версий ПО
+        - Средств защиты
         """
         prerequisites = cve.get("prerequisites", [])
         required_services = cve.get("requires_service", [])
@@ -242,8 +393,11 @@ class AttackCorrelator:
                     sw_names_lower.add(sw.get("name", "").lower())
 
         reasons = []
+        protection_notes = []
 
-        # === Проверка SQL-инъекций ===
+        # === БЫСТРЫЕ ПРОВЕРКИ (возврат при явной нереализуемости) ===
+        
+        # Проверка SQL-инъекций
         if attack_type == "sql_injection":
             if not self.system_info.has_database:
                 return (
@@ -251,20 +405,24 @@ class AttackCorrelator:
                     "На сервере не обнаружено ни одной СУБД. SQL-инъекция невозможна при отсутствии базы данных."
                 )
             if not self.system_info.has_web_server:
-                return (
-                    AttackFeasibility.NOT_FEASIBLE,
-                    "На сервере нет веб-сервера. SQL-инъекция через веб-интерфейс невозможна."
-                )
+                web_ports = {80, 443, 8080, 8443}
+                if not web_ports.intersection(open_port_nums):
+                    return (
+                        AttackFeasibility.NOT_FEASIBLE,
+                        "На сервере нет веб-сервера и открытых веб-портов. SQL-инъекция через веб-интерфейс невозможна."
+                    )
 
-        # === Проверка XSS ===
+        # Проверка XSS
         if attack_type == "cross_site_scripting":
             if not self.system_info.has_web_server:
-                return (
-                    AttackFeasibility.NOT_FEASIBLE,
-                    "На сервере нет веб-сервера. XSS-атака невозможна."
-                )
+                web_ports = {80, 443, 8080, 8443}
+                if not web_ports.intersection(open_port_nums):
+                    return (
+                        AttackFeasibility.NOT_FEASIBLE,
+                        "На сервере нет веб-сервера и открытых веб-портов. XSS-атака невозможна."
+                    )
 
-        # === Проверка RDP-атак ===
+        # Проверка RDP-атак
         if "rdp" in required_services:
             if not self.system_info.has_rdp_enabled:
                 return (
@@ -278,7 +436,7 @@ class AttackCorrelator:
                 )
             reasons.append("RDP включён и порт 3389 открыт")
 
-        # === Проверка SMB-атак ===
+        # Проверка SMB-атак
         if "smb" in required_services:
             if not self.system_info.has_smb_enabled:
                 return (
@@ -287,7 +445,7 @@ class AttackCorrelator:
                 )
             reasons.append("SMB активен (порт 445 открыт)")
 
-        # === Проверка FTP-атак ===
+        # Проверка FTP-атак
         if "ftp" in required_services:
             if not self.system_info.has_ftp_enabled:
                 return (
@@ -296,7 +454,7 @@ class AttackCorrelator:
                 )
             reasons.append("FTP-сервер активен")
 
-        # === Проверка SSH-атак ===
+        # Проверка SSH-атак
         if "ssh" in required_services:
             if 22 not in open_port_nums:
                 return (
@@ -305,18 +463,18 @@ class AttackCorrelator:
                 )
             reasons.append("SSH-сервер активен")
 
-        # === Проверка веб-атак ===
+        # Проверка веб-атак
         if "web_server" in required_services or "web_application" in required_services:
             if not self.system_info.has_web_server:
                 web_ports = {80, 443, 8080, 8443}
                 if not web_ports.intersection(open_port_nums):
                     return (
                         AttackFeasibility.NOT_FEASIBLE,
-                        "Веб-сервер не обнаружен. Веб-атаки невозможны."
+                        "Веб-сервер не обнаружен и веб-порты закрыты. Веб-атаки невозможны."
                     )
             reasons.append("Веб-сервер обнаружен")
 
-        # === Проверка Exchange ===
+        # Проверка Exchange
         if "exchange_server" in required_services:
             exchange_found = any("exchange" in sw for sw in sw_names_lower)
             if not exchange_found:
@@ -326,7 +484,7 @@ class AttackCorrelator:
                 )
             reasons.append("Exchange Server обнаружен")
 
-        # === Проверка Active Directory ===
+        # Проверка Active Directory
         if "active_directory" in required_services or "domain_controller" in prerequisites:
             ad_services = {"ntds", "kdc", "dns", "adws"}
             if not ad_services.intersection(running_svc_lower):
@@ -336,7 +494,7 @@ class AttackCorrelator:
                 )
             reasons.append("Active Directory обнаружен")
 
-        # === Проверка Print Spooler ===
+        # Проверка Print Spooler
         if "print_spooler" in required_services:
             if "spooler" not in running_svc_lower:
                 return (
@@ -345,7 +503,7 @@ class AttackCorrelator:
                 )
             reasons.append("Print Spooler запущен")
 
-        # === Проверка Java / Log4j ===
+        # Проверка Java / Log4j
         if "java_application" in required_services:
             java_found = any("java" in sw or "jre" in sw or "jdk" in sw for sw in sw_names_lower)
             if not java_found:
@@ -374,29 +532,20 @@ class AttackCorrelator:
             )
 
         # === Учёт средств защиты ===
-        protection_notes = []
         if self.system_info.firewall_active:
             protection_notes.append("Брандмауэр активен (может блокировать часть атак)")
         if self.system_info.antivirus_active:
             protection_notes.append("Антивирус активен (может обнаружить эксплоит)")
 
-        # === Финальная оценка ===
-        if reasons:
-            reason_text = ". ".join(reasons)
-            if protection_notes:
-                reason_text += ". Средства защиты: " + "; ".join(protection_notes)
-
-            if any("уязвимое ПО" in r for r in reasons):
-                return (AttackFeasibility.FEASIBLE, reason_text)
-            else:
-                return (AttackFeasibility.PARTIALLY_FEASIBLE, reason_text)
-
-        # Если нет определённой оценки
-        return (
-            AttackFeasibility.REQUIRES_ANALYSIS,
-            "Недостаточно данных для автоматической оценки. Требуется ручной анализ."
-            + (f" Средства защиты: {'; '.join(protection_notes)}" if protection_notes else "")
+        # === МНОГОФАКТОРНАЯ ОЦЕНКА (улучшенная логика) ===
+        score, max_score, feasibility, detailed_reason = self._calculate_feasibility_score(
+            cve, av, reasons, protection_notes
         )
+
+        # Добавляем числовую оценку в reason
+        final_reason = f"Оценка реализуемости: {score}/{max_score}. {detailed_reason}"
+
+        return (feasibility, final_reason)
 
     def _analyze_port_based_vulnerabilities(self, scan_result: ScanResult) -> list[VulnerabilityMatch]:
         """Анализ уязвимостей на основе обнаруженных открытых портов."""
@@ -810,8 +959,115 @@ class AttackCorrelator:
         
         return "Неидентифицированное ПО"
 
+    def validate_results(self) -> dict:
+        """
+        Валидация результатов корреляции.
+        Обнаруживает противоречия и аномалии в данных.
+        
+        Возвращает отчёт о валидации с флагами проблем.
+        """
+        validation_report = {
+            "total_results": len(self.results),
+            "discrepancies": [],
+            "warnings": [],
+            "quality_score": 100,  # 0-100
+        }
+        
+        trivy_cve_set = set()
+        if self.trivy_result:
+            # Собираем CVE из Trivy
+            vulns = []
+            if isinstance(self.trivy_result, dict):
+                vulns = self.trivy_result.get("vulnerabilities", [])
+            elif hasattr(self.trivy_result, "vulnerabilities"):
+                vulns = self.trivy_result.vulnerabilities
+            
+            for v in vulns:
+                v_id = v.get("vuln_id") if isinstance(v, dict) else getattr(v, "vuln_id", "")
+                if v_id:
+                    trivy_cve_set.add(v_id.upper())
+        
+        for match in self.results:
+            cve_id = match.cve_id.split(",")[0].strip().upper() if match.cve_id else ""
+            
+            # Проверка 1: Trivy подтвердил, но мы сказали "НЕ РЕАЛИЗУЕМА"
+            if cve_id in trivy_cve_set and match.feasibility == AttackFeasibility.NOT_FEASIBLE.value:
+                validation_report["discrepancies"].append({
+                    "type": "TRIVY_CONTRADICTION",
+                    "cve_id": cve_id,
+                    "description": f"Trivy подтвердил уязвимость {cve_id}, но система оценила как 'НЕ РЕАЛИЗУЕМА'",
+                    "severity": "HIGH",
+                    "recommendation": "Требуется ручной анализ - возможно ошибка в оценке конфигурации"
+                })
+                validation_report["quality_score"] -= 10
+            
+            # Проверка 2: Система сказала "РЕАЛИЗУЕМА", но Trivy не нашёл
+            if (match.feasibility == AttackFeasibility.FEASIBLE.value and 
+                cve_id and cve_id not in trivy_cve_set and trivy_cve_set):
+                validation_report["warnings"].append({
+                    "type": "UNCONFIRMED_FEASIBLE",
+                    "cve_id": cve_id,
+                    "description": f"Атака оценена как 'РЕАЛИЗУЕМА', но Trivy не обнаружил уязвимость",
+                    "severity": "MEDIUM",
+                    "recommendation": "Проверить версии ПО - возможно требуется обновление баз Trivy"
+                })
+                validation_report["quality_score"] -= 5
+            
+            # Проверка 3: Критичная уязвимость без целевого ПО
+            if match.severity in ["CRITICAL", "HIGH"] and not match.target_software:
+                validation_report["warnings"].append({
+                    "type": "MISSING_TARGET_SOFTWARE",
+                    "cve_id": cve_id,
+                    "description": f"Критичная уязвимость {cve_id} без определённого целевого ПО",
+                    "severity": "MEDIUM",
+                    "recommendation": "Уточнить привязку ПО через дополнительные источники"
+                })
+                validation_report["quality_score"] -= 3
+            
+            # Проверка 4: Отсутствие описания CWE
+            if not match.cwe_id or match.cwe_id == "N/A":
+                validation_report["warnings"].append({
+                    "type": "MISSING_CWE",
+                    "cve_id": cve_id,
+                    "description": f"Уязвимость {cve_id} без классификации CWE",
+                    "severity": "LOW",
+                    "recommendation": "Обогатить базу CVE данными о CWE"
+                })
+                validation_report["quality_score"] -= 1
+        
+        # Проверка 5: Статистика по реализуемости
+        feasible_count = sum(1 for m in self.results if m.feasibility == AttackFeasibility.FEASIBLE.value)
+        total_count = len(self.results)
+        
+        if total_count > 0:
+            feasible_ratio = feasible_count / total_count
+            # Если более 80% атак реализуемы - это может быть аномалией
+            if feasible_ratio > 0.8:
+                validation_report["warnings"].append({
+                    "type": "HIGH_FEASIBILITY_RATIO",
+                    "description": f"{feasible_ratio:.0%} атак оценены как реализуемые",
+                    "severity": "MEDIUM",
+                    "recommendation": "Проверить корректность оценки конфигурации защиты"
+                })
+                validation_report["quality_score"] -= 5
+            
+            # Если менее 5% атак реализуемы - возможно система слишком консервативна
+            elif feasible_ratio < 0.05 and total_count > 10:
+                validation_report["warnings"].append({
+                    "type": "LOW_FEASIBILITY_RATIO",
+                    "description": f"Только {feasible_ratio:.0%} атак оценены как реализуемые",
+                    "severity": "LOW",
+                    "recommendation": "Проверить полноту данных о системе"
+                })
+                validation_report["quality_score"] -= 3
+        
+        # Ограничиваем quality_score минимум 0
+        validation_report["quality_score"] = max(0, validation_report["quality_score"])
+        
+        return validation_report
+
     def get_summary(self) -> dict:
-        """Сводка результатов корреляции."""
+        """Сводка результатов корреляции с метриками качества."""
         total = len(self.results)
         feasible = sum(1 for r in self.results if r.feasibility == AttackFeasibility.FEASIBLE.value)
         not_feasible = sum(1 for r in self.results if r.feasibility == AttackFeasibility.NOT_FEASIBLE.value)
@@ -820,6 +1076,17 @@ class AttackCorrelator:
 
         critical = sum(1 for r in self.results if str(r.severity).upper() == "CRITICAL" and r.feasibility != AttackFeasibility.NOT_FEASIBLE.value)
         high = sum(1 for r in self.results if str(r.severity).upper() == "HIGH" and r.feasibility != AttackFeasibility.NOT_FEASIBLE.value)
+        
+        # Рассчитываем contextual severity для критичных уязвимостей
+        contextual_critical = 0
+        for r in self.results:
+            if str(r.severity).upper() == "CRITICAL" and r.feasibility != AttackFeasibility.NOT_FEASIBLE.value:
+                # Учитываем только те, где реализуемость высокая
+                if r.feasibility == AttackFeasibility.FEASIBLE.value:
+                    contextual_critical += 1
+        
+        # Получаем отчёт валидации
+        validation = self.validate_results()
 
         return {
             "total_vulnerabilities_analyzed": total,
@@ -827,6 +1094,13 @@ class AttackCorrelator:
             "not_feasible_attacks": not_feasible,
             "partially_feasible": partial,
             "requires_analysis": unknown,
-            "critical_actionable": critical,
+            "critical_actionable": contextual_critical,  # Только реально реализуемые критичные
             "high_actionable": high,
+            "validation_quality_score": validation["quality_score"],
+            "validation_discrepancies": len(validation["discrepancies"]),
+            "validation_warnings": len(validation["warnings"]),
         }
+    
+    def get_validation_report(self) -> dict:
+        """Полный отчёт валидации результатов."""
+        return self.validate_results()
