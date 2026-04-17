@@ -7,7 +7,13 @@ logs/
 /tools
 /reports
 /history
-build
-dist
 SecurityAttacker.spec
 SecurityServer.spec
+dist
+build
+.vscode
+.qwen
+data
+skills
+.continue
+.idea

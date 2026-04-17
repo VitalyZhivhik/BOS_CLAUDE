@@ -67,6 +67,7 @@ class SystemInfo:
     firewall_active: bool = False
     antivirus_active: bool = False
     updates_installed: bool = False
+    trivy_scan_result: dict = field(default_factory=dict)  # Результаты сканирования Trivy
 
 
 @dataclass
@@ -107,6 +108,7 @@ class VulnerabilityMatch:
     feasibility: str = AttackFeasibility.REQUIRES_ANALYSIS.value
     reason: str = ""
     recommendation: str = ""
+    target_software: str = ""
 
 
 def to_json(obj):

@@ -71,8 +71,9 @@ QGroupBox {
 }
 QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 6px; color: #909090; }
 QPushButton {
-    padding: 8px 14px; border-radius: 3px; font-weight: 600; font-size: 11px;
+    padding: 6px 12px; border-radius: 3px; font-weight: 600; font-size: 10px;
     border: 1px solid #444; color: #d0d0d0; background: #252525;
+    min-height: 28px;
 }
 QPushButton:hover { background: #333; border-color: #555; }
 QPushButton:disabled { background: #1a1a1a; color: #555; border-color: #2a2a2a; }
@@ -635,7 +636,7 @@ class AttackerGUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Security Assessment — Атакующий агент v2")
-        self.setMinimumSize(1250, 800)
+        self.setMinimumSize(1350, 850)  # Увеличиваем размер окна
 
         self.open_ports = []
         self.attack_vectors = []   # Накопительный список векторов (мёрж всех сканирований)
@@ -675,11 +676,44 @@ class AttackerGUI(QMainWindow):
         ml.setContentsMargins(8, 8, 8, 8)
 
         # ── Левая панель ──
+        # Создаём контейнер с скроллом для левой панели
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setStyleSheet("""
+            QScrollArea {
+                background: #121212;
+                border: none;
+            }
+            QScrollBar:vertical {
+                background: #121212;
+                width: 6px;
+                border: none;
+            }
+            QScrollBar::handle:vertical {
+                background: #444;
+                border-radius: 3px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #555;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+                border: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: #121212;
+            }
+        """)
+        
         left = QWidget()
-        left.setFixedWidth(300)
+        left.setFixedWidth(265)  # Увеличенная ширина левой панели
+        left.setStyleSheet("background: #121212;")
         ll = QVBoxLayout(left)
         ll.setSpacing(6)
-        ll.setContentsMargins(0, 0, 0, 0)
+        ll.setContentsMargins(4, 4, 4, 4)
 
         t = QLabel("АТАКУЮЩИЙ АГЕНТ")
         t.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
@@ -702,65 +736,106 @@ class AttackerGUI(QMainWindow):
         cf.addWidget(self.conn_detail)
         ll.addWidget(self.conn_frame)
 
-        # Параметры цели
+        # Параметры цели - расширены
         tg = QGroupBox("Параметры цели")
+        tg.setStyleSheet("QGroupBox { font-size: 12px; font-weight: bold; padding-top: 20px; }")
         tl = QVBoxLayout(tg)
-        tl.setSpacing(4)
+        tl.setSpacing(6)
+        tl.setContentsMargins(8, 12, 8, 10)
+
         tl.addWidget(QLabel("IP-адрес сервера:"))
         self.target_input = QLineEdit(TARGET_SERVER_HOST)
         self.target_input.setFont(QFont("Consolas", 12))
+        self.target_input.setFixedHeight(32)
         tl.addWidget(self.target_input)
+
         tl.addWidget(QLabel("Порт API сервера:"))
         self.port_spin = QSpinBox()
         self.port_spin.setRange(1024, 65535)
         self.port_spin.setValue(TARGET_SERVER_PORT)
+        self.port_spin.setFixedHeight(28)
         tl.addWidget(self.port_spin)
+
         r = QHBoxLayout()
+        r.setSpacing(6)
         r.addWidget(QLabel("Порты от:"))
         self.ps_spin = QSpinBox()
         self.ps_spin.setRange(1, 65535)
         self.ps_spin.setValue(1)
+        self.ps_spin.setFixedHeight(28)
         r.addWidget(self.ps_spin)
         r.addWidget(QLabel("до:"))
         self.pe_spin = QSpinBox()
         self.pe_spin.setRange(1, 65535)
         self.pe_spin.setValue(10000)
+        self.pe_spin.setFixedHeight(28)
         r.addWidget(self.pe_spin)
         tl.addLayout(r)
+
         self.chk_deep = QCheckBox("Глубокий фингерпринтинг")
         self.chk_deep.setChecked(True)
         tl.addWidget(self.chk_deep)
         ll.addWidget(tg)
 
-        # Действия
+        # Действия - расширены
         ag = QGroupBox("Действия")
+        ag.setStyleSheet("QGroupBox { font-size: 12px; font-weight: bold; padding-top: 20px; }")
         al = QVBoxLayout(ag)
-        al.setSpacing(6)
+        al.setSpacing(8)
+        al.setContentsMargins(8, 12, 8, 10)
+
+        # Кнопки действий - динамический размер
+        action_btn_style = """
+            QPushButton { 
+                padding: 10px 14px; 
+                font-size: 11px; 
+                min-height: 36px; 
+                text-align: center;
+            }
+        """
 
         self.btn_check = QPushButton("1. Проверить связь с сервером")
+        self.btn_check.setStyleSheet(action_btn_style)
         self.btn_check.clicked.connect(self._check_connection)
         al.addWidget(self.btn_check)
 
         self.btn_scan = QPushButton("2. Сканировать порты")
+        self.btn_scan.setStyleSheet(action_btn_style)
         self.btn_scan.clicked.connect(self._start_scan)
         al.addWidget(self.btn_scan)
 
         self.btn_nuclei = QPushButton("3. Веб-уязвимости (Nuclei)  ➕")
+        self.btn_nuclei.setStyleSheet(action_btn_style)
         self.btn_nuclei.setEnabled(False)
         self.btn_nuclei.clicked.connect(self._start_nuclei)
         al.addWidget(self.btn_nuclei)
 
         self.btn_nmap = QPushButton("4. Сетевые протоколы (Nmap)  ➕")
+        self.btn_nmap.setStyleSheet(action_btn_style)
         self.btn_nmap.setEnabled(False)
         self.btn_nmap.clicked.connect(self._start_nmap)
         al.addWidget(self.btn_nmap)
 
+        # Кнопка параллельного сканирования
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.Shape.HLine)
+        sep2.setStyleSheet("color:#333;")
+        al.addWidget(sep2)
+
+        self.btn_parallel_scan = QPushButton("⚡ Запустить все сканеры параллельно")
+        self.btn_parallel_scan.setStyleSheet(action_btn_style + "QPushButton { background: #2a3a4a; }")
+        self.btn_parallel_scan.setToolTip("Запускает Nuclei + Nmap одновременно для экономии времени")
+        self.btn_parallel_scan.setEnabled(False)
+        self.btn_parallel_scan.clicked.connect(self._start_parallel_scan)
+        al.addWidget(self.btn_parallel_scan)
+
         self.progress_bar = QProgressBar()
-        self.progress_bar.setFixedHeight(18)
+        self.progress_bar.setFixedHeight(20)
         self.progress_bar.setVisible(False)
         al.addWidget(self.progress_bar)
 
         self.btn_send = QPushButton("5. Отправить на сервер для анализа")
+        self.btn_send.setStyleSheet(action_btn_style + "QPushButton { background: #2a4a2a; }")
         self.btn_send.setEnabled(False)
         self.btn_send.clicked.connect(self._send_results)
         al.addWidget(self.btn_send)
@@ -770,11 +845,14 @@ class AttackerGUI(QMainWindow):
         sep.setStyleSheet("color:#333;")
         al.addWidget(sep)
 
+        small_btn_style = "QPushButton { padding: 6px 12px; font-size: 10px; min-height: 28px; }"
         self.btn_clear_vectors = QPushButton("🗑  Очистить таблицу векторов")
+        self.btn_clear_vectors.setStyleSheet(small_btn_style)
         self.btn_clear_vectors.clicked.connect(self._clear_vectors)
         al.addWidget(self.btn_clear_vectors)
 
         self.btn_export = QPushButton("📥 Экспорт лога")
+        self.btn_export.setStyleSheet(small_btn_style)
         self.btn_export.clicked.connect(self._export_log)
         al.addWidget(self.btn_export)
 
@@ -793,7 +871,8 @@ class AttackerGUI(QMainWindow):
         sl.addWidget(self.lbl_stats)
         ll.addWidget(sf)
 
-        ml.addWidget(left)
+        scroll.setWidget(left)
+        ml.addWidget(scroll)
 
         # ── Правая часть — вкладки ──
         self.tabs = QTabWidget()
@@ -925,17 +1004,60 @@ class AttackerGUI(QMainWindow):
 
         self.tabs.addTab(ht, "📁 История")
 
-        # Вкладка 4: Сканеры Лог
+        # Вкладка Trivy УБРАНА - она не нужна атакующему агенту
+        # Trivy сканирует только серверную часть
+
+        # Вкладка 5: Сканеры Лог (разделён на 2 части)
         nt = QWidget()
         ntl = QVBoxLayout(nt)
-        self.scanner_output = QTextEdit()
-        self.scanner_output.setReadOnly(True)
-        self.scanner_output.setStyleSheet(
+        
+        # Заголовок
+        log_title = QLabel("🖥 Вывод сканеров (слева Nmap, справа Nuclei)")
+        log_title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        log_title.setStyleSheet("color:#888;padding:4px 0;")
+        ntl.addWidget(log_title)
+        
+        # Разделённый layout
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        
+        # Левая часть - Nmap
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_label = QLabel("🔷 Nmap")
+        left_label.setStyleSheet("color:#4488cc;font-weight:bold;padding:2px;")
+        left_layout.addWidget(left_label)
+        self.scanner_output_left = QTextEdit()
+        self.scanner_output_left.setReadOnly(True)
+        self.scanner_output_left.setStyleSheet(
             "background: #050f05; color: #00dd00; "
             "font-family: 'Consolas'; font-size: 11px;"
         )
-        ntl.addWidget(self.scanner_output)
+        left_layout.addWidget(self.scanner_output_left)
+        splitter.addWidget(left_widget)
+        
+        # Правая часть - Nuclei
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_label = QLabel("🔶 Nuclei")
+        right_label.setStyleSheet("color:#cc8844;font-weight:bold;padding:2px;")
+        right_layout.addWidget(right_label)
+        self.scanner_output_right = QTextEdit()
+        self.scanner_output_right.setReadOnly(True)
+        self.scanner_output_right.setStyleSheet(
+            "background: #050f05; color: #00dd00; "
+            "font-family: 'Consolas'; font-size: 11px;"
+        )
+        right_layout.addWidget(self.scanner_output_right)
+        splitter.addWidget(right_widget)
+        
+        splitter.setSizes([500, 500])
+        ntl.addWidget(splitter)
         self.tabs.addTab(nt, "🖥 Сканеры Лог")
+        
+        # Для обратной совместимости
+        self.scanner_output = self.scanner_output_left
 
         # Вкладка 5: Системный Лог
         lt = QWidget()
@@ -993,6 +1115,40 @@ class AttackerGUI(QMainWindow):
             color = "#00dd00"
         self.scanner_output.append(f'<span style="color:{color};">{msg}</span>')
         self.scanner_output.moveCursor(QTextCursor.MoveOperation.End)
+    
+    def _append_scanner_log_left(self, msg):
+        """Логирование в левую панель (Nmap)"""
+        if "🔴" in msg or "❌" in msg:
+            color = "#ff4444"
+        elif "✅" in msg or "✔" in msg:
+            color = "#44ff44"
+        elif "⚠" in msg:
+            color = "#ffaa44"
+        elif "═" in msg or "─" in msg:
+            color = "#4488cc"
+        elif "▸" in msg or "💻" in msg or "🚀" in msg:
+            color = "#88bbdd"
+        else:
+            color = "#00dd00"
+        self.scanner_output_left.append(f'<span style="color:{color};">{msg}</span>')
+        self.scanner_output_left.moveCursor(QTextCursor.MoveOperation.End)
+    
+    def _append_scanner_log_right(self, msg):
+        """Логирование в правую панель (Nuclei)"""
+        if "🔴" in msg or "❌" in msg:
+            color = "#ff4444"
+        elif "✅" in msg or "✔" in msg:
+            color = "#44ff44"
+        elif "⚠" in msg:
+            color = "#ffaa44"
+        elif "═" in msg or "─" in msg:
+            color = "#cc8844"
+        elif "▸" in msg or "💻" in msg or "🚀" in msg:
+            color = "#ddbb88"
+        else:
+            color = "#00dd00"
+        self.scanner_output_right.append(f'<span style="color:{color};">{msg}</span>')
+        self.scanner_output_right.moveCursor(QTextCursor.MoveOperation.End)
 
     # ──────────── ПРОВЕРКА СВЯЗИ ────────────
 
@@ -1098,6 +1254,7 @@ class AttackerGUI(QMainWindow):
         if ports:
             self.btn_nuclei.setEnabled(True)
             self.btn_nmap.setEnabled(True)
+            self.btn_parallel_scan.setEnabled(True)  # Включаем кнопку параллельного сканирования
             self.btn_send.setEnabled(True)
 
         self._save_history_file("PortScan")
@@ -1119,12 +1276,12 @@ class AttackerGUI(QMainWindow):
         self._lock_scanners()
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
-        self.scanner_output.clear()
+        self.scanner_output_right.clear()  # Очищаем правую панель
         self.tabs.setCurrentIndex(4)
 
         self.nuclei_worker = NucleiWorker(self.target_input.text(), self.open_ports)
         self.nuclei_worker.progress.connect(self._on_scanner_progress)
-        self.nuclei_worker.log_msg.connect(self._append_scanner_log)
+        self.nuclei_worker.log_msg.connect(self._append_scanner_log_right)  # Правая панель
         self.nuclei_worker.finished.connect(
             lambda v, t: self._on_scanner_done(v, t, "NucleiScan"))
         self.nuclei_worker.error.connect(self._on_scanner_error)
@@ -1137,16 +1294,178 @@ class AttackerGUI(QMainWindow):
         self._lock_scanners()
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
-        self.scanner_output.clear()
+        self.scanner_output_left.clear()  # Очищаем левую панель
         self.tabs.setCurrentIndex(4)
 
         self.nmap_worker = NmapWorker(self.target_input.text(), self.open_ports)
         self.nmap_worker.progress.connect(self._on_scanner_progress)
-        self.nmap_worker.log_msg.connect(self._append_scanner_log)
+        self.nmap_worker.log_msg.connect(self._append_scanner_log_left)  # Левая панель
         self.nmap_worker.finished.connect(
             lambda v, t: self._on_scanner_done(v, t, "NmapScan"))
         self.nmap_worker.error.connect(self._on_scanner_error)
         self.nmap_worker.start()
+    
+    def _start_parallel_scan(self):
+        """Запускает Nuclei и Nmap параллельно (PortScan уже выполнен)"""
+        logger.info("=" * 60)
+        logger.info(" ⚡ ПАРАЛЛЕЛЬНОЕ СКАНИРОВАНИЕ (Nuclei + Nmap)")
+        logger.info("=" * 60)
+        
+        if not self.open_ports:
+            QMessageBox.warning(self, "Предупреждение", 
+                "Сначала выполните сканирование портов!")
+            return
+        
+        # Блокируем кнопки
+        self.btn_parallel_scan.setEnabled(False)
+        self.btn_nuclei.setEnabled(False)
+        self.btn_nmap.setEnabled(False)
+        self.btn_scan.setEnabled(False)
+        self.btn_send.setEnabled(False)
+        
+        # Показываем оба прогресс-бара
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("Nuclei: ожидание...")
+        
+        # Создаём второй прогресс-бар для Nmap если его нет
+        if not hasattr(self, 'progress_bar_nmap'):
+            self.progress_bar_nmap = QProgressBar()
+            self.progress_bar_nmap.setFixedHeight(18)
+            # Вставляем после первого прогресс-бара
+            al = self.btn_parallel_scan.parent().layout()
+            idx = al.indexOf(self.progress_bar)
+            al.insertWidget(idx + 1, self.progress_bar_nmap)
+        
+        self.progress_bar_nmap.setVisible(True)
+        self.progress_bar_nmap.setValue(0)
+        self.progress_bar_nmap.setFormat("Nmap: ожидание...")
+        
+        self.scanner_output.clear()
+        self.tabs.setCurrentIndex(4)
+        
+        # Счётчики для завершения
+        self._parallel_completed = {"nuclei": False, "nmap": False}
+        self._parallel_vectors = {"nuclei": [], "nmap": []}
+        self._parallel_start_time = time.time()
+        
+        # Генерируем векторы из PortScan (уже выполнено)
+        from attacker.attacker_agent import AttackVectorGenerator
+        vec_gen = AttackVectorGenerator()
+        portscan_vectors = vec_gen.generate(self.open_ports)
+        added_portscan = self._merge_vectors(portscan_vectors, source="PortScan")
+        logger.info(f"  ✔ PortScan: {len(portscan_vectors)} векторов добавлено ({added_portscan} новых)")
+        
+        # Запускаем Nuclei
+        logger.info("  ▸ Запуск Nuclei...")
+        self.nuclei_worker = NucleiWorker(self.target_input.text(), self.open_ports)
+        self.nuclei_worker.progress.connect(self._on_nuclei_parallel_progress)
+        self.nuclei_worker.log_msg.connect(lambda msg: self._append_scanner_log_left(msg))
+        self.nuclei_worker.finished.connect(self._on_parallel_nuclei_done)
+        self.nuclei_worker.error.connect(self._on_parallel_error)
+        self.nuclei_worker.start()
+        
+        # Запускаем Nmap
+        logger.info("  ▸ Запуск Nmap...")
+        self.nmap_worker = NmapWorker(self.target_input.text(), self.open_ports)
+        self.nmap_worker.progress.connect(self._on_nmap_parallel_progress)
+        self.nmap_worker.log_msg.connect(lambda msg: self._append_scanner_log_right(msg))
+        self.nmap_worker.finished.connect(self._on_parallel_nmap_done)
+        self.nmap_worker.error.connect(self._on_parallel_error)
+        self.nmap_worker.start()
+        
+        self._append_scanner_log_left("═" * 40)
+        self._append_scanner_log_left("  ⚡ NUCLEI ЗАПУЩЕН")
+        self._append_scanner_log_left("═" * 40)
+        
+        self._append_scanner_log_right("═" * 40)
+        self._append_scanner_log_right("  ⚡ NMAP ЗАПУЩЕН")
+        self._append_scanner_log_right("═" * 40)
+    
+    def _on_nuclei_parallel_progress(self, msg, val):
+        """Обновление прогресса Nuclei при параллельном сканировании"""
+        self.progress_bar.setFormat(f"Nuclei: {msg}")
+        if val >= 0:
+            self.progress_bar.setValue(val)
+    
+    def _on_nmap_parallel_progress(self, msg, val):
+        """Обновление прогресса Nmap при параллельном сканировании"""
+        self.progress_bar_nmap.setFormat(f"Nmap: {msg}")
+        if val >= 0:
+            self.progress_bar_nmap.setValue(val)
+    
+    def _on_parallel_nuclei_done(self, vectors, elapsed):
+        """Nuclei завершил работу в параллельном режиме"""
+        self._parallel_vectors["nuclei"] = vectors
+        self._parallel_completed["nuclei"] = True
+        self._append_scanner_log_left(f"  ✅ Nuclei завершён за {elapsed:.1f} сек, найдено {len(vectors)} векторов")
+        self.progress_bar.setFormat(f"Nuclei: завершён за {elapsed:.1f} сек")
+        self._check_parallel_completion()
+    
+    def _on_parallel_nmap_done(self, vectors, elapsed):
+        """Nmap завершил работу в параллельном режиме"""
+        self._parallel_vectors["nmap"] = vectors
+        self._parallel_completed["nmap"] = True
+        self._append_scanner_log_right(f"  ✅ Nmap завершён за {elapsed:.1f} сек, найдено {len(vectors)} векторов")
+        self.progress_bar_nmap.setFormat(f"Nmap: завершён за {elapsed:.1f} сек")
+        self._check_parallel_completion()
+    
+    def _on_parallel_error(self, error_msg):
+        """Ошибка в одном из параллельных сканеров"""
+        logger.error(f"  ❌ Ошибка сканера: {error_msg}")
+        # Не блокируем остальные сканеры, просто логируем
+    
+    def _check_parallel_completion(self):
+        """Проверяет, все ли сканеры завершили работу"""
+        if all(self._parallel_completed.values()):
+            elapsed = time.time() - self._parallel_start_time
+            
+            self._append_scanner_log_left("═" * 40)
+            self._append_scanner_log_left(f"  ⚡ ВСЕ СКАНЕРЫ ЗАВЕРШЕНЫ за {elapsed:.1f} сек")
+            
+            self._append_scanner_log_right("═" * 40)
+            self._append_scanner_log_right(f"  ⚡ ВСЕ СКАНЕРЫ ЗАВЕРШЕНЫ за {elapsed:.1f} сек")
+            
+            # Мёржим все векторы
+            all_vectors = []
+            for scan_type, vectors in self._parallel_vectors.items():
+                all_vectors.extend(vectors)
+                logger.info(f"  [{scan_type}] {len(vectors)} векторов")
+            
+            # Добавляем без дубликатов
+            added = self._merge_vectors(all_vectors, source="Parallel")
+            
+            logger.info(f"  Итого добавлено: {added} уникальных векторов")
+            
+            # Обновляем UI
+            self._update_attacks_table()
+            self._update_stats()
+            
+            # Разблокируем кнопки
+            self.progress_bar.setVisible(False)
+            if hasattr(self, 'progress_bar_nmap'):
+                self.progress_bar_nmap.setVisible(False)
+            self.btn_parallel_scan.setEnabled(True)
+            self.btn_nuclei.setEnabled(True)
+            self.btn_nmap.setEnabled(True)
+            self.btn_scan.setEnabled(True)
+            self.btn_send.setEnabled(True)
+            
+            self.tabs.setCurrentIndex(1)  # Вкладка векторов атак
+            
+            self._save_history_file("Parallel")
+            self.statusBar().showMessage(
+                f"Параллельное сканирование: завершено за {elapsed:.1f} сек, "
+                f"добавлено {added} новых векторов (итого {len(self.attack_vectors)})"
+            )
+            
+            QMessageBox.information(
+                self,
+                "Параллельное сканирование завершено",
+                f"Все сканеры завершили работу за {elapsed:.1f} секунд!\n\n"
+                f"Добавлено {added} уникальных векторов атак.\n"
+                f"Итого в таблице: {len(self.attack_vectors)} векторов."
+            )
 
     def _lock_scanners(self):
         self.btn_nuclei.setEnabled(False)
