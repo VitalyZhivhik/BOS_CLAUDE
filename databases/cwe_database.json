@@ -598,5 +598,205 @@
     "mitigation": "Проверка зависимостей, использование SBOM, аудит кода, проверка подписей пакетов",
     "requires_technology": ["any_application", "package_manager"],
     "detection_methods": ["supply_chain_scanning", "binary_analysis", "behavioral_analysis"]
+  },
+  {
+    "id": "CWE-284",
+    "name": "Некорректный контроль доступа",
+    "description": "Программа неправильно ограничивает доступ к ресурсам или функциям",
+    "category": "access_control",
+    "related_capec": ["CAPEC-233", "CAPEC-1"],
+    "mitigation": "Реализация ролевой модели доступа, проверка разрешений, аудит доступа",
+    "requires_technology": ["any_application", "web_server"],
+    "detection_methods": ["access_testing", "authorization_review"]
+  },
+  {
+    "id": "CWE-1173",
+    "name": "Неправильное использование проверки безопасности приложением",
+    "description": "Приложение использует проверки безопасности неправильным образом, создавая логические бреши в защите",
+    "category": "security_checks",
+    "related_capec": ["CAPEC-233", "CAPEC-115"],
+    "mitigation": "Строгая валидация всех входных данных, централизованные проверки безопасности",
+    "requires_technology": ["any_application", "web_application"],
+    "detection_methods": ["code_review", "access_testing", "static_analysis"]
+  },
+  {
+    "id": "CWE-1220",
+    "name": "Недостаточная авторизация доступа к аппаратным ресурсам",
+    "description": "Недостаточная проверка прав доступа к аппаратным регистрам или памяти устройств",
+    "category": "access_control",
+    "related_capec": ["CAPEC-233", "CAPEC-1"],
+    "mitigation": "Проверка привилегий при доступе к hardware, использование privilege separation",
+    "requires_technology": ["embedded_system", "firmware", "iot_device"],
+    "detection_methods": ["firmware_analysis", "access_testing"]
+  },
+  {
+    "id": "CWE-1231",
+    "name": "Обход защиты памяти при записи за пределы буфера",
+    "description": "Некорректное ограничение диапазона записей приводит к переполнению буфера с обходом защитных механизмов",
+    "category": "memory_safety",
+    "related_capec": ["CAPEC-100"],
+    "mitigation": "Включение DEP, ASLR, SafeSEH, проверка границ",
+    "requires_technology": ["native_application"],
+    "detection_methods": ["fuzzing", "static_analysis", "binary_analysis"]
+  },
+  {
+    "id": "CWE-1256",
+    "name": "Недостаточная изоляция компонентов системы",
+    "description": "Компоненты приложения не изолированы должным образом, позволяя атакующему влиять на поведение других компонентов",
+    "category": "architecture_security",
+    "related_capec": ["CAPEC-439", "CAPEC-502"],
+    "mitigation": "Использование sandboxing, контейнеровзация, принцип наименьших привилегий",
+    "requires_technology": ["any_application", "container_platform"],
+    "detection_methods": ["architecture_review", "isolation_testing"]
+  },
+  {
+    "id": "CWE-1288",
+    "name": "Недостаточная валидация ввода при небезопасном взаимодействии с оборудованием",
+    "description": "Недостаточная проверка данных при коммуникации с hardware, позволяющая манипуляции",
+    "category": "input_validation",
+    "related_capec": ["CAPEC-137"],
+    "mitigation": "Валидация протоколов связи, checksums, криптографическая защита канала",
+    "requires_technology": ["embedded_system", "iot_device", "hardware_interface"],
+    "detection_methods": ["firmware_analysis", "protocol_testing"]
+  },
+  {
+    "id": "CWE-1304",
+    "name": "Небезопасная конфигурация безопасности в критических компонентах",
+    "description": "Компоненты системы имеют небезопасные настройки по умолчанию, которые могут быть использованы атакующим",
+    "category": "configuration",
+    "related_capec": ["CAPEC-121"],
+    "mitigation": "Жёсткие настройки по умолчанию, регулярный аудит конфигурации",
+    "requires_technology": ["any_application", "network_device", "web_server"],
+    "detection_methods": ["configuration_audit", "security_hardening"]
+  },
+  {
+    "id": "CWE-1332",
+    "name": "Неправильная конфигурация разрядности/размера данных",
+    "description": "Неверное указание размера типов данных приводит к уязвимостям переполнения",
+    "category": "data_handling",
+    "related_capec": ["CAPEC-100"],
+    "mitigation": "Использование безопасных типов данных, проверка компилятором",
+    "requires_technology": ["native_application", "embedded_system"],
+    "detection_methods": ["static_analysis", "code_review", "compiler_warnings"]
+  },
+  {
+    "id": "CWE-1341",
+    "name": "Неправильная обработка ошибок в нескольких потоках",
+    "description": "Ошибки в обработке состояний гонки между несколькими потоками выполнения",
+    "category": "race_condition",
+    "related_capec": ["CAPEC-29", "CAPEC-584"],
+    "mitigation": "Использование атомарных операций, mutex, thread-safe структуры данных",
+    "requires_technology": ["native_application", "multi_threaded_app"],
+    "detection_methods": ["concurrency_testing", "static_analysis", "thread_analysis"]
+  },
+  {
+    "id": "CWE-1369",
+    "name": "Недостаточная обработка состояния сессии",
+    "description": "Приложение неправильно обрабатывает состояние сессии, позволяя атакующему манипулировать им",
+    "category": "session_management",
+    "related_capec": ["CAPEC-62", "CAPEC-39"],
+    "mitigation": "Безопасное управление сессиями, валидация состояния, шифрование",
+    "requires_technology": ["web_application", "api"],
+    "detection_methods": ["session_testing", "code_review", "dynamic_analysis"]
+  },
+  {
+    "id": "CWE-1383",
+    "name": "Обход ограничений безопасности через символические ссылки",
+    "description": "Атакующий использует symlinks для обхода проверок безопасности файловой системы",
+    "category": "file_handling",
+    "related_capec": ["CAPEC-126", "CAPEC-27"],
+    "mitigation": "Проверка symlinks перед доступом к файлам, использование O_NOFOLLOW",
+    "requires_technology": ["operating_system", "file_system"],
+    "detection_methods": ["file_system_audit", "static_analysis"]
+  },
+  {
+    "id": "CWE-1395",
+    "name": "Уязвимость в драйвере устройства",
+    "description": "Уязвимости в драйверах устройств, позволяющие повышение привилегий или отказ в обслуживании",
+    "category": "driver_security",
+    "related_capec": ["CAPEC-100", "CAPEC-233"],
+    "mitigation": "Регулярные обновления драйверов, использование driver signing",
+    "requires_technology": ["operating_system", "hardware_driver"],
+    "detection_methods": ["driver_analysis", "fuzzing", "binary_analysis"]
+  },
+  {
+    "id": "CWE-1405",
+    "name": "Недостаточная проверка согласованности составного элемента",
+    "description": "Приложение не проверяет согласованность данных в составных структурах",
+    "category": "data_validation",
+    "related_capec": ["CAPEC-135"],
+    "mitigation": "Проверка целостности данных, schema validation",
+    "requires_technology": ["any_application"],
+    "detection_methods": ["input_validation", "dynamic_analysis"]
+  },
+  {
+    "id": "CWE-1416",
+    "name": "Неправильная обработка XML внешних сущностей (XXE)",
+    "description": "Уязвимость парсера XML, позволяющая чтение локальных файлов, SSRF или DoS",
+    "category": "injection",
+    "related_capec": ["CAPEC-233", "CAPEC-664"],
+    "mitigation": "Отключение DTD и внешних сущностей, обновление парсеров",
+    "requires_technology": ["xml_parser", "web_application"],
+    "detection_methods": ["static_analysis", "dynamic_analysis", "xml_audit"]
+  },
+  {
+    "id": "CWE-1229",
+    "name": "Обход критической проверки безопасности через параметры",
+    "description": "Атакующий манипулирует параметрами для обхода проверок безопасности",
+    "category": "authorization",
+    "related_capec": ["CAPEC-233", "CAPEC-1"],
+    "mitigation": "Серверная валидация параметров, проверка прав на каждом этапе",
+    "requires_technology": ["web_application", "api"],
+    "detection_methods": ["access_testing", "parameter_tampering_testing"]
+  },
+  {
+    "id": "CWE-1310",
+    "name": "Неправильное вычисление размера буфера",
+    "description": "Ошибки в вычислении размера памяти для операций копирования/выделения",
+    "category": "memory_safety",
+    "related_capec": ["CAPEC-100"],
+    "mitigation": "Проверка вычислений размера, использование safe functions",
+    "requires_technology": ["native_application"],
+    "detection_methods": ["static_analysis", "fuzzing", "code_review"]
+  },
+  {
+    "id": "CWE-1338",
+    "name": "Недостаточные меры защиты от аппаратных атак",
+    "description": "Устройство не имеет достаточной защиты от физических или hardware атак",
+    "category": "hardware_security",
+    "related_capec": ["CAPEC-111", "CAPEC-118"],
+    "mitigation": "Использование secure boot, TPM, hardware encryption",
+    "requires_technology": ["embedded_system", "iot_device"],
+    "detection_methods": ["hardware_analysis", "physical_security_assessment"]
+  },
+  {
+    "id": "CWE-1301",
+    "name": "Недостаточные компоненты с небезопасными конфигурациями по умолчанию",
+    "description": "Компоненты с уязвимыми настройками по умолчанию",
+    "category": "supply_chain",
+    "related_capec": ["CAPEC-151", "CAPEC-437"],
+    "mitigation": "Изменение настроек по умолчанию, обновление компонентов",
+    "requires_technology": ["any_application", "library", "framework"],
+    "detection_methods": ["dependency_scan", "configuration_audit"]
+  },
+  {
+    "id": "CWE-1382",
+    "name": "Использование энергозависимой памяти после выключения",
+    "description": "Конфиденциальные данные сохраняются в памяти после выключения системы",
+    "category": "data_protection",
+    "related_capec": ["CAPEC-116"],
+    "mitigation": "Очистка памяти перед выключением, использование secure deletion",
+    "requires_technology": ["operating_system", "embedded_system"],
+    "detection_methods": ["memory_analysis", "forensics"]
+  },
+  {
+    "id": "CWE-1287",
+    "name": "Недостаточная валидация входных данных в загрузчике",
+    "description": "Небезопасная обработка входных данных в boot loader",
+    "category": "boot_security",
+    "related_capec": ["CAPEC-137"],
+    "mitigation": "Валидация загружаемых данных, secure boot",
+    "requires_technology": ["firmware", "bootloader"],
+    "detection_methods": ["firmware_analysis", "boot_audit"]
   }
 ]

@@ -289,7 +289,7 @@ class TrivyCorrelator:
                     f"Требует дополнительной проверки."
                 )
             
-            # Создаём усиленный результат
+            # Создаём усиленный результат с target_software
             enhanced_match = VulnerabilityMatch(
                 cve_id=vuln_id,
                 cwe_id=", ".join(trivy_vuln.cwe_ids) if trivy_vuln.cwe_ids else "N/A",
@@ -305,6 +305,7 @@ class TrivyCorrelator:
                 feasibility=feasibility.value,
                 reason=reason,
                 recommendation=self._generate_trivy_recommendation(trivy_vuln, feasibility),
+                target_software=f"{trivy_vuln.pkg_name} v.{trivy_vuln.installed_version}" if trivy_vuln.installed_version else trivy_vuln.pkg_name,
             )
             
             self.results.append(enhanced_match)

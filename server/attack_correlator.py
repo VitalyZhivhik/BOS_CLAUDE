@@ -120,20 +120,39 @@ class AttackCorrelator:
             logger.warning("[4/4] Данные Trivy отсутствуют - корреляция без подтверждения уязвимостей")
             self._report_progress(92, "ВНИМАНИЕ: Trivy не запущен - корреляция без подтверждения")
 
-        # Присвоение обнаруженного ПО к уязвимостям
-        if self.trivy_result:
-            trivy_vulns = self.trivy_result.get("vulnerabilities", []) if isinstance(self.trivy_result, dict) else getattr(self.trivy_result, "vulnerabilities", [])
-            software_map = {}
-            for v in trivy_vulns:
-                v_id = v.get("vuln_id") if isinstance(v, dict) else getattr(v, "vuln_id", "")
-                pkg = v.get("pkg_name") if isinstance(v, dict) else getattr(v, "pkg_name", "")
-                ver = v.get("installed_version") if isinstance(v, dict) else getattr(v, "installed_version", "")
-                if v_id and pkg:
-                    software_map[v_id] = f"{pkg} v.{ver}" if ver else pkg
+        # Присвоение обнаруженного ПО к уязвимостям (Умная корреляция)
+        logger.info("Присвоение целевого ПО к уязвимостям...")
+        self._report_progress(95, "Присвоение целевого ПО к уязвимостям...")
+        
+        # Шаг 1: Строим карту CVE -> ПО из всех доступных источников
+        software_map = self._build_software_map(scan_result)
+        
+        # Шаг 2: Применяем карту к результатам
+        for match in self.results:
+            if match.target_software:  # Уже установлено из предыдущих шагов
+                continue
             
-            for match in self.results:
-                if match.cve_id and match.cve_id in software_map:
-                    match.target_software = software_map[match.cve_id]
+            # Пробуем найти ПО для каждого CVE в списке
+            if match.cve_id:
+                for cve in match.cve_id.split(","):
+                    cve = cve.strip()
+                    if cve in software_map:
+                        match.target_software = software_map[cve]
+                        break
+                
+                # Если не нашли по CVE, пробуем по attack_vector_id
+                if not match.target_software and match.attack_vector_id:
+                    # Ищем ПО по имени атаки/вектора
+                    for key, sw in software_map.items():
+                        if match.attack_name.lower() in sw.lower() or sw.lower() in match.attack_name.lower():
+                            match.target_software = sw
+                            break
+            
+            # Фоллбэк: если всё ещё нет ПО, используем эвристику по порту
+            if not match.target_software:
+                match.target_software = self._guess_software_from_port(match, scan_result)
+        
+        logger.info(f"Присвоено ПО: {sum(1 for m in self.results if m.target_software)}/{len(self.results)} результатов")
 
         total_elapsed = time.time() - start_time
         self._report_progress(100, f"Корреляция завершена. Найдено {len(self.results)} уникальных результатов")
@@ -592,6 +611,204 @@ class AttackCorrelator:
         logger.info(f"  - Новых критических находок: {len(corr_result.new_critical_findings)}")
         
         return merged
+
+    def _build_software_map(self, scan_result: ScanResult) -> dict:
+        """
+        Строит карту CVE -> ПО из всех доступных источников.
+        
+        Приоритеты:
+        1. Trivy (самый надежный источник - реальные уязвимости в ПО)
+        2. CVE база данных (affected_software из описания CVE)
+        3. Установленное ПО на сервере
+        4. Сопоставление по портам
+        """
+        software_map = {}
+        
+        # 1. Приоритет: Данные из Trivy (самый надежный источник)
+        if self.trivy_result:
+            trivy_vulns = []
+            if isinstance(self.trivy_result, dict):
+                trivy_vulns = self.trivy_result.get("vulnerabilities", [])
+            elif hasattr(self.trivy_result, "vulnerabilities"):
+                trivy_vulns = self.trivy_result.vulnerabilities
+            
+            for v in trivy_vulns:
+                v_id = v.get("vuln_id") if isinstance(v, dict) else getattr(v, "vuln_id", "")
+                pkg = v.get("pkg_name") if isinstance(v, dict) else getattr(v, "pkg_name", "")
+                ver = v.get("installed_version") if isinstance(v, dict) else getattr(v, "installed_version", "")
+                
+                if v_id and pkg:
+                    software_name = f"{pkg} v.{ver}" if ver else pkg
+                    software_map[v_id] = software_name
+                    
+                    # Также добавляем варианты без версии для гибкого поиска
+                    if ver:
+                        software_map[f"{v_id}_base"] = pkg
+            
+            logger.info(f"[SOFTWARE_MAP] Из Trivy добавлено {len(software_map)} записей")
+        
+        # 2. CVE база данных (affected_software)
+        if hasattr(self.vuln_db, 'cve_db'):
+            cve_list = self.vuln_db.cve_db if isinstance(self.vuln_db.cve_db, list) else []
+            for cve_info in cve_list:
+                cve_id = cve_info.get("id", "")
+                if cve_id in software_map:
+                    continue  # Уже есть из Trivy
+                
+                affected = cve_info.get("affected_software", [])
+                if affected:
+                    # Берем первое affected ПО как наиболее вероятное
+                    software_map[cve_id] = affected[0]
+        
+        # 3. Сопоставление по установленному ПО
+        for sw in self.system_info.installed_software:
+            sw_name = sw.name if hasattr(sw, 'name') else sw.get("name", "")
+            sw_version = sw.version if hasattr(sw, 'version') else sw.get("version", "")
+            
+            if not sw_name:
+                continue
+            
+            # Ищем CVE для этого ПО
+            cves = self.vuln_db.find_cves_by_software(sw_name)
+            for cve in cves:
+                cve_id = cve.get("id", "")
+                if cve_id and cve_id not in software_map:
+                    software_name = f"{sw_name} v.{sw_version}" if sw_version else sw_name
+                    software_map[cve_id] = software_name
+        
+        # 4. Сопоставление по портам из scan_result
+        if hasattr(scan_result, 'open_ports'):
+            ports = scan_result.open_ports
+        elif isinstance(scan_result, dict):
+            ports = scan_result.get("open_ports", [])
+        else:
+            ports = []
+        
+        port_service_map = {
+            21: "FTP Server",
+            22: "OpenSSH",
+            25: "SMTP Server",
+            53: "DNS Server",
+            80: "HTTP Server (Apache/Nginx/IIS)",
+            110: "POP3 Server",
+            143: "IMAP Server",
+            443: "HTTPS Server (Apache/Nginx/IIS)",
+            445: "Windows SMB",
+            993: "IMAPS Server",
+            995: "POP3S Server",
+            1433: "Microsoft SQL Server",
+            1521: "Oracle Database",
+            3306: "MySQL",
+            3389: "Microsoft RDP",
+            5432: "PostgreSQL",
+            5900: "VNC Server",
+            6379: "Redis",
+            8080: "HTTP Proxy (Tomcat/Jenkins)",
+            8443: "HTTPS Alt (Tomcat)",
+            27017: "MongoDB",
+        }
+        
+        for port_info in ports:
+            port_num = port_info.port if hasattr(port_info, 'port') else port_info.get("port", 0)
+            service = port_info.service if hasattr(port_info, 'service') else port_info.get("service", "")
+            
+            # Если есть конкретный сервис от сканера
+            if service and service.lower() not in ["unknown", ""]:
+                # Находим CVE для этого порта
+                cves = self.vuln_db.find_cves_by_port(port_num)
+                for cve in cves:
+                    cve_id = cve.get("id", "")
+                    if cve_id and cve_id not in software_map:
+                        software_map[cve_id] = service
+            
+            # Если есть стандартный сервис для порта
+            elif port_num in port_service_map:
+                cves = self.vuln_db.find_cves_by_port(port_num)
+                for cve in cves:
+                    cve_id = cve.get("id", "")
+                    if cve_id and cve_id not in software_map:
+                        software_map[cve_id] = port_service_map[port_num]
+        
+        logger.info(f"[SOFTWARE_MAP] Всего записей в карте ПО: {len(software_map)}")
+        return software_map
+
+    def _guess_software_from_port(self, match: VulnerabilityMatch, scan_result: ScanResult) -> str:
+        """
+        Эвристическое определение ПО по порту из scan_result.
+        Используется как фоллбэк когда нет точных данных.
+        """
+        # Стандартные маппинги портов
+        port_service_map = {
+            21: "FTP Server",
+            22: "OpenSSH",
+            25: "SMTP Server",
+            53: "DNS Server",
+            80: "HTTP Server (Apache/Nginx/IIS)",
+            110: "POP3 Server",
+            143: "IMAP Server",
+            443: "HTTPS Server (Apache/Nginx/IIS)",
+            445: "Windows SMB",
+            993: "IMAPS Server",
+            995: "POP3S Server",
+            1433: "Microsoft SQL Server",
+            1521: "Oracle Database",
+            3306: "MySQL",
+            3389: "Microsoft RDP",
+            5432: "PostgreSQL",
+            5900: "VNC Server",
+            6379: "Redis",
+            8080: "HTTP Proxy (Tomcat/Jenkins)",
+            8443: "HTTPS Alt (Tomcat)",
+            27017: "MongoDB",
+        }
+        
+        # Получаем порт из match
+        target_port = match.cve_id  # Может быть в CVE_ID если формат особый
+        port = None
+        
+        # Пробуем извлечь порт из attack_vector_id
+        if match.attack_vector_id:
+            av_id = match.attack_vector_id
+            if av_id.startswith("port-"):
+                try:
+                    port = int(av_id.replace("port-", ""))
+                except ValueError:
+                    pass
+        
+        # Если не нашли, пробуем из target_port в CVE базе
+        if port is None:
+            cve_id = match.cve_id.split(",")[0].strip()
+            # Ищем CVE в списке
+            if hasattr(self.vuln_db, 'cve_db') and isinstance(self.vuln_db.cve_db, list):
+                for cve in self.vuln_db.cve_db:
+                    if cve.get("id") == cve_id:
+                        requires_port = cve.get("requires_port", [])
+                        if requires_port:
+                            port = requires_port[0]
+                        break
+        
+        if port and port in port_service_map:
+            return port_service_map[port]
+        
+        # Последняя попытка: используем информацию из имени атаки
+        attack_name_lower = match.attack_name.lower() if match.attack_name else ""
+        
+        if "веб" in attack_name_lower or "http" in attack_name_lower:
+            return "Web Server (Apache/Nginx/IIS)"
+        elif "ssh" in attack_name_lower:
+            return "OpenSSH"
+        elif "rdp" in attack_name_lower or "удаленный рабочий стол" in attack_name_lower:
+            return "Microsoft RDP"
+        elif "smb" in attack_name_lower:
+            return "Windows SMB"
+        elif "ftp" in attack_name_lower:
+            return "FTP Server"
+        elif "sql" in attack_name_lower or "база данных" in attack_name_lower:
+            return "Database Server"
+        elif "почт" in attack_name_lower or "smtp" in attack_name_lower:
+            return "Mail Server"
+        
+        return "Неидентифицированное ПО"
 
     def get_summary(self) -> dict:
         """Сводка результатов корреляции."""
