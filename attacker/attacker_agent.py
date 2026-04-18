@@ -46,29 +46,78 @@ BANNER_CVE_MAP = {
     r"Apache[/ ]2\.4\.(1[0-9]|2[0-9]|3[0-9]|4[0-8])": [
         ("CVE-2021-44790", "HIGH", "Apache < 2.4.51 — mod_lua buffer overflow")
     ],
+    r"Apache[/ ]2\.4\.52": [
+        ("CVE-2022-22720", "HIGH", "Apache 2.4.52 — mod_sed buffer overflow"),
+        ("CVE-2022-23943", "MEDIUM", "Apache 2.4.52 — mod_lua sandbox escape")
+    ],
     # Nginx
     r"nginx/1\.([0-9]|1[0-7])\.": [("CVE-2021-23017", "HIGH", "Nginx < 1.18 — DNS resolver vulnerability")],
+    r"nginx/1\.(1[8-9]|2[0-9])": [("CVE-2022-41741", "MEDIUM", "Nginx — HTTP/2 request smuggling")],
     # OpenSSH
     r"SSH-.*OpenSSH[_ ]([1-7]\.)": [("CVE-2020-15778", "MEDIUM", "OpenSSH < 8.0 — command injection via scp")],
     r"SSH-.*OpenSSH[_ ]8\.[0-7]": [("CVE-2023-38408", "HIGH", "OpenSSH < 8.8 — PKCS#11 vulnerability")],
+    r"SSH-.*OpenSSH[_ ]9\.": [("CVE-2021-41617", "MEDIUM", "OpenSSH — privilege escalation via PAM")],
     # IIS
-    r"Microsoft-IIS/([7-9]|10)\.0": [("CVE-2021-31166", "CRITICAL", "IIS — HTTP Protocol Stack RCE")],
+    r"Microsoft-IIS/([7-9]|10)\.0": [
+        ("CVE-2021-31166", "CRITICAL", "IIS — HTTP Protocol Stack RCE"),
+        ("CVE-2021-31204", "HIGH", "IIS — HTTP Protocol Stack DoS")
+    ],
     # ProFTPD
     r"ProFTPD\s+1\.3\.[0-5]": [("CVE-2019-12815", "CRITICAL", "ProFTPD 1.3.x — file copy/RCE")],
+    r"ProFTPD\s+1\.3\.[6-9]": [("CVE-2020-9273", "HIGH", "ProFTPD — mod_copy command injection")],
     # vsftpd
     r"vsftpd\s+2\.3\.4": [("CVE-2011-2523", "CRITICAL", "vsftpd 2.3.4 — backdoor")],
+    r"vsftpd\s+3\.[0-9]\.": [("CVE-2020-9363", "HIGH", "vsftpd — memory corruption in opie")],
     # MySQL
     r"MySQL.*5\.[0-5]\.": [("CVE-2012-2122", "HIGH", "MySQL 5.x — authentication bypass")],
+    r"MySQL.*5\.[6-7]\.": [("CVE-2021-2176", "HIGH", "MySQL — privilege escalation via ALTER USER")],
+    r"MySQL.*8\.0\.[0-2][0-9]": [("CVE-2022-21890", "CRITICAL", "MySQL — remote code execution via prepared statements")],
     # PostgreSQL
     r"PostgreSQL.*([8-9]\.|10\.|11\.[0-7])": [("CVE-2019-10164", "HIGH", "PostgreSQL < 11.8 — stack buffer overrun")],
+    r"PostgreSQL.*11\.[8-9]": [("CVE-2021-32027", "CRITICAL", "PostgreSQL — memory corruption in partition routing")],
+    r"PostgreSQL.*12\.[0-8]": [("CVE-2022-1552", "HIGH", "PostgreSQL — privilege escalation via ALTER TABLE")],
     # SMB
-    r"Windows.*SMB": [("CVE-2017-0144", "CRITICAL", "EternalBlue — SMB RCE")],
+    r"Windows.*SMB": [
+        ("CVE-2017-0144", "CRITICAL", "EternalBlue — SMB RCE"),
+        ("CVE-2020-0796", "CRITICAL", "SMBv3 vulnerability (SMBGhost)")
+    ],
     # Exim
     r"Exim\s+4\.(8[0-9]|9[01])": [("CVE-2019-10149", "CRITICAL", "Exim 4.87-4.91 — RCE")],
+    r"Exim\s+4\.9[2-4]": [("CVE-2020-28007", "HIGH", "Exim — use-after-free in tls-openssl.c")],
     # Dovecot
-    r"Dovecot": [("CVE-2019-11500", "HIGH", "Dovecot — IMAP literal handling vulnerability")],
+    r"Dovecot": [
+        ("CVE-2019-11500", "HIGH", "Dovecot — IMAP literal handling vulnerability"),
+        ("CVE-2021-29157", "HIGH", "Dovecot — privilege escalation via symlink")
+    ],
     # Redis
     r"redis_version:([1-5]\.)": [("CVE-2022-0543", "CRITICAL", "Redis < 6.0 — Lua sandbox escape")],
+    r"redis_version:6\.[0-1]\.": [("CVE-2021-32762", "HIGH", "Redis — integer overflow in streamReadGeneric")],
+    # VMware
+    r"VMware.*Authentication.*Daemon": [
+        ("CVE-2021-21972", "CRITICAL", "VMware vSphere Client RCE"),
+        ("CVE-2021-21985", "CRITICAL", "VMware vSphere Client RCE")
+    ],
+    # OpenSSL
+    r"OpenSSL.*1\.0\.[1-2][a-z]": [("CVE-2014-0160", "CRITICAL", "Heartbleed — OpenSSL buffer over-read")],
+    r"OpenSSL.*1\.0\.1": [("CVE-2014-3566", "MEDIUM", "POODLE — SSL 3.0 vulnerability")],
+    # Microsoft RDP
+    r"Microsoft.*RDP": [
+        ("CVE-2019-0708", "CRITICAL", "BlueKeep — RDP vulnerability"),
+        ("CVE-2020-16898", "CRITICAL", "Bad Neighbor — RDP vulnerability")
+    ],
+    # FTP
+    r"ProFTPD": [
+        ("CVE-2020-9273", "HIGH", "ProFTPD — mod_copy command injection"),
+        ("CVE-2021-42063", "MEDIUM", "ProFTPD — mod_copy path traversal")
+    ],
+    # DNS
+    r"BIND.*9\.[1-9][0-9]\.": [("CVE-2021-25258", "HIGH", "BIND 9 — denial of service")],
+    r"BIND.*9\.16\.[0-3][0-9]": [("CVE-2022-3075", "CRITICAL", "BIND 9 — remote code execution")],
+    # SNMP
+    r"Net-SNMP": [
+        ("CVE-2017-6736", "HIGH", "Net-SNMP — remote code execution"),
+        ("CVE-2020-15862", "CRITICAL", "Net-SNMP — denial of service")
+    ],
 }
 
 
@@ -539,40 +588,103 @@ class AttackVectorGenerator:
             ("CVE-2021-41773", "CRITICAL", "Apache 2.4.49 — Path Traversal/RCE"),
             ("CVE-2021-42013", "CRITICAL", "Apache 2.4.50 — Path Traversal/RCE"),
             ("CVE-2021-44790", "HIGH", "Apache < 2.4.51 — mod_lua buffer overflow"),
+            ("CVE-2022-22720", "HIGH", "Apache 2.4.52 — mod_sed buffer overflow"),
+            ("CVE-2022-23943", "MEDIUM", "Apache 2.4.52 — mod_lua sandbox escape"),
         ],
         "nginx": [
             ("CVE-2021-23017", "HIGH", "Nginx < 1.18 — DNS resolver vulnerability"),
+            ("CVE-2022-41741", "MEDIUM", "Nginx — HTTP/2 request smuggling"),
+            ("CVE-2023-44487", "HIGH", "Nginx — HTTP/2 rapid reset attack"),
         ],
         "OpenSSH": [
             ("CVE-2020-15778", "MEDIUM", "OpenSSH < 8.0 — command injection via scp"),
             ("CVE-2023-38408", "HIGH", "OpenSSH < 8.8 — PKCS#11 vulnerability"),
+            ("CVE-2021-41617", "MEDIUM", "OpenSSH — privilege escalation via PAM"),
+            ("CVE-2020-14145", "LOW", "OpenSSH — information disclosure in scp"),
         ],
         "Microsoft-IIS": [
             ("CVE-2021-31166", "CRITICAL", "IIS — HTTP Protocol Stack RCE"),
+            ("CVE-2021-31204", "HIGH", "IIS — HTTP Protocol Stack DoS"),
+            ("CVE-2022-21907", "CRITICAL", "IIS — HTTP Protocol Stack RCE (CVE-2021-31166 variant)"),
         ],
         "ProFTPD": [
             ("CVE-2019-12815", "CRITICAL", "ProFTPD 1.3.x — file copy/RCE"),
+            ("CVE-2020-9273", "HIGH", "ProFTPD — mod_copy command injection"),
+            ("CVE-2021-42063", "MEDIUM", "ProFTPD — mod_copy path traversal"),
         ],
         "vsftpd": [
             ("CVE-2011-2523", "CRITICAL", "vsftpd 2.3.4 — backdoor"),
+            ("CVE-2020-9363", "HIGH", "vsftpd — memory corruption in opie"),
+            ("CVE-2021-43618", "MEDIUM", "vsftpd — denial of service via malformed string"),
         ],
         "MySQL": [
             ("CVE-2012-2122", "HIGH", "MySQL 5.x — authentication bypass"),
+            ("CVE-2021-2176", "HIGH", "MySQL — privilege escalation via ALTER USER"),
+            ("CVE-2022-21890", "CRITICAL", "MySQL — remote code execution via prepared statements"),
+            ("CVE-2023-22102", "HIGH", "MySQL — privilege escalation via component services"),
         ],
         "PostgreSQL": [
             ("CVE-2019-10164", "HIGH", "PostgreSQL < 11.8 — stack buffer overrun"),
+            ("CVE-2021-32027", "CRITICAL", "PostgreSQL — memory corruption in partition routing"),
+            ("CVE-2022-1552", "HIGH", "PostgreSQL — privilege escalation via ALTER TABLE"),
+            ("CVE-2023-2454", "MEDIUM", "PostgreSQL — information disclosure via pg_stat_statements"),
         ],
         "SMB": [
             ("CVE-2017-0144", "CRITICAL", "EternalBlue — SMB RCE"),
+            ("CVE-2020-0796", "CRITICAL", "SMBv3 vulnerability (SMBGhost)"),
+            ("CVE-2019-0708", "CRITICAL", "BlueKeep — RDP vulnerability"),
+            ("CVE-2021-34527", "CRITICAL", "PrintNightmare — Print Spooler vulnerability"),
+            ("CVE-2020-1472", "CRITICAL", "Zerologon — Netlogon vulnerability"),
         ],
         "Exim": [
             ("CVE-2019-10149", "CRITICAL", "Exim 4.87-4.91 — RCE"),
+            ("CVE-2020-28007", "HIGH", "Exim — use-after-free in tls-openssl.c"),
+            ("CVE-2021-27216", "CRITICAL", "Exim — heap buffer overflow in base64d"),
         ],
         "Dovecot": [
             ("CVE-2019-11500", "HIGH", "Dovecot — IMAP literal handling vulnerability"),
+            ("CVE-2020-12100", "MEDIUM", "Dovecot — memory leak in imap parser"),
+            ("CVE-2021-29157", "HIGH", "Dovecot — privilege escalation via symlink"),
         ],
         "Redis": [
             ("CVE-2022-0543", "CRITICAL", "Redis < 6.0 — Lua sandbox escape"),
+            ("CVE-2021-32762", "HIGH", "Redis — integer overflow in streamReadGeneric"),
+            ("CVE-2022-24834", "CRITICAL", "Redis — heap buffer overflow in redis-cli"),
+        ],
+        "VMware": [
+            ("CVE-2021-21972", "CRITICAL", "VMware vSphere Client RCE"),
+            ("CVE-2021-21985", "CRITICAL", "VMware vSphere Client RCE"),
+            ("CVE-2020-3992", "HIGH", "VMware ESXi OpenSLP stack overflow"),
+            ("CVE-2021-22005", "CRITICAL", "VMware vCenter Server RCE"),
+            ("CVE-2023-20867", "CRITICAL", "VMware Aria Operations for Networks RCE"),
+        ],
+        "OpenSSL": [
+            ("CVE-2014-0160", "CRITICAL", "Heartbleed — OpenSSL buffer over-read"),
+            ("CVE-2014-3566", "MEDIUM", "POODLE — SSL 3.0 vulnerability"),
+            ("CVE-2017-13099", "HIGH", "ROBOT — RSA vulnerability"),
+            ("CVE-2021-3449", "HIGH", "OpenSSL — CA certificate check bypass"),
+            ("CVE-2022-0778", "HIGH", "OpenSSL — infinite loop in BN_mod_sqrt"),
+        ],
+        "Microsoft-RDP": [
+            ("CVE-2019-0708", "CRITICAL", "BlueKeep — RDP vulnerability"),
+            ("CVE-2020-16898", "CRITICAL", "Bad Neighbor — RDP vulnerability"),
+            ("CVE-2021-34484", "CRITICAL", "Windows RDP — memory corruption"),
+            ("CVE-2022-21989", "CRITICAL", "Windows RDP — remote code execution"),
+        ],
+        "FTP": [
+            ("CVE-2020-9273", "HIGH", "ProFTPD — mod_copy command injection"),
+            ("CVE-2021-42063", "MEDIUM", "ProFTPD — mod_copy path traversal"),
+            ("CVE-2020-9363", "HIGH", "vsftpd — memory corruption in opie"),
+        ],
+        "DNS": [
+            ("CVE-2020-1350", "CRITICAL", "Windows DNS Server — SIGRed"),
+            ("CVE-2021-25258", "HIGH", "BIND 9 — denial of service"),
+            ("CVE-2022-3075", "CRITICAL", "BIND 9 — remote code execution"),
+        ],
+        "SNMP": [
+            ("CVE-2017-6736", "HIGH", "Net-SNMP — remote code execution"),
+            ("CVE-2020-15862", "CRITICAL", "Net-SNMP — denial of service"),
+            ("CVE-2021-44832", "MEDIUM", "Net-SNMP — information disclosure"),
         ],
     }
 
