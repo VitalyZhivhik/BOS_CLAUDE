@@ -19,6 +19,7 @@ from common.models import (
     AttackFeasibility, Severity, AttackVector
 )
 from server.vulnerability_db import VulnerabilityDatabase
+from server.vector_cve_resolver import resolve_cves_for_attack_vector
 from server.trivy_correlator import TrivyCorrelator
 from server.trivy_scanner import TrivyScanResult
 from common.logger import get_server_logger
@@ -188,20 +189,8 @@ class AttackCorrelator:
         """Анализ одного вектора атаки."""
         matches = []
 
-        # Поиск соответствующих CVE по типу атаки и сервису
-        related_cves = []
-        if av.target_service:
-            related_cves.extend(self.vuln_db.find_cves_by_service(av.target_service))
-        if av.target_port:
-            related_cves.extend(self.vuln_db.find_cves_by_port(av.target_port))
-
-        # Убираем дубликаты CVE
-        seen_ids = set()
-        unique_cves = []
-        for cve in related_cves:
-            if cve["id"] not in seen_ids:
-                seen_ids.add(cve["id"])
-                unique_cves.append(cve)
+        # Каскадный поиск CVE: текст вектора, тип атаки, CWE, сервис/порт, курируемые примеры
+        unique_cves = resolve_cves_for_attack_vector(av, self.vuln_db)
 
         for cve in unique_cves:
             feasibility, reason = self._evaluate_feasibility(cve, av)
@@ -214,6 +203,10 @@ class AttackCorrelator:
 
             recommendation = self._generate_recommendation(cve, feasibility, mitigations)
 
+            desc = cve.get("description", "")
+            if cve.get("_synthetic"):
+                desc = f"{desc} [Справочная запись: нет полной карточки в локальной БД CVE — сверьте с NVD.]"
+
             match = VulnerabilityMatch(
                 cve_id=cve["id"],
                 cwe_id=cwe_ids,
@@ -221,7 +214,7 @@ class AttackCorrelator:
                 mitre_technique=mitre_ids,
                 attack_vector_id=av.id,
                 attack_name=av.name,
-                description=cve["description"],
+                description=desc,
                 severity=cve.get("severity", Severity.MEDIUM.value),
                 feasibility=feasibility.value,
                 reason=reason,

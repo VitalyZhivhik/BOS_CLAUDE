@@ -80,6 +80,8 @@ class AttackVector:
     attack_type: str = ""
     severity: str = Severity.MEDIUM.value
     tools_used: str = ""
+    # Явные CVE для корреляции (если заданы генератором или клиентом API)
+    representative_cve_ids: list = field(default_factory=list)
 
 
 @dataclass
@@ -138,9 +140,11 @@ def from_json_scan_result(data: dict) -> ScanResult:
             result.open_ports.append(p)
     for s in data.get("discovered_services", []):
         result.discovered_services.append(s)
+    av_fields = set(AttackVector.__dataclass_fields__.keys())
     for a in data.get("attack_vectors", []):
         if isinstance(a, dict):
-            result.attack_vectors.append(AttackVector(**a))
+            safe = {k: v for k, v in a.items() if k in av_fields}
+            result.attack_vectors.append(AttackVector(**safe))
         else:
             result.attack_vectors.append(a)
     return result
