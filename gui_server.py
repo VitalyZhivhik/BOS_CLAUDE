@@ -1477,7 +1477,8 @@ class ServerGUI(QMainWindow):
                                 "attack_name": str(r.attack_name) if r.attack_name else "",
                                 # Фикс ошибки 500 (сериализация Enum)
                                 "severity": getattr(r.severity, 'name', str(r.severity)),
-                                "feasibility": getattr(r.feasibility, 'name', str(r.feasibility)),
+                                # Возвращаем единый формат (русские значения из AttackFeasibility.value)
+                                "feasibility": __import__("common.models", fromlist=["normalize_feasibility"]).normalize_feasibility(getattr(r, "feasibility", None)),
                                 "description": str(r.description) if r.description else "",
                                 "recommendation": str(r.recommendation) if r.recommendation else "",
                             }
@@ -1579,12 +1580,14 @@ class ServerGUI(QMainWindow):
             logger.debug(f"[UI] Обновление таблицы. Уникальных строк: {len(unique_results)} из {len(results)}")
             feasible_cnt = 0
             not_feasible_cnt = 0
+            partial_cnt = 0
             for r in unique_results:
                 row = self.results_table.rowCount()
                 self.results_table.insertRow(row)
                 cve = str(r.cve_id or "Нет CVE")
                 sev = str(r.severity or "INFO")
-                feas = str(r.feasibility or "UNKNOWN")
+                from common.models import normalize_feasibility
+                feas = normalize_feasibility(getattr(r, "feasibility", None))
                 name = str(r.attack_name or "Неизвестная атака")
                 desc = str(r.description or "")[:150]
                 self.results_table.setItem(row, 0, QTableWidgetItem(cve))
@@ -1592,18 +1595,24 @@ class ServerGUI(QMainWindow):
                 si.setForeground(QColor({"CRITICAL": "#c44", "HIGH": "#a85", "MEDIUM": "#997", "LOW": "#696"}.get(sev, "#888")))
                 self.results_table.setItem(row, 1, si)
                 fi = QTableWidgetItem(feas)
-                if "НЕ РЕАЛИЗУЕМА" in feas:
+                # ВАЖНО: проверяем ЧАСТИЧНО раньше РЕАЛИЗУЕМА (иначе частичные попадают как реализуемые)
+                if "ЧАСТИЧНО" in feas:
+                    fi.setForeground(QColor("#d29922"))
+                    partial_cnt += 1
+                elif feas == "НЕ РЕАЛИЗУЕМА":
                     fi.setForeground(QColor("#696"))
                     not_feasible_cnt += 1
-                elif "РЕАЛИЗУЕМА" in feas:
+                elif feas == "РЕАЛИЗУЕМА":
                     fi.setForeground(QColor("#b55"))
                     feasible_cnt += 1
+                else:
+                    fi.setForeground(QColor("#888"))
                 self.results_table.setItem(row, 2, fi)
                 self.results_table.setItem(row, 3, QTableWidgetItem(name))
                 self.results_table.setItem(row, 4, QTableWidgetItem(desc))
             self.correlation_summary.setText(
                 f"Всего (уникальных): {len(unique_results)}  |  "
-                f"🔴 Реализуемых: {feasible_cnt}  |  "
+                f"🔴 Реализуемых: {feasible_cnt}  |  🟡 Частичных: {partial_cnt}  |  "
                 f"🟢 Нереализуемых: {not_feasible_cnt}"
             )
         except Exception as e:

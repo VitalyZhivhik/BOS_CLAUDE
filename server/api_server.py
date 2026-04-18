@@ -244,11 +244,13 @@ class RequestHandler(BaseHTTPRequestHandler):
                 # ──────────────────────────────────────────────────────────────────
                 reporter = ReportGenerator(
                     system_summary=state.system_summary if isinstance(state.system_summary, dict) else {},
-                    results=results,
+                    correlation_results=results,
                     summary=summary,
                     toolkit=state.toolkit,              # AttackToolkit для схем 4 и 5
                     local_scan_report=state.local_scan_report,  # ScanReport для схемы 3
                     attacker_scan_data=scan_data,       # Данные атакующего для схемы 3
+                    system_info=state.system_info,      # для точного сопоставления ПО в отчёте
+                    trivy_result=state.trivy_result,
                 )
 
                 html_path = reporter.generate_html(os.path.join(reports_dir, f"report_{ts}.html"))
@@ -270,7 +272,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                             "cve_id": r.cve_id,
                             "attack_name": r.attack_name,
                             "severity": r.severity,
-                            "feasibility": r.feasibility,
+                            "feasibility": __import__("common.models", fromlist=["normalize_feasibility"]).normalize_feasibility(getattr(r, "feasibility", None)),
                             "reason": r.reason,
                             "recommendation": r.recommendation,
                             "description": r.description,

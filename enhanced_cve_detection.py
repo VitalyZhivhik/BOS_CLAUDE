@@ -27,6 +27,9 @@ class EnhancedCVEDetector:
     def __init__(self):
         self.nvd_api_base = "https://services.nvd.nist.gov/rest/json/cves/2.0"
         self.cve_search_base = "https://cve.circl.lu/api"
+        # Простой кэш, чтобы не долбить внешние API при повторных вызовах
+        self._cache: dict[tuple, tuple[float, list]] = {}
+        self._cache_ttl_sec = 6 * 60 * 60  # 6 часов
         
     def detect_cves_for_service(self, service: str, version: str = "", port: int = 0) -> List[Dict]:
         """
@@ -40,7 +43,13 @@ class EnhancedCVEDetector:
         Returns:
             Список найденных CVE
         """
-        cves = []
+        key = (service or "").strip().lower(), (version or "").strip().lower(), int(port or 0)
+        now = time.time()
+        cached = self._cache.get(key)
+        if cached and (now - cached[0]) < self._cache_ttl_sec:
+            return cached[1]
+
+        cves: list[dict] = []
         
         # 1. Поиск по локальной базе (быстро)
         local_cves = self._search_local_cve_database(service, version, port)
@@ -50,6 +59,11 @@ class EnhancedCVEDetector:
         if version:
             nvd_cves = self._search_nvd_by_version(service, version)
             cves.extend(nvd_cves)
+
+        # 2.1 Доп. источник: CIRCL cve-search (быстрый, но не гарантирован)
+        # Включаем только если есть версия или узнаваемый продукт в баннере
+        if version:
+            cves.extend(self._search_circl_by_keyword(service, version))
         
         # 3. Поиск по порту (универсальный)
         if port:
@@ -70,6 +84,7 @@ class EnhancedCVEDetector:
                 seen.add(cve_id)
                 unique_cves.append(cve)
         
+        self._cache[key] = (now, unique_cves)
         return unique_cves
     
     def _search_local_cve_database(self, service: str, version: str, port: int) -> List[Dict]:
@@ -215,17 +230,34 @@ class EnhancedCVEDetector:
         """Поиск CVE по баннеру."""
         cves = []
         
-        # Регулярные выражения для определения CVE по баннеру
+        # Регулярные выражения для определения CVE по баннеру.
+        # Покрываем несколько форматов: "Apache/2.4.49", "Server: Apache/2.4.49", "SSH-2.0-OpenSSH_7.4p1", и т.д.
         banner_patterns = {
-            r"OpenSSH[_ ]([8-9]\.|10\.)": [
-                {"id": "CVE-2020-15778", "severity": "MEDIUM", "description": "OpenSSH command injection"},
+            # OpenSSH
+            r"OpenSSH[_/-]([0-9]+\.[0-9]+)(?:p[0-9]+)?": [
+                {"id": "CVE-2020-15778", "severity": "MEDIUM", "description": "OpenSSH < 8.0 — command injection via scp (сверьте версию)"},
+                {"id": "CVE-2023-38408", "severity": "HIGH", "description": "OpenSSH < 8.8 — PKCS#11 vulnerability (сверьте версию)"},
             ],
-            r"Apache[/ ]2\.4\.49": [
-                {"id": "CVE-2021-41773", "severity": "CRITICAL", "description": "Apache Path Traversal/RCE"},
+            # Apache
+            r"(?:Apache|Server:\\s*Apache)[/ ]2\\.4\\.49\\b": [
+                {"id": "CVE-2021-41773", "severity": "CRITICAL", "description": "Apache 2.4.49 — Path Traversal/RCE"},
             ],
-            r"Apache[/ ]2\.4\.50": [
-                {"id": "CVE-2021-42013", "severity": "CRITICAL", "description": "Apache Path Traversal/RCE"},
+            r"(?:Apache|Server:\\s*Apache)[/ ]2\\.4\\.50\\b": [
+                {"id": "CVE-2021-42013", "severity": "CRITICAL", "description": "Apache 2.4.50 — Path Traversal/RCE"},
             ],
+            # nginx
+            r"(?:nginx|Server:\\s*nginx)/1\\.(?:[0-9]|1[0-7])\\.[0-9]+": [
+                {"id": "CVE-2021-23017", "severity": "HIGH", "description": "Nginx < 1.18 — DNS resolver vulnerability"},
+            ],
+            # IIS
+            r"(?:Microsoft-IIS|Server:\\s*Microsoft-IIS)/([7-9]|10)\\.0": [
+                {"id": "CVE-2021-31166", "severity": "CRITICAL", "description": "IIS — HTTP Protocol Stack RCE"},
+            ],
+            # OpenSSL
+            r"OpenSSL\\s*1\\.0\\.1[a-z]?\\b": [
+                {"id": "CVE-2014-0160", "severity": "CRITICAL", "description": "Heartbleed — OpenSSL buffer over-read (зависит от сборки)"},
+            ],
+            # VMware
             r"VMware.*Authentication.*Daemon": [
                 {"id": "CVE-2021-21972", "severity": "CRITICAL", "description": "VMware vSphere Client RCE"},
                 {"id": "CVE-2021-21985", "severity": "CRITICAL", "description": "VMware vSphere Client RCE"},
@@ -237,6 +269,32 @@ class EnhancedCVEDetector:
                 cves.extend(pattern_cves)
         
         return cves
+
+    def _search_circl_by_keyword(self, service: str, version: str) -> List[Dict]:
+        """
+        Дополнительный источник: CIRCL cve-search (keyword search).
+        ВНИМАНИЕ: это best-effort, может быть нестабильно/ограничено.
+        """
+        out: list[dict] = []
+        try:
+            q = f\"{service} {version}\".strip().replace(\" \", \"%20\")
+            url = f\"{self.cve_search_base}/search/{q}\"
+            r = requests.get(url, timeout=8)
+            if r.status_code != 200:
+                return []
+            data = r.json()
+            # Формат может отличаться; пытаемся извлечь CVE-id
+            if isinstance(data, dict):
+                items = data.get(\"results\") or data.get(\"data\") or []
+            else:
+                items = data
+            for it in items[:25]:
+                cid = it.get(\"id\") or it.get(\"cve\") or it.get(\"CVE\") or \"\"
+                if cid and str(cid).startswith(\"CVE-\"):
+                    out.append({\"id\": str(cid), \"severity\": \"UNKNOWN\", \"description\": (it.get(\"summary\") or it.get(\"description\") or \"\")[:200]})
+        except Exception as e:
+            logger.warning(f\"CIRCL search failed: {e}\")
+        return out
     
     def _extract_severity_from_nvd(self, cve_data: Dict) -> str:
         """Извлечение уровня критичности из данных NVD."""

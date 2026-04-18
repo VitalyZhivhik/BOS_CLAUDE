@@ -782,6 +782,25 @@ class SoftwareEnricher:
         self.trivy_cve_map = {}  # {CVE-ID: {pkg_name, installed_version, cwe_ids, capec_ids}}
         if trivy_result:
             self._build_trivy_map(trivy_result)
+
+        # Отдельный список "пакеты из Trivy" (не смешиваем с установленным ПО реестра)
+        self.trivy_packages = []  # [{name, version}]
+        if trivy_result and isinstance(trivy_result, dict):
+            pkgs = []
+            seen = set()
+            for v in trivy_result.get("vulnerabilities", []) or []:
+                if not isinstance(v, dict):
+                    continue
+                pkg = (v.get("pkg_name") or "").strip()
+                ver = (v.get("installed_version") or "").strip()
+                if not pkg:
+                    continue
+                key = (pkg, ver)
+                if key in seen:
+                    continue
+                seen.add(key)
+                pkgs.append({"name": pkg, "version": ver})
+            self.trivy_packages = pkgs
     
     def _fuzzy_match_software(self, target_name: str, installed_list: list) -> tuple:
         """
@@ -942,7 +961,9 @@ class SoftwareEnricher:
                     pkg = trivy_info['pkg_name']
                     ver = trivy_info.get('installed_version', '')
                     if pkg:
-                        return f"{pkg} {ver}".strip() if ver else pkg
+                        # Явно помечаем источник, чтобы не путать с установленным ПО Windows
+                        base = f"{pkg} {ver}".strip() if ver else pkg
+                        return f"{base} (Trivy)"
 
         # 1. Поиск точного совпадения по тексту CVE
         matched_sw = self._search_in_installed_software(cve_id, capec_id)
@@ -1035,34 +1056,11 @@ class ReportGenerator:
 
         self.raw_results = correlation_results
 
-        # Инициализируем обогатитель ПО с данными Trivy
-        # SoftwareEnricher ожидает system_info с полными данными, а не summary
-        # Создаем подходящую структуру данных
-        system_info_for_enricher = {
-            'installed_software': [],  # Пока пустой, но можем заполнить из других источников
-            'open_ports': [],  # Аналогично
-        }
-
-        # Если trivy_result содержит информацию о ПО, используем её
-        if trivy_result and isinstance(trivy_result, dict):
-            vulnerabilities = trivy_result.get('vulnerabilities', [])
-            # Извлекаем уникальные пакеты из Trivy результатов
-            sw_set = set()
-            for v in vulnerabilities:
-                if isinstance(v, dict):
-                    pkg = v.get('pkg_name', '').strip()
-                    if pkg and pkg not in sw_set:
-                        sw_set.add(pkg)
-                        system_info_for_enricher['installed_software'].append({
-                            'name': pkg,
-                            'version': v.get('installed_version', ''),
-                            'publisher': 'Detected by Trivy'
-                        })
-
-        self.sw_enricher = SoftwareEnricher(
-            system_info_for_enricher, self.cve_db, self.capec_db,
-            trivy_result=trivy_result
-        )
+        # Инициализируем обогатитель ПО:
+        # 1) предпочитаем реальный SystemInfo (реестр/сервисы/порты) если он передан
+        # 2) Trivy используем как отдельный, самый точный источник (CVE->pkg)
+        system_info_for_enricher = kwargs.get("system_info") or system_summary or {}
+        self.sw_enricher = SoftwareEnricher(system_info_for_enricher, self.cve_db, self.capec_db, trivy_result=trivy_result)
 
         groups = {}
         for r in correlation_results:
@@ -1391,7 +1389,44 @@ class ReportGenerator:
         return atk_def_list
 
     def generate_json(self, filepath):
-        pass
+        try:
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        except Exception:
+            pass
+
+        out = {
+            "system_summary": self.system_summary,
+            "summary": self.summary,
+            "aggregated_groups": [],
+        }
+
+        for key, g in self.aggregated_groups.items():
+            base_r = g["base_record"]
+            port_raw = getattr(base_r, "target_port", None)
+            if port_raw in (None, "None", "null", "", 0, "0"):
+                port = "Локальный вектор (без порта)"
+            else:
+                port = str(port_raw)
+
+            out["aggregated_groups"].append(
+                {
+                    "software": g.get("mapped_sw", ""),
+                    "software_key": key,
+                    "port": port,
+                    "capec": getattr(base_r, "capec_id", "") or "Нет CAPEC",
+                    "cwe": getattr(base_r, "cwe_id", "") or "Нет CWE",
+                    "cves": sorted(list(g.get("cves", set()))),
+                    "attack_names": sorted(list(g.get("names", set()))),
+                    "severity": self._get_max_sev(g.get("sevs", [])),
+                    "feasibility": self._get_worst_feas(g.get("feas", [])),
+                    "count": int(g.get("count", 1)),
+                }
+            )
+
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(out, f, ensure_ascii=False, indent=2)
+
+        return filepath
 
     def generate_html(self, filepath):
         js_data = []

@@ -23,6 +23,50 @@ class AttackFeasibility(str, Enum):
     REQUIRES_ANALYSIS = "ТРЕБУЕТ АНАЛИЗА"
 
 
+def normalize_feasibility(value: object) -> str:
+    """
+    Приводит разные представления статуса реализуемости к единому формату.
+    ЕДИНЫЙ ФОРМАТ: строки из AttackFeasibility.value (на русском).
+    """
+    if value is None:
+        return AttackFeasibility.REQUIRES_ANALYSIS.value
+
+    # Enum → value
+    try:
+        if isinstance(value, AttackFeasibility):
+            return value.value
+    except Exception:
+        pass
+
+    s = str(value).strip()
+    if not s:
+        return AttackFeasibility.REQUIRES_ANALYSIS.value
+
+    u = s.upper()
+
+    # Иногда в коде/GUI отправляют имя enum: FEASIBLE / PARTIALLY_FEASIBLE / NOT_FEASIBLE / REQUIRES_ANALYSIS
+    if u in ("FEASIBLE", "FEASIBILITY.FEASIBLE"):
+        return AttackFeasibility.FEASIBLE.value
+    if u in ("PARTIALLY_FEASIBLE", "FEASIBILITY.PARTIALLY_FEASIBLE"):
+        return AttackFeasibility.PARTIALLY_FEASIBLE.value
+    if u in ("NOT_FEASIBLE", "FEASIBILITY.NOT_FEASIBLE"):
+        return AttackFeasibility.NOT_FEASIBLE.value
+    if u in ("REQUIRES_ANALYSIS", "FEASIBILITY.REQUIRES_ANALYSIS"):
+        return AttackFeasibility.REQUIRES_ANALYSIS.value
+
+    # Русские/частичные совпадения
+    if "ЧАСТИЧНО" in u:
+        return AttackFeasibility.PARTIALLY_FEASIBLE.value
+    if "НЕ" in u and "РЕАЛИЗ" in u:
+        return AttackFeasibility.NOT_FEASIBLE.value
+    if "ТРЕБУЕТ" in u:
+        return AttackFeasibility.REQUIRES_ANALYSIS.value
+    if "РЕАЛИЗ" in u:
+        return AttackFeasibility.FEASIBLE.value
+
+    return AttackFeasibility.REQUIRES_ANALYSIS.value
+
+
 @dataclass
 class OpenPort:
     port: int

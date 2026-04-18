@@ -18,6 +18,7 @@ import os
 import struct
 import time
 import re
+import ssl
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -160,53 +161,130 @@ class PortScanner:
 
     def _check_port(self, port: int) -> OpenPort | None:
         """Проверка одного порта."""
+        sock = None
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(self.timeout)
             result = sock.connect_ex((self.target, port))
-            if result == 0:
-                service = KNOWN_PORTS.get(port, "Unknown")
-                banner = self._grab_banner(sock, port)
-                sock.close()
-                return OpenPort(port=port, service=service, banner=banner)
-            sock.close()
+            if result != 0:
+                return None
+
+            # ВАЖНО: после connect_ex баннер лучше снимать отдельным зондированием,
+            # чтобы поддержать TLS и протокол-специфичные запросы.
+            service = KNOWN_PORTS.get(port, "Unknown")
+            return OpenPort(port=port, service=service, banner=self._grab_banner(port))
         except Exception:
-            pass
+            return None
+        finally:
+            try:
+                if sock:
+                    sock.close()
+            except Exception:
+                pass
         return None
 
-    def _grab_banner(self, sock: socket.socket, port: int) -> str:
-        """Получение баннера сервиса."""
-        try:
-            # Для HTTP-портов отправляем запрос
-            if port in (80, 8080, 8000, 8888):
-                sock.send(b"HEAD / HTTP/1.1\r\nHost: target\r\nConnection: close\r\n\r\n")
-            elif port in (443, 8443):
-                # Для HTTPS не пытаемся через сырой сокет
+    def _grab_banner(self, port: int) -> str:
+        """Получение баннера сервиса (протокол-специфичное зондирование)."""
+        def _recv_some(s: socket.socket, n: int = 2048) -> str:
+            try:
+                data = s.recv(n)
+                return data.decode("utf-8", errors="replace").strip()
+            except Exception:
                 return ""
-            else:
-                # Для остальных ждём приветственный баннер
-                sock.settimeout(2)
 
-            data = sock.recv(1024)
-            banner = data.decode("utf-8", errors="replace").strip()
+        def _tcp_probe(payload: bytes | None, read_first: bool = False, timeout: float = 2.0) -> str:
+            s = None
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(timeout)
+                s.connect((self.target, port))
+                if read_first:
+                    b = _recv_some(s)
+                    if b:
+                        return b[:300]
+                if payload:
+                    s.sendall(payload)
+                return _recv_some(s)[:300]
+            except Exception:
+                return ""
+            finally:
+                try:
+                    if s:
+                        s.close()
+                except Exception:
+                    pass
 
-            # Извлекаем полезную информацию из HTTP-ответа
-            if banner.startswith("HTTP/"):
-                server_match = re.search(r"Server:\s*(.+)", banner, re.IGNORECASE)
-                powered_match = re.search(r"X-Powered-By:\s*(.+)", banner, re.IGNORECASE)
+        def _http_like(use_tls: bool) -> str:
+            s = None
+            try:
+                raw = socket.create_connection((self.target, port), timeout=2.0)
+                raw.settimeout(2.0)
+                if use_tls:
+                    ctx = ssl.create_default_context()
+                    # сканер, поэтому не валим сбор из-за валидации сертификата
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
+                    s = ctx.wrap_socket(raw, server_hostname=self.target)
+                else:
+                    s = raw
+
+                req = f"HEAD / HTTP/1.1\r\nHost: {self.target}\r\nUser-Agent: BOS-Scanner\r\nConnection: close\r\n\r\n"
+                s.sendall(req.encode("ascii", errors="ignore"))
+                resp = _recv_some(s, 4096)
+                if not resp:
+                    return ""
+                server_match = re.search(r"^Server:\\s*(.+)$", resp, re.IGNORECASE | re.MULTILINE)
+                powered_match = re.search(r"^X-Powered-By:\\s*(.+)$", resp, re.IGNORECASE | re.MULTILINE)
                 parts = []
                 if server_match:
                     parts.append(f"Server: {server_match.group(1).strip()}")
                 if powered_match:
                     parts.append(f"X-Powered-By: {powered_match.group(1).strip()}")
                 if parts:
-                    return " | ".join(parts)
-                # Если нет заголовков, берём первую строку
-                return banner.split("\r\n")[0][:100]
+                    return " | ".join(parts)[:300]
+                return resp.splitlines()[0][:300]
+            except Exception:
+                return ""
+            finally:
+                try:
+                    if s:
+                        s.close()
+                except Exception:
+                    pass
 
-            return banner[:200]
-        except Exception:
-            return ""
+        # --- HTTP/HTTPS ---
+        if port in (80, 8080, 8000, 8888, 8443):
+            return _http_like(use_tls=port in (443, 8443))
+        if port in (443,):
+            return _http_like(use_tls=True)
+
+        # --- SSH: баннер приходит сразу ---
+        if port == 22:
+            return _tcp_probe(None, read_first=True)
+
+        # --- FTP: приветствие сразу ---
+        if port == 21:
+            return _tcp_probe(None, read_first=True)
+
+        # --- SMTP: приветствие + EHLO ---
+        if port == 25:
+            greet = _tcp_probe(None, read_first=True)
+            # иногда баннер приходит только после команды
+            ehlo = _tcp_probe(b"EHLO example.com\r\n", read_first=False)
+            combo = " | ".join([x for x in (greet, ehlo) if x])
+            return combo[:300]
+
+        # --- IMAP/POP3: приветствие сразу/после NOOP ---
+        if port in (110, 143, 993, 995):
+            return _tcp_probe(None, read_first=True)
+
+        # --- Redis: INFO выдаёт redis_version ---
+        if port == 6379:
+            return _tcp_probe(b"INFO\r\n", read_first=False)
+
+        # --- SMB/RPC обычно не дают простого баннера; оставим пустым ---
+        # --- Остальное: попробуем считать что-то сразу ---
+        return _tcp_probe(None, read_first=True)
 
 
 class EnhancedCVEDetector:
@@ -369,26 +447,27 @@ class EnhancedCVEDetector:
         """Поиск CVE по баннеру."""
         cves = []
 
-        # Регулярные выражения для определения CVE по баннеру
-        banner_patterns = {
-            r"OpenSSH[_ ]([8-9]\.|10\.)": [
-                {"id": "CVE-2020-15778", "severity": "MEDIUM", "description": "OpenSSH command injection"},
-            ],
-            r"Apache[/ ]2\.4\.49": [
-                {"id": "CVE-2021-41773", "severity": "CRITICAL", "description": "Apache Path Traversal/RCE"},
-            ],
-            r"Apache[/ ]2\.4\.50": [
-                {"id": "CVE-2021-42013", "severity": "CRITICAL", "description": "Apache Path Traversal/RCE"},
-            ],
-            r"VMware.*Authentication.*Daemon": [
-                {"id": "CVE-2021-21972", "severity": "CRITICAL", "description": "VMware vSphere Client RCE"},
-                {"id": "CVE-2021-21985", "severity": "CRITICAL", "description": "VMware vSphere Client RCE"},
-            ],
-        }
+        # 1) Быстрый путь: общий BANNER_CVE_MAP (самый богатый набор паттернов)
+        for pattern, rows in BANNER_CVE_MAP.items():
+            if re.search(pattern, banner or "", re.IGNORECASE):
+                for cve_id, severity, desc in rows:
+                    cves.append({"id": cve_id, "severity": severity, "description": desc})
 
-        for pattern, pattern_cves in banner_patterns.items():
-            if re.search(pattern, banner, re.IGNORECASE):
-                cves.extend(pattern_cves)
+        # 2) Дополнительные паттерны под баннеры вида "Server: Apache/2.4.49"
+        extra_patterns = {
+            r"Server:\s*Apache/2\.4\.49": [("CVE-2021-41773", "CRITICAL", "Apache 2.4.49 — Path Traversal/RCE")],
+            r"Server:\s*Apache/2\.4\.50": [("CVE-2021-42013", "CRITICAL", "Apache 2.4.50 — Path Traversal/RCE")],
+            r"Server:\s*nginx/1\.([0-9]|1[0-7])\.": [("CVE-2021-23017", "HIGH", "Nginx < 1.18 — DNS resolver vulnerability")],
+            r"Server:\s*Microsoft-IIS/([7-9]|10)\.0": [
+                ("CVE-2021-31166", "CRITICAL", "IIS — HTTP Protocol Stack RCE"),
+                ("CVE-2021-31204", "HIGH", "IIS — HTTP Protocol Stack DoS"),
+            ],
+            r"\bOpenSSL\s*1\.0\.1[a-z]?\b": [("CVE-2014-0160", "CRITICAL", "Heartbleed — OpenSSL buffer over-read")],
+        }
+        for pattern, rows in extra_patterns.items():
+            if re.search(pattern, banner or "", re.IGNORECASE):
+                for cve_id, severity, desc in rows:
+                    cves.append({"id": cve_id, "severity": severity, "description": desc})
 
         return cves
 
@@ -424,50 +503,103 @@ class OSDetector:
 
     @staticmethod
     def detect(target: str, open_ports: list[OpenPort]) -> str:
-        """Попытка определить ОС по TTL и набору портов."""
-        os_hints = []
+        """
+        Определение ОС по портам и баннерам.
 
-        # TTL-анализ
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(3)
-            # Пробуем подключиться к первому открытому порту
-            if open_ports:
-                sock.connect((target, open_ports[0].port))
-                # TTL из IP-заголовка не доступен через обычный сокет,
-                # но мы можем анализировать по набору портов
-                sock.close()
-        except Exception:
-            pass
+        Важно: TTL здесь не используется (недоступен через обычный socket),
+        поэтому делаем скоринговую модель, чтобы снизить ложные срабатывания.
+        """
+        if not open_ports:
+            return "Не удалось определить"
 
-        # Анализ по открытым портам
-        port_set = {p.port for p in open_ports}
+        port_set = {p.port for p in open_ports if getattr(p, "port", None) is not None}
+        banners = " ".join([(p.banner or "") for p in open_ports]).lower()
 
-        # Windows signatures
-        win_ports = {135, 139, 445, 3389, 5985}
-        if len(port_set & win_ports) >= 2:
-            os_hints.append("Windows")
+        scores = {
+            "Windows": 0,
+            "Linux": 0,
+            "FreeBSD": 0,
+            "NetworkDevice": 0,
+        }
+        details: list[str] = []
 
-        # Linux signatures
-        if 22 in port_set and 135 not in port_set and 445 not in port_set:
-            os_hints.append("Linux/Unix")
+        # --- Портовые сигнатуры ---
+        # Windows / AD / WinRM / SMB
+        if len(port_set & {135, 139, 445}) >= 2:
+            scores["Windows"] += 4
+            details.append("есть RPC/NetBIOS/SMB (135/139/445)")
+        if 3389 in port_set:
+            scores["Windows"] += 2
+            details.append("есть RDP (3389)")
+        if len(port_set & {5985, 5986}) >= 1:
+            scores["Windows"] += 3
+            details.append("есть WinRM (5985/5986)")
+        if len(port_set & {88, 389, 636, 464, 3268, 3269}) >= 2:
+            scores["Windows"] += 4
+            details.append("похоже на AD (88/389/636/464/3268/3269)")
 
-        # Web server analysis
-        for p in open_ports:
-            if "IIS" in p.banner:
-                os_hints.append("Windows (IIS)")
-            elif "Apache" in p.banner and "Win" in p.banner:
-                os_hints.append("Windows (Apache)")
-            elif "nginx" in p.banner.lower():
-                os_hints.append("Linux (nginx)")
+        # Linux/Unix чаще: SSH + отсутствие Windows-сигнатур
+        if 22 in port_set:
+            scores["Linux"] += 2
+            details.append("есть SSH (22)")
+        if 111 in port_set:
+            scores["Linux"] += 2
+            details.append("есть rpcbind/NFS (111)")
+        if len(port_set & {2049, 111}) >= 2:
+            scores["Linux"] += 3
+            details.append("есть NFS (2049) + rpcbind (111)")
 
-        if os_hints:
-            return "; ".join(set(os_hints))
-        return "Не удалось определить"
+        # FreeBSD: ssh + pf/удалёнка/типичные демоны (очень эвристично)
+        if 22 in port_set and "freebsd" in banners:
+            scores["FreeBSD"] += 5
+            details.append("в баннере есть freebsd")
+
+        # Сетевые устройства: SNMP, telnet, web UI + vendor hints
+        if 161 in port_set or 162 in port_set:
+            scores["NetworkDevice"] += 3
+            details.append("есть SNMP (161/162)")
+
+        # --- Баннерные сигнатуры ---
+        if "microsoft-iis" in banners or "windows" in banners or "win32" in banners:
+            scores["Windows"] += 4
+            details.append("баннер: microsoft/windows")
+        if "openssh_for_windows" in banners:
+            scores["Windows"] += 4
+            details.append("баннер: OpenSSH_for_Windows")
+        if "ubuntu" in banners or "debian" in banners or "centos" in banners or "red hat" in banners or "fedora" in banners:
+            scores["Linux"] += 4
+            details.append("баннер: distro linux")
+        if "nginx" in banners or "apache" in banners:
+            # это не ОС, но косвенно: nginx чаще на linux, IIS чаще на windows
+            if "microsoft-iis" not in banners:
+                scores["Linux"] += 1
+                details.append("баннер: web server (nginx/apache)")
+        if "cisco" in banners or "mikrotik" in banners or "juniper" in banners or "routeros" in banners:
+            scores["NetworkDevice"] += 5
+            details.append("баннер: network vendor")
+
+        # --- Выбор результата ---
+        best = max(scores.items(), key=lambda kv: kv[1])
+        os_name, score = best
+
+        # минимальный порог уверенности
+        if score < 3:
+            return "Не удалось определить"
+
+        # Приводим к привычному формату
+        if os_name == "NetworkDevice":
+            return "Сетевое устройство/сетевой сервис"
+
+        # Добавим уточнение (не слишком шумное)
+        top_details = ", ".join(details[:3]) if details else ""
+        return f"{os_name}" + (f" ({top_details})" if top_details else "")
 
 
 class AttackVectorGenerator:
     """Генерация векторов атак для обнаруженных портов и сервисов."""
+    def __init__(self, target: str | None = None):
+        # target нужен только для OSDetector (баннеры/подключения мы уже сделали на этапе скана)
+        self.target = target or ""
 
     # Улучшенные шаблоны атак с привязкой к CVE
     ATTACK_TEMPLATES = {
@@ -691,7 +823,7 @@ class AttackVectorGenerator:
     def generate(self, open_ports: list[OpenPort]) -> list[AttackVector]:
         """Генерация векторов атак для обнаруженных портов."""
         print("\n[*] Генерация векторов атак...")
-        vectors = []
+        vectors: list[AttackVector] = []
 
         # 1. Стандартные векторы по портам
         for port_info in open_ports:
@@ -704,17 +836,24 @@ class AttackVectorGenerator:
         vectors.extend(service_vectors)
 
         # 3. Добавляем атаки на основе анализа баннеров
+        # Дедуплицируем по (CVE, порт), т.к. часть CVE уже придёт из EnhancedCVEDetector
         banner_findings = BannerAnalyzer.analyze(open_ports)
+        banner_seen: set[tuple[str, int]] = set()
         for finding in banner_findings:
+            key = (finding.get("cve_id", ""), int(finding.get("port") or 0))
+            if key in banner_seen:
+                continue
+            banner_seen.add(key)
             av = AttackVector(
                 id=f"AV-BANNER-{finding['cve_id']}",
                 name=f"{finding['cve_id']} (по баннеру)",
                 description=finding['description'],
                 target_port=finding['port'],
-                target_service="banner_detected",
+                target_service=open_ports[0].service if open_ports else "banner_detected",
                 attack_type="known_vulnerability",
                 severity=finding['severity'],
-                tools_used="Version-specific exploit",
+                tools_used="BannerAnalyzer",
+                representative_cve_ids=[finding["cve_id"]],
             )
             vectors.append(av)
 
@@ -737,23 +876,32 @@ class AttackVectorGenerator:
                 ))
 
         # 5. Добавляем атаки на основе обнаруженной ОС
-        os_info = OSDetector.detect("", open_ports) if open_ports else ""
-        if "Windows" in os_info:
+        os_info = OSDetector.detect(self.target if hasattr(self, "target") else "", open_ports) if open_ports else ""
+        if os_info.startswith("Windows"):
             vectors.extend([
                 AttackVector("AV-WIN-SAM", "SAM Database Extraction", "Извлечение базы SAM с хешами паролей", None, "Windows", "credential_theft", Severity.HIGH.value, "Mimikatz, secretsdump"),
                 AttackVector("AV-WIN-PASSBACK", "NTLM Hash Passback", "Перехват NTLM-хешей через SMB", 445, "Windows SMB", "credential_theft", Severity.HIGH.value, "Responder, Impacket"),
                 AttackVector("AV-WIN-KERBEROAST", "Kerberoasting", "Атака на сервисные учётные записи Kerberos", None, "Windows AD", "credential_theft", Severity.HIGH.value, "Rubeus, Invoke-Kerberoast"),
             ])
-        elif "Linux" in os_info:
+        elif os_info.startswith("Linux"):
             vectors.extend([
                 AttackVector("AV-LIN-PRIVESC", "Linux Privilege Escalation", "Повышение привилегий через уязвимости ядра", None, "Linux", "privilege_escalation", Severity.HIGH.value, "LinPEAS, linux-exploit-suggester"),
                 AttackVector("AV-LIN-CRON", "Cron Job Exploitation", "Эксплуатация задач cron с повышенными привилегиями", None, "Linux", "privilege_escalation", Severity.MEDIUM.value, "LinPEAS"),
                 AttackVector("AV-LIN-SUID", "SUID Binary Exploitation", "Эксплуатация SUID-бинарников", None, "Linux", "privilege_escalation", Severity.HIGH.value, "GTFOBins, LinPEAS"),
             ])
 
-        print(f"[+] Сгенерировано {len(vectors)} возможных векторов атак "
+        # 6) Финальная дедупликация векторов (по id) на случай пересечений источников
+        unique: list[AttackVector] = []
+        seen_ids: set[str] = set()
+        for v in vectors:
+            if v.id in seen_ids:
+                continue
+            seen_ids.add(v.id)
+            unique.append(v)
+
+        print(f"[+] Сгенерировано {len(unique)} возможных векторов атак "
               f"(в т.ч. {len(banner_findings)} по баннерам, {len(service_vectors)} по сервисам)")
-        return vectors
+        return unique
 
     def _generate_service_based_vectors(self, open_ports: list[OpenPort]) -> list[AttackVector]:
         """Генерация векторов атак на основе обнаруженных сервисов и CVE."""
@@ -923,7 +1071,7 @@ def run_attacker(target_ip: str = None, server_port: int = None,
             print(f"  [{vuln['severity']:>8}] {vuln['cve_id']}: {vuln['description'][:60]}")
 
     # 4. Генерация векторов атак
-    generator = AttackVectorGenerator()
+    generator = AttackVectorGenerator(target=target)
     attack_vectors = generator.generate(open_ports)
 
     # 4.5. Добавляем векторы атак на основе результатов Nmap и Nuclei

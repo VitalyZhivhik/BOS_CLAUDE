@@ -1941,16 +1941,19 @@ class AttackerGUI(QMainWindow):
                     {"CRITICAL": "#ff4444", "HIGH": "#ff8844",
                      "MEDIUM": "#ccaa44", "LOW": "#44aa44"}.get(sev, "#888")))
                 self.response_table.setItem(r, 1, si)
-                fi = QTableWidgetItem(str(it.get("feasibility", "")))
+                from common.models import normalize_feasibility
+                feas_norm = normalize_feasibility(it.get("feasibility", ""))
+                fi = QTableWidgetItem(feas_norm)
                 fi.setForeground(QColor(
-                    "#c55" if fi.text() == "РЕАЛИЗУЕМА"
-                    else "#5a9" if fi.text() == "НЕ РЕАЛИЗУЕМА"
+                    "#c55" if feas_norm == "РЕАЛИЗУЕМА"
+                    else "#5a9" if feas_norm == "НЕ РЕАЛИЗУЕМА"
                     else "#d29922"))
                 self.response_table.setItem(r, 2, fi)
                 self.response_table.setItem(r, 3, QTableWidgetItem(str(it.get("attack_name", ""))))
                 self.response_table.setItem(r, 4, QTableWidgetItem(str(it.get("recommendation", ""))[:150]))
 
-            feasible = sum(1 for d in details if d.get("feasibility") == "РЕАЛИЗУЕМА")
+            from common.models import normalize_feasibility
+            feasible = sum(1 for d in details if normalize_feasibility(d.get("feasibility")) == "РЕАЛИЗУЕМА")
             self.response_summary.setText(
                 f"Всего: {len(details)}  |  🔴 Реализуемых: {feasible}  |  "
                 f"🟢 Нереализуемых: {len(details) - feasible}"
