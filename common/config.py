@@ -51,4 +51,6 @@ KNOWN_PORTS = {
     8080: "HTTP-Proxy",
     8443: "HTTPS-Alt",
     27017: "MongoDB",
+    902: "VMware",
+    912: "VMware",
 }

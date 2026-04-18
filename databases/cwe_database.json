@@ -9,7 +9,11 @@
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
-    ]
+    ],
+    "name_ru": "Sensitive Cookie Without 'HttpOnly' Flag",
+    "description_ru": "Продукт uses a cookie to store sensitive information, but the cookie is not marked with the HttpOnly flag.",
+    "mitigation_ru": "Реализуйте флаг HtpOnly при включении чувствительного печенья в ответ. Несмотря на то, что это смягчение эффективно для защиты печенья от собственного скриптодвигателя браузера, компоненты третьей стороны или модификаторы могут иметь свои собственные двигатели, которые обеспечивают доступ к печенью. Нападающие также могут использовать XMLHTTRResponse для непосредственного прочтения заголовков и получения печенья.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1007",
@@ -23,7 +27,11 @@
     "requires_technology": [],
     "detection_methods": [
       "manual_dynamic_analysis_if_utilizing_user_accounts_attempt_to_submit_a_username_that_contains_homoglyphs_similarly_check_to_see_if_links_containing_homoglyphs_can_be_sent_via_email_web_browsers_or_other_mechanisms_moderate"
-    ]
+    ],
+    "name_ru": "Insufficient Visual Distinction of Homoglyphs Presented to User",
+    "description_ru": "Продукт displays information or identifiers to a user, but the display mechanism does not make it easy for the user to distinguish between visually similar or identical glyphs (homoglyphs), which may cause the user to misinterpret a glyph and perform an unintended, insecure action.",
+    "mitigation_ru": "В процессе реализации используйте браузер, который отображает Punycode для IDN в URL и режиме, или какой цветный код различных сценариев в URL. В силу популярности гомоглиф-атаки несколько браузеров помогают предохранить от этого атаки с помощью Punycode. Например, Mozilla Firefox и Gooogle Chrome будут отображать IDN как Punycode, если высокоуровневые домена не ограничивают, какие персонажи могут быть использованы в доменных именах или если ярлыки смешивают сценарии для различных языков.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-102",
@@ -33,7 +41,11 @@
     "related_capec": [],
     "mitigation": "Для выявления проблемы в процессе внедрения в файлы конфигурации xml могут применяться ручные проверки или автоматизированный статический анализ.",
     "requires_technology": [],
-    "detection_methods": []
+    "detection_methods": [],
+    "name_ru": "Struts: Duplicate Validation Forms",
+    "description_ru": "Продукт uses multiple validation forms with the same name, which might cause the Struts Validator to validate a form that the programmer does not expect.",
+    "mitigation_ru": "Для выявления проблемы в процессе внедрения в файлы конфигурации xml могут применяться ручные проверки или автоматизированный статический анализ.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1021",
@@ -53,7 +65,11 @@
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
-    ]
+    ],
+    "name_ru": "Improper Restriction of Rendered UI Layers or Frames",
+    "description_ru": "The web application does not restrict or incorrectly restricts frame objects or UI layers that belong to another application or domain, which can lead to user confusion about which interface the user is interacting with.",
+    "mitigation_ru": "Использование X-Frame-Вариантов позволяет разработчикам веб-содержания ограничивать использование их приложений в форме накладок, систем или iFrames. Разработчик может указать, из каких областей можно создать контент. Концепция X-Frame-Вариативы хорошо документирована, но внедрение этого защитного механизма разрабатывается для охвата пробелов. Нет необходимости разрешать использование систем в нескольких областях.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1022",
@@ -65,7 +81,11 @@
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
-    ]
+    ],
+    "name_ru": "Use of Web Link to Untrusted Target with window.opener Access",
+    "description_ru": "The web application produces links to untrusted external sites outside of its sphere of control, but it does not properly prevent the external site from modifying security-critical properties of the window.opener object, such as the location property.",
+    "mitigation_ru": "В конструкции указывается, что любой связанный внешний документ не должен иметь доступа к объекту места вызова.;",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1023",
@@ -75,7 +95,11 @@
     "related_capec": [],
     "mitigation": "Провести тщательное испытание схемы сопоставления перед включением кода в производство.",
     "requires_technology": [],
-    "detection_methods": []
+    "detection_methods": [],
+    "name_ru": "Incomplete Comparison with Missing Factors",
+    "description_ru": "Продукт performs a comparison between entities that must consider multiple factors or characteristics of each entity, but the comparison does not include one or more of these factors.",
+    "mitigation_ru": "Провести тщательное испытание схемы сопоставления перед включением кода в производство.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1024",
@@ -87,7 +111,11 @@
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
-    ]
+    ],
+    "name_ru": "Comparison of Incompatible Types",
+    "description_ru": "Продукт performs a comparison between two entities, but the entities are of different, incompatible types that cannot be guaranteed to provide correct results when they are directly compared.",
+    "mitigation_ru": "Провести тщательное испытание схемы сопоставления перед включением кода в производство.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1025",
@@ -97,7 +125,11 @@
     "related_capec": [],
     "mitigation": "Провести тщательное испытание схемы сопоставления перед включением кода в производство.",
     "requires_technology": [],
-    "detection_methods": []
+    "detection_methods": [],
+    "name_ru": "Comparison Using Wrong Factors",
+    "description_ru": "The code performs a comparison between two entities, but the comparison examines the wrong factors or characteristics of the entities, which can lead to incorrect results and resultant weaknesses.",
+    "mitigation_ru": "Провести тщательное испытание схемы сопоставления перед включением кода в производство.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-103",
@@ -109,7 +141,11 @@
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
-    ]
+    ],
+    "name_ru": "Struts: Incomplete validate() Method Definition",
+    "description_ru": "Продукт has a validator form that either does not define a validate() method, or defines a validate() method but does not call super.validate().",
+    "mitigation_ru": "Внедрение метода подтверждения () и вызов супер. Подтверждения () в рамках этого метода.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1037",
@@ -123,7 +159,11 @@
     "requires_technology": [],
     "detection_methods": [
       "white_box_in_theory_this_weakness_can_be_detected_through_the_use_of_white_box_testing_techniques_where_specifically_crafted_test_cases_are_used_in_conjunction_with_debuggers_to_verify_the_order_of_statements_being_executed_opportunistic_although_the_mentioned_detection_method_is_theoretically_possible_the_use_of_speculative_execution_is_a_preferred_way_of_increasing_processor_performance_the_reality_is_that_a_large_number_of_statements_are_executed_out_of_order_and_determining_if_any_of_them_break_an_access_control_property_would_be_extremely_opportunistic"
-    ]
+    ],
+    "name_ru": "Processor Optimization Removal or Modification of Security-critical Code",
+    "description_ru": "The developer builds a security-critical protection mechanism into the software, but the processor optimizes the execution of the program such that the mechanism is removed or modified.",
+    "mitigation_ru": "Осуществление: DAWG (Dynamics Aldenting Way Guard) - процессорный кэш, надлежащим образом разделённый на различные программы/процессы, которые не делят ресурсы.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1038",
@@ -131,9 +171,12 @@
     "description": "The product uses a mechanism that automatically optimizes code, e.g. to improve a characteristic such as performance, but the optimizations can have an unintended side effect that might violate an intended security assumption.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
-    "detection_methods": []
+    "detection_methods": [],
+    "name_ru": "Insecure Automated Optimizations",
+    "description_ru": "Продукт uses a mechanism that automatically optimizes code, e.g. to improve a characteristic such as performance, but the optimizations can have an unintended side effect that might violate an intended security assumption.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1039",
@@ -147,7 +190,11 @@
       "dynamic_analysis_with_manual_results_interpretation_use_indicators_from_model_performance_deviations_such_as_sudden_drops_in_accuracy_or_unexpected_outputs_to_verify_the_model",
       "dynamic_analysis_with_manual_results_interpretation_use_indicators_from_input_data_collection_mechanisms_to_verify_that_inputs_are_statistically_within_the_distribution_of_the_training_and_test_data",
       "architecture_or_design_review_use_multiple_models_or_model_ensembling_techniques_to_check_for_consistency_of_predictions/inferences"
-    ]
+    ],
+    "name_ru": "Inadequate Detection or Handling of Adversarial Input Perturbations in Automated Recognition Mechanism",
+    "description_ru": "Продукт uses an automated mechanism such as machine learning to recognize complex data inputs (e.g. image or audio) as a particular concept or category, but it does not properly detect or handle inputs that have been modified or constructed in a way that causes the mechanism to detect a different, incorrect concept.",
+    "mitigation_ru": "Архитектура и проектирование алгоритмические модификации, такие, как скручивание или сжатие моделей, могут помочь смягчить эту слабость. Скрупулирование моделей обеспечивает, чтобы при выводе поступающих данных использовались только весы, которые имеют самое непосредственное отношение к этой задаче, и продемонстрировали устойчивость к состязательным диспропорциям. Архитектура и проектирование Рассмотреть возможность проведения состязательной подготовки, т.е. метода, который включает состязательн",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-104",
@@ -159,7 +206,11 @@
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
-    ]
+    ],
+    "name_ru": "Struts: Form Bean Does Not Extend Validation Class",
+    "description_ru": "If a form bean does not extend an ActionForm subclass of the Validator framework, it can expose the application to other weaknesses related to insufficient input validation.",
+    "mitigation_ru": "Осуществление обеспечивает, чтобы все формы охватывали один из классов проверки.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1041",
@@ -171,7 +222,11 @@
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
-    ]
+    ],
+    "name_ru": "Use of Redundant Code",
+    "description_ru": "Продукт has multiple functions, methods, procedures, macros, etc. that\n\t\t\t\t\tcontain the same code.",
+    "mitigation_ru": "Осуществление соединяет общую функциональность в одну функцию, а затем называет эту функцию со всей базы кодов.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1042",
@@ -179,9 +234,12 @@
     "description": "The code contains a member element that is declared as static (but not final), in which\n\t\t\t\t\tits parent class element \n\t\t\t\t\tis not a singleton class - that is, a class element that can be used only once in\n\t\t\t\t\tthe 'to' association of a Create action.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
-    "detection_methods": []
+    "detection_methods": [],
+    "name_ru": "Static Member Data Element outside of a Singleton Class Element",
+    "description_ru": "The code contains a member element that is declared as static (but not final), in which\n\t\t\t\t\tits parent class element \n\t\t\t\t\tis not a singleton class - that is, a class element that can be used only once in\n\t\t\t\t\tthe 'to' association of a Create action.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1043",
@@ -189,9 +247,12 @@
     "description": "The product uses a data element that has an excessively large\n\t\t\t\t\tnumber of sub-elements with non-primitive data types such as structures or aggregated objects.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
-    "detection_methods": []
+    "detection_methods": [],
+    "name_ru": "Data Element Aggregating an Excessively Large Number of Non-Primitive Elements",
+    "description_ru": "Продукт uses a data element that has an excessively large\n\t\t\t\t\tnumber of sub-elements with non-primitive data types such as structures or aggregated objects.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1044",
@@ -199,9 +260,12 @@
     "description": "The product's architecture contains too many - or too few -\n\t\t\t\t\thorizontal layers.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
-    "detection_methods": []
+    "detection_methods": [],
+    "name_ru": "Architecture with Number of Horizontal Layers Outside of Expected Range",
+    "description_ru": "Продукт's architecture contains too many - or too few -\n\t\t\t\t\thorizontal layers.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1045",
@@ -209,9 +273,12 @@
     "description": "A parent class has a virtual destructor method, but the parent has a child class that does not have a virtual destructor.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
-    "detection_methods": []
+    "detection_methods": [],
+    "name_ru": "Parent Class with a Virtual Destructor and a Child Class without a Virtual Destructor",
+    "description_ru": "A parent class has a virtual destructor method, but the parent has a child class that does not have a virtual destructor.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1046",
@@ -219,9 +286,12 @@
     "description": "The product creates an immutable text string using string concatenation operations.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
-    "detection_methods": []
+    "detection_methods": [],
+    "name_ru": "Creation of Immutable Text Using String Concatenation",
+    "description_ru": "Продукт creates an immutable text string using string concatenation operations.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1047",
@@ -229,9 +299,12 @@
     "description": "The product contains modules in which one module has references that cycle back to itself, i.e., there are circular dependencies.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
-    "detection_methods": []
+    "detection_methods": [],
+    "name_ru": "Modules with Circular Dependencies",
+    "description_ru": "Продукт contains modules in which one module has references that cycle back to itself, i.e., there are circular dependencies.",
+    "category_ru": "Неизвестно"
   },
   {
     "id": "CWE-1048",
@@ -239,7 +312,7 @@
     "description": "The code contains callable control elements that\n         contain an excessively large number of references to other\n         application objects external to the context of the callable,\n         i.e. a Fan-Out value that is excessively large.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -249,7 +322,7 @@
     "description": "The product performs a data query with a large number of joins\n\t\t\t\t\tand sub-queries on a large data table.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -269,7 +342,7 @@
     "description": "The product has a loop body or loop condition that contains a control element that directly or\n\t\t\t\t\tindirectly consumes platform resources, e.g. messaging, sessions, locks, or file\n\t\t\t\t\tdescriptors.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -279,7 +352,7 @@
     "description": "The product initializes data using hard-coded values that act as network resource identifiers.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -289,7 +362,7 @@
     "description": "The product initializes a data element using a hard-coded\n\t\t\t\t\tliteral that is not a simple integer or static constant element.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -299,7 +372,7 @@
     "description": "The product does not have documentation that represents how it is designed.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -309,7 +382,7 @@
     "description": "The code at one architectural layer invokes code that resides\n\t\t\t\t\tat a deeper layer than the adjacent layer, i.e., the invocation skips at least one\n\t\t\t\t\tlayer, and the invoked code is not part of a vertical utility layer that can be referenced from any horizontal layer.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -319,7 +392,7 @@
     "description": "The product contains a class with inheritance from more than\n\t\t\t\t\tone concrete class.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -331,7 +404,7 @@
     "description": "A named-callable or method control element has a signature that\n\t\t\t\t\tsupports a variable (variadic) number of parameters or arguments.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -343,7 +416,7 @@
     "description": "The product uses a dedicated, central data manager component as required by design, but it contains code that performs data-access operations that do not use this data manager.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -353,7 +426,7 @@
     "description": "The code contains a function or method that\n\t\t operates in a multi-threaded environment but owns an unsafe non-final\n\t\t                     static storable or member data element.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -383,7 +456,7 @@
     "description": "The product performs too many data queries without using efficient data processing functionality such as stored procedures.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -393,7 +466,7 @@
     "description": "The product does not sufficiently hide the internal representation and implementation details of data or methods, which might allow external components or modules to modify data unexpectedly, invoke unexpected functionality, or introduce dependencies that the programmer did not intend.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -405,7 +478,7 @@
     "description": "The code has a parent class that contains references to a child class, its methods, or its members.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -415,7 +488,7 @@
     "description": "A static code block creates an instance of a class.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -425,7 +498,7 @@
     "description": "The product contains a function, subroutine, or method whose signature has an unnecessarily large number of\n\t\t\t\t\tparameters/arguments.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -437,7 +510,7 @@
     "description": "The product uses deployed components from application servers, but it also uses low-level functions/methods for management of resources, instead of the API provided by the application server.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -447,7 +520,7 @@
     "description": "The product contains a serializable data element that does not\n\t\t\t\t\thave an associated serialization method.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -457,7 +530,7 @@
     "description": "The product contains a data query against an SQL table or view\n\t\t\t\t\tthat is configured in a way that does not utilize an index and may cause\n\t\t\t\t\tsequential searches to be performed.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -467,7 +540,7 @@
     "description": "The implementation of the product is not consistent with the\n\t\t\t\t\tdesign as described within the relevant documentation.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -497,7 +570,7 @@
     "description": "The product contains a serializable, storable data element such as a field or member,\n\t\t\t\t\tbut the data element contains member elements that are not\n\t\t\t\t\tserializable.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -507,7 +580,7 @@
     "description": "The source code contains a block that does not contain any code, i.e., the block is empty.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -519,7 +592,7 @@
     "description": "The product accesses a data resource through a database without using a\n\t\t\t\t\tconnection pooling capability.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -529,7 +602,7 @@
     "description": "The product contains a client with a function or method that contains a large number of data accesses/queries that are sent through a data manager, i.e., does not use efficient database capabilities.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -539,7 +612,7 @@
     "description": "A class has an inheritance level that is too high, i.e., it\n\t\t\t\t\thas a large number of parent classes.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -549,7 +622,7 @@
     "description": "The product performs unconditional control transfer (such as a\n\t\t\t\t\t\"goto\") in code outside of a branching structure such as a switch\n\t\t\t\t\tblock.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -561,7 +634,7 @@
     "description": "The product's architecture, source code, design, documentation,\n\t\t\t\t\tor other artifact does not follow required conventions.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -573,7 +646,7 @@
     "description": "The code performs a comparison such as an\n        equality test between two float (floating point) values, but\n        it uses comparison operators that do not account for the\n        possibility of loss of precision.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -585,7 +658,7 @@
     "description": "The source code does not follow\n\t\t\t\tdesired style or formatting for indentation, white\n\t\t\t\tspace, comments, etc.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -597,7 +670,7 @@
     "description": "A parent class contains one or more child classes, but the parent class does not have a virtual destructor method.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -619,7 +692,7 @@
     "description": "A source code file has too many lines of\n\t\t\t\t\tcode.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -631,7 +704,7 @@
     "description": "The code contains a class instance that calls the method or function to delete or destroy itself.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -641,7 +714,7 @@
     "description": "The product is intended to manage data access through a particular data manager component such as a relational or non-SQL database, but it contains code that performs data access operations without using that component.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -651,7 +724,7 @@
     "description": "A function or method contains too many\n\t\t\t\t\toperations that utilize a data manager or file resource.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -661,7 +734,7 @@
     "description": "A function, method, procedure, etc. contains an excessive amount of code that has been\n\t\t\t\t\tcommented out within its body.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -673,7 +746,7 @@
     "description": "A class contains an unnecessarily large number of\n\t\t\t\t\tchildren.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -683,7 +756,7 @@
     "description": "A class contains a virtual method, but the method does not have an associated virtual destructor.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -695,7 +768,7 @@
     "description": "The code has a synchronous call to a remote resource, but there is no timeout for the call, or the timeout is set to infinite.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -705,7 +778,7 @@
     "description": "The product uses a large data table that contains an excessively large number of\n\t\t\t\t\tindices.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -725,7 +798,7 @@
     "description": "A method for a class performs an operation that directly\n\t\t\t\t\taccesses a member element from another class.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -735,7 +808,7 @@
     "description": "The product contains a method that accesses an object but does not later invoke\n\t\t\t\t\tthe element's associated finalize/destructor method.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -747,7 +820,7 @@
     "description": "The product uses the same control element across multiple\n\t\t\t\t\tarchitectural layers.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -757,7 +830,7 @@
     "description": "The product uses an unnecessarily complex internal representation for its data structures or interrelationships between those structures.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -767,7 +840,7 @@
     "description": "The product contains an index range scan for a large data table,\n\t\t\t\t\tbut the scan can cover a large number of rows.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -777,7 +850,7 @@
     "description": "The product uses a loop with a control flow condition based on\n\t\t\t\t\ta value that is updated within the body of the loop.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -787,7 +860,7 @@
     "description": "The product implements a Singleton design pattern but does not use appropriate locking or other synchronization mechanism to ensure that the singleton class is only instantiated once.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -797,7 +870,7 @@
     "description": "The product uses a storable data element that does not have\n\t\t\t\t\tall of the associated functions or methods that are necessary to support\n\t\t\t\t\tcomparison.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -807,7 +880,7 @@
     "description": "The code contains a data element with a pointer that does not have an associated copy or constructor method.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -817,7 +890,7 @@
     "description": "The product's code, documentation, or other artifacts do not\n\t\t\t\t\tconsistently use the same naming conventions for variables, callables, groups of\n\t\t\t\t\trelated callables, I/O capabilities, data types, file names, or similar types of\n\t\t\t\t\telements.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -841,7 +914,7 @@
     "description": "Validation fields that do not appear in forms they are associated with indicate that the validation logic is out of date.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_to_find_the_issue_in_the_implementation_manual_checks_or_automated_static_analysis_could_be_applied_to_the_xml_configuration_files_moderate",
@@ -854,7 +927,7 @@
     "description": "The product or code does not isolate system-dependent\n\t\t\t\t\tfunctionality into separate standalone modules.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -864,7 +937,7 @@
     "description": "The product uses automatically-generated code that cannot be\n\t\t\t\t\texecuted without a specific runtime support component.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -874,7 +947,7 @@
     "description": "The code uses a data representation that relies on low-level\n\t\t\t\t\tdata representation or constructs that may vary across different processors,\n\t\t\t\t\tphysical machines, OSes, or other physical components.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -884,7 +957,7 @@
     "description": "The product relies on third-party components that do\n\t\t\t\t\tnot provide equivalent functionality across all desirable\n\t\t\t\t\tplatforms.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -894,7 +967,7 @@
     "description": "The product relies on third-party components that are not\n\t\t\t\t\tactively supported or maintained by the original developer or a trusted proxy\n\t\t\t\t\tfor the original developer.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -906,7 +979,7 @@
     "description": "The product or code uses machine-dependent functionality, but\n\t\t\t\t\tit does not sufficiently encapsulate or isolate this functionality from\n\t\t\t\t\tthe rest of the code.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -918,7 +991,7 @@
     "description": "The source code uses literal constants that may need to change\n\t\t\t\t\tor evolve over time, instead of using symbolic constants.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -930,7 +1003,7 @@
     "description": "The source code uses symbolic constants, but it does not\n\t\t\t\t\tsufficiently place the definitions of these constants into a more centralized or\n\t\t\t\t\tisolated location.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -940,7 +1013,7 @@
     "description": "The code is structured in a way that relies too much on using\n\t\t\t\t\tor setting global variables throughout various points in the code, instead of\n\t\t\t\t\tpreserving the associated information in a narrower, more local\n\t\t\t\t\tcontext.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -952,7 +1025,7 @@
     "description": "The code contains a callable, block, or other code element in\n\t\t\t\t\twhich the same variable is used to control more than one unique task or store\n\t\t\t\t\tmore than one instance of data.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -974,7 +1047,7 @@
     "description": "The product's design documentation does not adequately describe\n\t\t\t\t\tcontrol flow, data flow, system initialization, relationships between tasks,\n\t\t\t\t\tcomponents, rationales, or other important aspects of the\n\t\t\t\t\tdesign.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -984,7 +1057,7 @@
     "description": "The product's documentation does not adequately define inputs,\n\t\t\t\t\toutputs, or system/software interfaces.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -994,7 +1067,7 @@
     "description": "The document does not fully define all mechanisms that are used\n\t\t\t\t\tto control or influence how product-specific programs are\n\t\t\t\t\texecuted.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1004,7 +1077,7 @@
     "description": "The source code uses comment styles or formats that are\n\t\t\t\t\tinconsistent or do not follow expected standards for the\n\t\t\t\t\tproduct.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1014,7 +1087,7 @@
     "description": "The source code contains whitespace that is inconsistent across\n\t\t\t\t\tthe code or does not follow expected standards for the\n\t\t\t\t\tproduct.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1024,7 +1097,7 @@
     "description": "The source code contains elements such as source files \n\t\t\t\t\tthat do not consistently provide a prologue or header that has been\n\t\t\t\t\tstandardized for the project.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1044,7 +1117,7 @@
     "description": "The code contains a function or method whose signature and/or associated\n\t\t\t\t\tinline documentation does not sufficiently describe the callable's inputs, outputs,\n\t\t\t\t\tside effects, assumptions, or return codes.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1054,7 +1127,7 @@
     "description": "The documentation does not sufficiently describe the techniques\n\t\t\t\t\tthat are used for error handling, exception processing, or similar\n\t\t\t\t\tmechanisms.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1064,7 +1137,7 @@
     "description": "The code uses too many unconditional branches (such as\n\t\t\t\t\t\"goto\").",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1089,7 +1162,7 @@
     "description": "The code is too complex, as calculated using a well-defined,\n\t\t\t\t\tquantitative measure.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -1101,7 +1174,7 @@
     "description": "The code contains McCabe cyclomatic complexity that exceeds a\n\tdesirable maximum.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -1113,7 +1186,7 @@
     "description": "The code is structured in a way that a Halstead complexity\n\t\t\t\t\tmeasure exceeds a desirable maximum.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1123,7 +1196,7 @@
     "description": "The product uses too much self-modifying code.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1133,7 +1206,7 @@
     "description": "The code contains a callable or other code grouping in which\n\t\t\t\t\tthe nesting / branching is too deep.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1143,7 +1216,7 @@
     "description": "The product has an attack surface whose quantitative\n\t\t\t\t\tmeasurement exceeds a desirable maximum.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1153,7 +1226,7 @@
     "description": "The source code declares a variable in one scope, but the\n\t\t\t\t\tvariable is only used within a narrower scope.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -1165,7 +1238,7 @@
     "description": "The code is compiled without sufficient warnings enabled, which\n\t\t\t\t\tmay prevent the detection of subtle bugs or quality\n\t\t\t\t\tissues.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "manual_analysis_inspect_scripts_and_tools_that_invoke_the_\t_____compiler_ensure_that_the_appropriate_command_line_\t_____switches_and/or_configuration_are_specified_to_report_\t_____warnings_and_errors"
@@ -1209,7 +1282,7 @@
     "description": "The product misinterprets an input, whether from an attacker or another product, in a security-relevant fashion.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "fuzzing_fuzz_testing_(fuzzing)_is_a_powerful_technique_for_generating_large_numbers_of_diverse_inputs_-_either_randomly_or_algorithmically_-_and_dynamically_invoking_the_code_with_those_inputs_even_with_random_inputs_it_is_often_capable_of_generating_unexpected_results_such_as_crashes_memory_corruption_or_resource_consumption_fuzzing_effectively_produces_repeatable_test_cases_that_clearly_indicate_bugs_which_helps_developers_to_diagnose_the_issues_high"
@@ -1239,7 +1312,7 @@
     "description": "The product contains code that is not essential for execution,\n\t     i.e. makes no state changes and has no side effects that alter\n\t     data or control flow, such that removal of the code would have no impact\n\t     to functionality or correctness.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -1279,7 +1352,7 @@
     "description": "The ASP.NET application does not use, or incorrectly uses, the model validation framework.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1289,7 +1362,7 @@
     "description": "The product performs CPU computations using\n         algorithms that are not as efficient as they could be for the\n         needs of the developer, i.e., the computations can be\n         optimized further.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1299,7 +1372,7 @@
     "description": "The product uses a function, library, or third party component\n\t     that has been explicitly prohibited, whether by the developer or\n\t     the customer.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -1330,7 +1403,7 @@
     "description": "This entry has been deprecated because it was a duplicate of CWE-908. All content has been transferred to CWE-908.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1625,7 +1698,7 @@
     "description": "The product manages resources or behaves in a way that indirectly creates a new, distinct resource that can be used by attackers in violation of the intended policy.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1648,7 +1721,7 @@
     "description": "The product prevents direct access to a resource containing sensitive information, but it does not sufficiently limit access to metadata that is derived from the original, sensitive information.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -1913,7 +1986,7 @@
     "description": "The product has or supports multiple distributed components or sub-systems that are each required to keep their own local copy of shared data - such as state or cache - but the product does not ensure that all local copies remain consistent with each other.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -2038,7 +2111,7 @@
     "description": "The product reads from a buffer using buffer access mechanisms such as indexes or pointers that reference memory locations after the targeted buffer.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high",
@@ -2186,7 +2259,7 @@
     "description": "The product reads from a buffer using buffer access mechanisms such as indexes or pointers that reference memory locations prior to the targeted buffer.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high",
@@ -2862,7 +2935,7 @@
     "description": "This entry has been deprecated because it was a duplicate of CWE-170. All content has been transferred to CWE-170.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -2927,7 +3000,7 @@
     "description": "This entry has been deprecated because it was at a lower level of abstraction than supported by CWE. All relevant content has been integrated into CWE-319.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -3272,7 +3345,7 @@
     "description": "The product uses an authentication mechanism to restrict access to specific users or identities, but the mechanism does not sufficiently prove that the claimed identity is correct.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4120,7 +4193,7 @@
     "description": "The product subtracts one value from another, such that the result is less than the minimum allowable integer value, which produces a value that is not equal to the correct result.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -4168,7 +4241,7 @@
     "description": "The product uses a signed primitive and performs a cast to an unsigned primitive, which can produce an unexpected value if the value of the signed primitive can not be represented using an unsigned primitive.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -4207,7 +4280,7 @@
     "description": "The product receives input from an upstream component, but it does not account for byte ordering (e.g. big-endian and little-endian) when processing the input, causing an incorrect number or value to be used.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "black_box_because_byte_ordering_bugs_are_usually_very_noticeable_even_with_normal_inputs_this_bug_is_more_likely_to_occur_in_rarely_triggered_error_conditions_making_them_difficult_to_detect_using_black_box_methods"
@@ -4451,7 +4524,7 @@
     "description": "The product operates in an environment in which its existence or specific identity should not be known, but it behaves differently than other products with equivalent functionality, in a way that is observable to an attacker.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4530,7 +4603,7 @@
     "description": "The product's intended functionality exposes information to certain actors in accordance with the developer's security policy, but this information is regarded as sensitive according to the intended security policies of other stakeholders such as the product's administrator, users, or others whose information is being processed.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4540,7 +4613,7 @@
     "description": "A process is invoked with sensitive command-line arguments, environment variables, or other elements that can be seen by other processes on the operating system.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4562,7 +4635,7 @@
     "description": "This entry has been deprecated, as it was not effective as a weakness and was structured more like a category. In addition, the name is inappropriate, since the \"container\" term is widely understood by developers in different ways than originally intended by PLOVER, the original source for this entry.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4572,7 +4645,7 @@
     "description": "This entry has been deprecated because it incorporated and confused multiple weaknesses. The issues formerly covered in this entry can be found at CWE-766 and CWE-767.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4582,7 +4655,7 @@
     "description": "This weakness has been deprecated because it was a duplicate of CWE-493. All content has been transferred to CWE-493.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4650,7 +4723,7 @@
     "description": "The product truncates the display, recording, or processing of security-relevant information in a way that can obscure the source or nature of an attack.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4660,7 +4733,7 @@
     "description": "The product does not record or display information that would be important for identifying the source or nature of an attack, or determining if an action is safe.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4670,7 +4743,7 @@
     "description": "The product records security-relevant information according to an alternate name of the affected entity, instead of the canonical name.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4680,7 +4753,7 @@
     "description": "This weakness can be found at CWE-199.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4705,7 +4778,7 @@
     "description": "The product does not handle or incorrectly handles input that is not syntactically well-formed with respect to the associated specification.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -4717,7 +4790,7 @@
     "description": "The product does not properly handle when the expected number of values for parameters, fields, or arguments is not provided in input, or if those values are undefined.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4742,7 +4815,7 @@
     "description": "The product does not handle or incorrectly handles when a parameter, field, or argument name is specified, but the associated value is missing, i.e. it is empty, blank, or null.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4752,7 +4825,7 @@
     "description": "The product does not handle or incorrectly handles when more values are provided than expected.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4762,7 +4835,7 @@
     "description": "The product does not handle or incorrectly handles when a value is not defined or supported for the associated parameter, field, or argument name.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4809,7 +4882,7 @@
     "description": "The product does not handle or incorrectly handles when a particular parameter, field, or argument name is not defined or supported by the product.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4819,7 +4892,7 @@
     "description": "The product does not handle or incorrectly handles inputs that are related to complex structures.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4829,7 +4902,7 @@
     "description": "The product does not handle or incorrectly handles when a particular structural element is not completely specified.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4839,7 +4912,7 @@
     "description": "The product does not properly handle when a particular element is not completely specified.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4861,7 +4934,7 @@
     "description": "The product does not handle or incorrectly handles when two or more structural elements should be consistent, but are not.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4895,7 +4968,7 @@
     "description": "The product uses the chroot() system call to create a jail, but does not change the working directory afterward. This does not prevent access to files outside of the jail.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -4907,7 +4980,7 @@
     "description": "Using realloc() to resize buffers that store sensitive information can leave the sensitive information exposed to attack, because it is not removed from memory.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -4919,7 +4992,7 @@
     "description": "The J2EE application directly manages connections, instead of using the container's connection management facilities.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -4943,7 +5016,7 @@
     "description": "This entry has been deprecated because it was a duplicate of CWE-350. All content has been transferred to CWE-350.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -4953,7 +5026,7 @@
     "description": "An exception is thrown from a function, but it is not caught.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -4965,7 +5038,7 @@
     "description": "This entry has been deprecated because of name\n\tconfusion and an accidental combination of multiple\n\tweaknesses. Most of its content has been transferred to\n\tCWE-785.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -5291,7 +5364,7 @@
     "description": "The product does not handle or incorrectly handles when it has insufficient privileges to perform an operation, leading to resultant weaknesses.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -5384,7 +5457,7 @@
     "description": "The product does not preserve permissions or incorrectly preserves permissions when copying, restoring, or sharing objects, which can cause them to have less restrictive permissions than intended.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -5485,7 +5558,7 @@
     "description": "The product does not properly manage a user within its environment.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -5596,7 +5669,7 @@
     "description": "This entry has been deprecated because it was a duplicate of CWE-350. All content has been transferred to CWE-350.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -5787,7 +5860,7 @@
     "description": "The product implements an authentication technique, but it skips a step that weakens the technique.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -5799,7 +5872,7 @@
     "description": "The authentication algorithm is sound, but the implemented mechanism can be bypassed as the result of a separate weakness that is primary to the authentication error.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -5967,7 +6040,7 @@
     "description": "The product stores sensitive information in cleartext in a file, or on disk.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -5981,7 +6054,7 @@
     "related_capec": [
       "CAPEC-37"
     ],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -6008,7 +6081,7 @@
     "description": "The product stores sensitive information in cleartext in memory.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -6018,7 +6091,7 @@
     "description": "The product stores sensitive information in cleartext within the GUI.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -6284,7 +6357,7 @@
     "description": "The product uses a Pseudo-Random Number Generator (PRNG) but does not correctly manage seeds.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -6355,7 +6428,7 @@
     "description": "The product uses a scheme that generates numbers or identifiers that are more predictable than required.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -6399,7 +6472,7 @@
     "description": "The product uses a constant value, name, or reference, but this value can (or should) vary across different environments.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -6537,7 +6610,7 @@
     "description": "The product does not properly distinguish between different types of elements in a way that leads to insecure behavior.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -6604,7 +6677,7 @@
     "description": "The product's user interface does not warn the user before undertaking an unsafe action on behalf of that user. This makes it easier for attackers to trick users into inflicting damage to their system.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -6614,7 +6687,7 @@
     "description": "The user interface provides a warning to a user regarding dangerous or sensitive operations, but the warning is not noticeable enough to warrant attention.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -6624,7 +6697,7 @@
     "description": "The product does not implement or incorrectly implements one or more security-relevant checks as specified by the design of a standardized algorithm, protocol, or technique.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -6726,7 +6799,7 @@
     "description": "This entry has been deprecated. There are no documented cases in which a switch's control expression is evaluated more than once.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -6781,7 +6854,7 @@
     "description": "The product divides a value by zero.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high",
@@ -6832,7 +6905,7 @@
     "description": "This entry was deprecated because it overlapped the same concepts as race condition (CWE-362) and Improper Synchronization (CWE-662).",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -6865,7 +6938,7 @@
       "CAPEC-149",
       "CAPEC-155"
     ],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -6967,7 +7040,7 @@
     "description": "A constant symbolic reference to an object is used, even though the reference can resolve to a different object over time.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7013,7 +7086,7 @@
     "description": "The product encounters an error but does not provide a status code or return value to indicate that an error has occurred.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7023,7 +7096,7 @@
     "description": "A function or operation returns an incorrect return value or status code that does not indicate the true result of execution, causing the product to modify its behavior based on the incorrect result.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "fuzzing_fuzz_testing_(fuzzing)_is_a_powerful_technique_for_generating_large_numbers_of_diverse_inputs_-_either_randomly_or_algorithmically_-_and_dynamically_invoking_the_code_with_those_inputs_even_with_random_inputs_it_is_often_capable_of_generating_unexpected_results_such_as_crashes_memory_corruption_or_resource_consumption_fuzzing_effectively_produces_repeatable_test_cases_that_clearly_indicate_bugs_which_helps_developers_to_diagnose_the_issues_high"
@@ -7035,7 +7108,7 @@
     "description": "The product does not properly check when a function or operation returns a value that is legitimate for the function, but is not expected by the product.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -7063,7 +7136,7 @@
     "description": "Catching overly broad exceptions promotes complex error handling code that is more likely to contain security vulnerabilities.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -7075,7 +7148,7 @@
     "description": "The product throws or raises an overly broad exceptions that can hide important details and produce inappropriate responses to certain conditions.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -7130,7 +7203,7 @@
     "description": "The product makes resources available to untrusted parties when those resources are only intended to be accessed by the product.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -7142,7 +7215,7 @@
     "description": "A process does not close sensitive file descriptors before invoking a child process, which allows the child to perform unauthorized I/O operations using those descriptors.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -7198,7 +7271,7 @@
     "description": "An algorithm in a product has an inefficient worst-case computational complexity that may be detrimental to system performance and can be triggered by an attacker, typically using crafted manipulations that ensure that the worst case is being reached.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7208,7 +7281,7 @@
     "description": "The product allows an entity to perform a legitimate but expensive operation before authentication or authorization has taken place.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7218,7 +7291,7 @@
     "description": "The product does not handle or incorrectly handles a compressed input with a very high compression ratio that produces a large output.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7336,7 +7409,7 @@
     "description": "The product accepts path input in the form of trailing dot ('filedir.') without appropriate validation, which can lead to ambiguous path resolution and allow an attacker to traverse the file system to unintended locations or access arbitrary files.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7356,7 +7429,7 @@
     "description": "The product opens an alternate channel to communicate with an authorized user, but the channel is accessible to other actors.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7376,7 +7449,7 @@
     "description": "This entry has been deprecated because it was a duplicate of CWE-441. All content has been transferred to CWE-441.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7456,7 +7529,7 @@
     "description": "The product accepts path input in the form of multiple trailing dot ('filedir....') without appropriate validation, which can lead to ambiguous path resolution and allow an attacker to traverse the file system to unintended locations or access arbitrary files.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7526,7 +7599,7 @@
     "description": "An interaction error occurs when two entities have correct behavior when running independently of each other, but when they are integrated as components in a larger system or process, they introduce incorrect behaviors that may cause resultant weaknesses.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7550,7 +7623,7 @@
     "description": "A product acts as an intermediary or monitor between two or more endpoints, but it does not have a complete model of an endpoint's features, behaviors, or state, potentially causing the product to perform incorrect actions based on this incomplete model.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7560,7 +7633,7 @@
     "description": "A's behavior or functionality changes with a new version of A, or a new environment, which is not known (or manageable) by B.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7570,7 +7643,7 @@
     "description": "The product accepts path input in the form of internal dot ('file.ordir') without appropriate validation, which can lead to ambiguous path resolution and allow an attacker to traverse the file system to unintended locations or access arbitrary files.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7580,7 +7653,7 @@
     "description": "A feature, API, or function does not perform according to its specification.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7605,7 +7678,7 @@
     "description": "This weakness can be found at CWE-113.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7630,7 +7703,7 @@
     "description": "The user interface does not correctly enable or configure a security feature, but the interface provides feedback that causes the user to believe that the feature is in a secure state.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7660,7 +7733,7 @@
     "description": "The UI performs the wrong action with respect to the user's request.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "manual_analysis_perform_extensive_functionality_testing_of_the_ui_the_ui_should_behave_as_specified"
@@ -7672,7 +7745,7 @@
     "description": "The product accepts path input in the form of multiple internal dot ('file...dir') without appropriate validation, which can lead to ambiguous path resolution and allow an attacker to traverse the file system to unintended locations or access arbitrary files.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7767,7 +7840,7 @@
     "description": "This weakness has been deprecated because its name and description did not match. The description duplicated CWE-454, while the name suggested a more abstract initialization problem. Please refer to CWE-665 for the more abstract problem.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7843,7 +7916,7 @@
     "description": "A function can return a pointer to memory that is outside of the buffer that the pointer is expected to reference.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)",
@@ -7893,7 +7966,7 @@
     "description": "The product accepts path input in the form of leading space (' filedir') without appropriate validation, which can lead to ambiguous path resolution and allow an attacker to traverse the file system to unintended locations or access arbitrary files.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -7974,7 +8047,7 @@
     "description": "The behavior of this function is undefined unless its control parameter is set to a specific value.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -8043,7 +8116,7 @@
     "description": "The product accepts path input in the form of internal space ('file(SPACE)name') without appropriate validation, which can lead to ambiguous path resolution and allow an attacker to traverse the file system to unintended locations or access arbitrary files.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -8053,7 +8126,7 @@
     "description": "The product accidentally uses the wrong operator, which changes the logic in security-relevant ways.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_this_weakness_can_be_found_easily_using_static_analysis_however_in_some_cases_an_operator_might_appear_to_be_incorrect_but_is_actually_correct_and_reflects_unusual_logic_within_the_program",
@@ -8170,7 +8243,7 @@
     "description": "The product accepts path input in the form of trailing slash ('filedir/') without appropriate validation, which can lead to ambiguous path resolution and allow an attacker to traverse the file system to unintended locations or access arbitrary files.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -8316,7 +8389,7 @@
     "description": "The product accepts path input in the form of multiple leading slash ('//multiple/leading/slash') without appropriate validation, which can lead to ambiguous path resolution and allow an attacker to traverse the file system to unintended locations or access arbitrary files.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -8338,7 +8411,7 @@
     "description": "The product mixes trusted and untrusted data in the same data structure or structured message.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -8488,7 +8561,7 @@
     "description": "This weakness can be found at CWE-385.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -8696,7 +8769,7 @@
     "description": "This entry has been deprecated because its abstraction was too low-level.  See CWE-532.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -8706,7 +8779,7 @@
     "description": "This entry has been deprecated because its abstraction was too low-level.  See CWE-532.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -8716,7 +8789,7 @@
     "description": "A command shell error message indicates that there exists an unhandled exception in the web application code. In many cases, an attacker can leverage the conditions that cause these errors in order to gain unauthorized access to the system.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -8728,7 +8801,7 @@
     "description": "A servlet error message indicates that there exists an unhandled exception in the web application code and may provide useful information to an attacker.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -8812,7 +8885,7 @@
     "description": "This entry has been deprecated because its abstraction was too low-level.  See CWE-532.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -8844,7 +8917,7 @@
     "description": "This weakness has been deprecated because it partially overlaps CWE-470, it describes legitimate programmer behavior, and other portions will need to be integrated into other entries.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -9179,7 +9252,7 @@
     "description": "The product does not follow or incorrectly follows the specifications as required by the implementation language, environment, framework, protocol, or platform.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -9433,7 +9506,7 @@
     "description": "This weakness has been deprecated because it covered redundant concepts already described in CWE-287.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -9477,7 +9550,7 @@
     "description": "This weakness has been deprecated.  It was poorly described and difficult to distinguish from other entries.  It was also inappropriate to assign a separate ID solely because of domain-specific considerations.  Its closest equivalent is CWE-1023.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -9703,7 +9776,7 @@
     "description": "The product creates a search index of private or sensitive documents, but it does not properly limit index access to actors who are authorized to see the original information.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -10173,7 +10246,7 @@
     "description": "The product violates well-established principles for secure design.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -10183,7 +10256,7 @@
     "description": "The product does not handle or incorrectly handles a file name that identifies a \"virtual\" resource that is not directly specified within the directory that is associated with the file name, causing the product to perform file-based operations on a resource that is not a file.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_-_binary_or_bytecode_according_to_soar_[ref-1479]_the_following_detection_techniques_may_be_useful:_cost_effective_for_partial_coverage:_bytecode_weakness_analysis_-_including_disassembler_+_source_code_weakness_analysis_soar_partial",
@@ -10295,7 +10368,7 @@
     "description": "The product exposes a resource to the wrong control sphere, providing unintended actors with inappropriate access to the resource.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -10305,7 +10378,7 @@
     "description": "The product does not properly transfer a resource/behavior to another sphere, or improperly imports a resource/behavior from another sphere, in a manner that provides unintended control over that resource.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -10325,7 +10398,7 @@
     "description": "The code contains a control flow path that does not reflect the algorithm that the path is intended to implement, leading to incorrect behavior any time this path is navigated.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -10335,7 +10408,7 @@
     "description": "The product uses security features in a way that prevents the product's administrator from tailoring security settings to reflect the environment in which the product is being used. This introduces resultant weaknesses or prevents it from operating at a level of security that is desired by the administrator.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -10345,7 +10418,7 @@
     "description": "The product uses, accesses, or otherwise operates on a resource after that resource has been expired, released, or revoked.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -10357,7 +10430,7 @@
     "description": "The product does not prevent the definition of control spheres from external actors.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -10382,7 +10455,7 @@
     "description": "The product performs the same operation on a resource two or more times, when the operation should only be applied once.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -10497,7 +10570,7 @@
     "description": "The product calls a function, procedure, or routine, but the caller specifies an argument that is the wrong data type, which may lead to resultant weaknesses.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "other_because_this_function_call_often_produces_\t_____incorrect_behavior_it_will_usually_be_detected_during_\t_____testing_or_normal_operation_of_the_product_opportunistic"
@@ -10509,7 +10582,7 @@
     "description": "The product calls a function, procedure, or routine, but the caller specifies an argument that contains the wrong value, which may lead to resultant weaknesses.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "manual_static_analysis_this_might_require_an_understanding_of_intended_program_behavior_or_design_to_determine_whether_the_value_is_incorrect"
@@ -10560,7 +10633,7 @@
     "description": "The product does not check for an error after calling a function that can return with a NULL pointer if the function fails, which leads to a resultant NULL pointer dereference.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "black_box_this_typically_occurs_in_rarely-triggered_error_conditions_reducing_the_chances_of_detection_during_black_box_testing",
@@ -10708,7 +10781,7 @@
     "description": "The web application sends a redirect to another location, but instead of exiting, it executes additional code.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "black_box_this_issue_might_not_be_detected_if_testing_is_performed_using_a_web_browser_because_the_browser_might_obey_the_redirect_and_move_the_user_to_a_different_page_before_the_application_has_produced_outputs_that_indicate_something_is_amiss"
@@ -10730,7 +10803,7 @@
     "description": "The product does not properly anticipate or handle exceptional conditions that rarely occur during normal operation of the product.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "dynamic_analysis_with_manual_results_interpretation_according_to_soar_[ref-1479]_the_following_detection_techniques_may_be_useful:_highly_cost_effective:_fault_injection_-_source_code_fault_injection_-_binary_cost_effective_for_partial_coverage:_forced_path_execution_high",
@@ -10745,7 +10818,7 @@
     "description": "The product does not correctly convert an object, resource, or structure from one type to a different type.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "fuzzing_fuzz_testing_(fuzzing)_is_a_powerful_technique_for_generating_large_numbers_of_diverse_inputs_-_either_randomly_or_algorithmically_-_and_dynamically_invoking_the_code_with_those_inputs_even_with_random_inputs_it_is_often_capable_of_generating_unexpected_results_such_as_crashes_memory_corruption_or_resource_consumption_fuzzing_effectively_produces_repeatable_test_cases_that_clearly_indicate_bugs_which_helps_developers_to_diagnose_the_issues_high"
@@ -10757,7 +10830,7 @@
     "description": "The product does not properly return control flow to the proper location after it has completed a task or detected an unusual condition.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -10827,7 +10900,7 @@
     "description": "This entry has been deprecated as it represents a specific observed example of a UNIX Hard Link weakness type rather than its own individual weakness type. Please refer to CWE-62.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -10849,7 +10922,7 @@
     "description": "The product does not properly handle special paths that may identify the data or resource fork of a file on the HFS+ file system.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11027,7 +11100,7 @@
     "description": "The product does not handle or incorrectly handles an exceptional condition.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -11039,7 +11112,7 @@
     "description": "The product does not return custom error pages to the user, possibly exposing sensitive information.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11065,7 +11138,7 @@
     "description": "The product uses an API function, data structure, or other entity in a way that relies on properties that are not always guaranteed to hold for that entity.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "fuzzing_fuzz_testing_(fuzzing)_is_a_powerful_technique_for_generating_large_numbers_of_diverse_inputs_-_either_randomly_or_algorithmically_-_and_dynamically_invoking_the_code_with_those_inputs_even_with_random_inputs_it_is_often_capable_of_generating_unexpected_results_such_as_crashes_memory_corruption_or_resource_consumption_fuzzing_effectively_produces_repeatable_test_cases_that_clearly_indicate_bugs_which_helps_developers_to_diagnose_the_issues_high"
@@ -11213,7 +11286,7 @@
     "description": "This entry has been deprecated because it was a duplicate of CWE-774. All content has been transferred to CWE-774.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11416,7 +11489,7 @@
     "description": "The product uses the RSA algorithm but does not incorporate Optimal Asymmetric Encryption Padding (OAEP), which might weaken the encryption.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -11482,7 +11555,7 @@
     "description": "The product reads or writes to a buffer using an index or pointer that references a memory location prior to the beginning of the buffer.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "fuzzing_fuzz_testing_(fuzzing)_is_a_powerful_technique_for_generating_large_numbers_of_diverse_inputs_-_either_randomly_or_algorithmically_-_and_dynamically_invoking_the_code_with_those_inputs_even_with_random_inputs_it_is_often_capable_of_generating_unexpected_results_such_as_crashes_memory_corruption_or_resource_consumption_fuzzing_effectively_produces_repeatable_test_cases_that_clearly_indicate_bugs_which_helps_developers_to_diagnose_the_issues_high",
@@ -11509,7 +11582,7 @@
     "description": "The product reads or writes to a buffer using an index or pointer that references a memory location after the end of the buffer.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "fuzzing_fuzz_testing_(fuzzing)_is_a_powerful_technique_for_generating_large_numbers_of_diverse_inputs_-_either_randomly_or_algorithmically_-_and_dynamically_invoking_the_code_with_those_inputs_even_with_random_inputs_it_is_often_capable_of_generating_unexpected_results_such_as_crashes_memory_corruption_or_resource_consumption_fuzzing_effectively_produces_repeatable_test_cases_that_clearly_indicate_bugs_which_helps_developers_to_diagnose_the_issues_high",
@@ -11557,7 +11630,7 @@
     "description": "The product receives data from an upstream component, but does not filter or incorrectly filters special elements before sending it to a downstream component.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11567,7 +11640,7 @@
     "description": "The product receives data from an upstream component, but does not completely filter special elements before sending it to a downstream component.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11577,7 +11650,7 @@
     "description": "The product receives data from an upstream component, but does not completely filter one or more instances of special elements before sending it to a downstream component.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11587,7 +11660,7 @@
     "description": "The product receives data from an upstream component, but only filters a single instance of a special element before sending it to a downstream component.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11597,7 +11670,7 @@
     "description": "The product receives data from an upstream component, but does not filter all instances of a special element before sending it to a downstream component.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11607,7 +11680,7 @@
     "description": "The product receives data from an upstream component, but only accounts for special elements at a specified location, thereby missing remaining special elements that may exist before sending it to a downstream component.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11617,7 +11690,7 @@
     "description": "The product receives data from an upstream component, but only accounts for special elements positioned relative to a marker (e.g. \"at the beginning/end of a string; the second argument\"), thereby missing remaining special elements that may exist before sending it to a downstream component.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11627,7 +11700,7 @@
     "description": "The product receives data from an upstream component, but only accounts for special elements at an absolute position (e.g. \"byte number 10\"), thereby missing remaining special elements that may exist before sending it to a downstream component.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11662,7 +11735,7 @@
     "description": "The product does not properly limit the number or frequency of interactions that it has with an actor, such as the number of incoming requests.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11699,7 +11772,7 @@
     "description": "The product uses a CAPTCHA challenge, but the challenge can be guessed or automatically recognized by a non-human actor.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11783,7 +11856,7 @@
     "description": "The product utilizes a shared resource in a concurrent manner but does not attempt to synchronize access to the resource.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11793,7 +11866,7 @@
     "description": "The product utilizes a shared resource in a concurrent manner, but it does not correctly synchronize access to the resource.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -11807,7 +11880,7 @@
     "related_capec": [
       "CAPEC-129"
     ],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high",
@@ -11822,7 +11895,7 @@
     "related_capec": [
       "CAPEC-129"
     ],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high",
@@ -11835,7 +11908,7 @@
     "description": "The product accesses or uses a pointer that has not been initialized.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high",
@@ -11861,7 +11934,7 @@
     "description": "The product releases a resource that is still intended to be used by itself or another actor.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -11873,7 +11946,7 @@
     "description": "The product does not restrict a reference to a Document Type Definition (DTD) to the intended control sphere. This might allow attackers to reference arbitrary DTDs, possibly causing the product to expose files, consume excessive system resources, or execute arbitrary http requests on behalf of the attacker.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11942,7 +12015,7 @@
     "description": "The product includes web functionality (such as a web widget) from another domain, which causes it to operate within the domain of the product, potentially granting total access and control of the product to the untrusted source.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11952,7 +12025,7 @@
     "description": "The product defines a function that is used as a handler for more than one signal.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -11962,7 +12035,7 @@
     "description": "The product attempts to unlock a resource that is not locked.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -11988,7 +12061,7 @@
     "description": "The product performs an iteration or loop without sufficiently limiting the number of times that the loop is executed.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "dynamic_analysis_with_manual_results_interpretation_according_to_soar_[ref-1479]_the_following_detection_techniques_may_be_useful:_cost_effective_for_partial_coverage:_fuzz_tester_framework-based_fuzzer_forced_path_execution_soar_partial",
@@ -12003,7 +12076,7 @@
     "description": "The product contains an iteration or loop with an exit condition that cannot be reached, i.e., an infinite loop.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -12028,7 +12101,7 @@
     "description": "The product requires that an actor should only be able to perform an action once, or to have only one unique action, but the product does not enforce or improperly enforces this restriction.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -12074,7 +12147,7 @@
     "description": "The product supports a session in which more than one behavior must be performed by an actor, but it does not properly ensure that the actor performs the behaviors in the required sequence.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)"
@@ -12086,7 +12159,7 @@
     "description": "The product or the administrator places a user into an incorrect group.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -12096,7 +12169,7 @@
     "description": "The product allocates or initializes a resource such as a pointer, object, or variable using one type, but it later accesses that resource using a type that is incompatible with the original type.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -12298,7 +12371,7 @@
     "description": "The product uses or accesses a file descriptor after it has been closed.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -12310,7 +12383,7 @@
     "description": "The product uses a reference count to manage a resource, but it does not update or incorrectly updates the reference count.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -12414,7 +12487,7 @@
     "description": "This entry has been deprecated. It originally came from PLOVER, which sometimes defined \"other\" and \"miscellaneous\" categories in order to satisfy exhaustiveness requirements for taxonomies. Within the context of CWE, the use of a more abstract entry is preferred in mapping situations. CWE-75 is a more appropriate mapping.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -12424,7 +12497,7 @@
     "description": "The product operates in an environment in which power is a limited resource that cannot be automatically replenished, but the product does not properly restrict the amount of power that its operation consumes.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -12434,7 +12507,7 @@
     "description": "The product stores sensitive information in a file system or device that does not have built-in access control.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -12444,7 +12517,7 @@
     "description": "The product stores sensitive information without properly limiting read or write access by unauthorized actors.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": [
       "automated_static_analysis_automated_static_analysis_commonly_referred_to_as_static_application_security_testing_(sast)_can_find_some_instances_of_this_weakness_by_analyzing_source_code_(or_binary/compiled_code)_without_having_to_execute_it_typically_this_is_done_by_building_a_model_of_data_flow_and_control_flow_then_searching_for_potentially-vulnerable_patterns_that_connect_\"sources\"_(origins_of_input)_with_\"sinks\"_(destinations_where_the_data_interacts_with_external_components_a_lower_layer_such_as_the_os_etc)_high"
@@ -12473,7 +12546,7 @@
     "description": "The product establishes a communication channel with an endpoint and receives a message from that endpoint, but it does not sufficiently ensure that the message was not modified during transmission.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },
@@ -12579,7 +12652,7 @@
     "description": "The product creates a communication channel to initiate an outgoing request to an actor, but it does not correctly specify the intended destination for that actor.",
     "category": "unknown",
     "related_capec": [],
-    "mitigation": "",
+    "mitigation": "Следуйте лучшим практикам безопасной разработки",
     "requires_technology": [],
     "detection_methods": []
   },

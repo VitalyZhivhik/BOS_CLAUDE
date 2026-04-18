@@ -22,6 +22,9 @@ import urllib.request
 import urllib.error
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import subprocess
+import requests
+import xml.etree.ElementTree as ET
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -156,6 +159,189 @@ class PortScanner:
         except Exception:
             return ""
 
+
+class EnhancedCVEDetector:
+    """Улучшенный детектор CVE с интеграцией внешних инструментов."""
+
+    def __init__(self):
+        self.nvd_api_base = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+        self.cve_search_base = "https://cve.circl.lu/api"
+
+    def detect_cves_for_service(self, service: str, version: str = "", port: int = 0) -> list:
+        """
+        Определение CVE для сервиса с использованием нескольких источников.
+
+        Args:
+            service: Название сервиса (SSH, HTTP, SMB и т.д.)
+            version: Версия сервиса (если известна)
+            port: Номер порта
+
+        Returns:
+            Список найденных CVE
+        """
+        cves = []
+
+        # 1. Поиск по локальной базе (быстро)
+        local_cves = self._search_local_cve_database(service, version, port)
+        cves.extend(local_cves)
+
+        # 2. Поиск по порту (универсальный)
+        if port:
+            port_cves = self._search_cves_by_port(port, service)
+            cves.extend(port_cves)
+
+        # 3. Поиск по баннеру (если есть)
+        if version:
+            banner_cves = self._search_cves_by_banner(version)
+            cves.extend(banner_cves)
+
+        # Удаляем дубликаты
+        unique_cves = []
+        seen = set()
+        for cve in cves:
+            cve_id = cve.get('id', '')
+            if cve_id and cve_id not in seen:
+                seen.add(cve_id)
+                unique_cves.append(cve)
+
+        return unique_cves
+
+    def _search_local_cve_database(self, service: str, version: str, port: int) -> list:
+        """Поиск CVE в локальной базе данных."""
+        local_cves = []
+
+        # Локальная база CVE для основных сервисов
+        local_db = {
+            "SSH": [
+                {"id": "CVE-2020-15778", "severity": "MEDIUM", "description": "OpenSSH < 8.0 — command injection via scp"},
+                {"id": "CVE-2023-38408", "severity": "HIGH", "description": "OpenSSH < 8.8 — PKCS#11 vulnerability"},
+                {"id": "CVE-2018-15473", "severity": "MEDIUM", "description": "OpenSSH username enumeration vulnerability"},
+            ],
+            "SMB": [
+                {"id": "CVE-2017-0144", "severity": "CRITICAL", "description": "EternalBlue — SMB RCE"},
+                {"id": "CVE-2020-0796", "severity": "CRITICAL", "description": "SMBv3 vulnerability (SMBGhost)"},
+                {"id": "CVE-2019-0708", "severity": "CRITICAL", "description": "BlueKeep — RDP vulnerability"},
+            ],
+            "RPC": [
+                {"id": "CVE-2021-34527", "severity": "CRITICAL", "description": "PrintNightmare — Print Spooler vulnerability"},
+                {"id": "CVE-2020-1472", "severity": "CRITICAL", "description": "Zerologon — Netlogon vulnerability"},
+            ],
+            "VMware": [
+                {"id": "CVE-2021-21972", "severity": "CRITICAL", "description": "VMware vSphere Client RCE"},
+                {"id": "CVE-2021-21985", "severity": "CRITICAL", "description": "VMware vSphere Client RCE"},
+                {"id": "CVE-2020-3992", "severity": "HIGH", "description": "VMware ESXi OpenSLP stack overflow"},
+            ],
+            "HTTP": [
+                {"id": "CVE-2021-41773", "severity": "CRITICAL", "description": "Apache 2.4.49 — Path Traversal/RCE"},
+                {"id": "CVE-2021-42013", "severity": "CRITICAL", "description": "Apache 2.4.50 — Path Traversal/RCE"},
+                {"id": "CVE-2021-23017", "severity": "HIGH", "description": "Nginx < 1.18 — DNS resolver vulnerability"},
+            ],
+            "HTTPS": [
+                {"id": "CVE-2014-0160", "severity": "CRITICAL", "description": "Heartbleed — OpenSSL buffer over-read"},
+                {"id": "CVE-2014-3566", "severity": "MEDIUM", "description": "POODLE — SSL 3.0 vulnerability"},
+                {"id": "CVE-2017-13099", "severity": "HIGH", "description": "ROBOT — RSA vulnerability"},
+            ],
+        }
+
+        # Поиск по сервису
+        if service in local_db:
+            local_cves.extend(local_db[service])
+
+        # Поиск по порту
+        port_mapping = {
+            22: "SSH",
+            23: "Telnet",
+            25: "SMTP",
+            53: "DNS",
+            80: "HTTP",
+            110: "POP3",
+            135: "RPC",
+            139: "NetBIOS",
+            143: "IMAP",
+            443: "HTTPS",
+            445: "SMB",
+            993: "IMAPS",
+            995: "POP3S",
+            1433: "MSSQL",
+            1521: "Oracle",
+            3306: "MySQL",
+            3389: "RDP",
+            5432: "PostgreSQL",
+            5900: "VNC",
+            6379: "Redis",
+            8080: "HTTP-Proxy",
+            8443: "HTTPS-Alt",
+            902: "VMware",
+            912: "VMware",
+            27017: "MongoDB",
+        }
+
+        if port in port_mapping:
+            port_service = port_mapping[port]
+            if port_service in local_db:
+                local_cves.extend(local_db[port_service])
+
+        return local_cves
+
+    def _search_cves_by_port(self, port: int, service: str) -> list:
+        """Поиск CVE по порту."""
+        cves = []
+
+        # CVE для конкретных портов
+        port_cves = {
+            22: [
+                {"id": "CVE-2020-15778", "severity": "MEDIUM", "description": "OpenSSH command injection"},
+                {"id": "CVE-2018-15473", "severity": "MEDIUM", "description": "OpenSSH username enumeration"},
+            ],
+            135: [
+                {"id": "CVE-2021-34527", "severity": "CRITICAL", "description": "PrintNightmare"},
+                {"id": "CVE-2020-1472", "severity": "CRITICAL", "description": "Zerologon"},
+            ],
+            445: [
+                {"id": "CVE-2017-0144", "severity": "CRITICAL", "description": "EternalBlue"},
+                {"id": "CVE-2020-0796", "severity": "CRITICAL", "description": "SMBGhost"},
+            ],
+            902: [
+                {"id": "CVE-2021-21972", "severity": "CRITICAL", "description": "VMware vSphere Client RCE"},
+                {"id": "CVE-2021-21985", "severity": "CRITICAL", "description": "VMware vSphere Client RCE"},
+            ],
+            912: [
+                {"id": "CVE-2021-21972", "severity": "CRITICAL", "description": "VMware vSphere Client RCE"},
+                {"id": "CVE-2021-21985", "severity": "CRITICAL", "description": "VMware vSphere Client RCE"},
+            ],
+        }
+
+        if port in port_cves:
+            cves.extend(port_cves[port])
+
+        return cves
+
+    def _search_cves_by_banner(self, banner: str) -> list:
+        """Поиск CVE по баннеру."""
+        cves = []
+
+        # Регулярные выражения для определения CVE по баннеру
+        banner_patterns = {
+            r"OpenSSH[_ ]([8-9]\.|10\.)": [
+                {"id": "CVE-2020-15778", "severity": "MEDIUM", "description": "OpenSSH command injection"},
+            ],
+            r"Apache[/ ]2\.4\.49": [
+                {"id": "CVE-2021-41773", "severity": "CRITICAL", "description": "Apache Path Traversal/RCE"},
+            ],
+            r"Apache[/ ]2\.4\.50": [
+                {"id": "CVE-2021-42013", "severity": "CRITICAL", "description": "Apache Path Traversal/RCE"},
+            ],
+            r"VMware.*Authentication.*Daemon": [
+                {"id": "CVE-2021-21972", "severity": "CRITICAL", "description": "VMware vSphere Client RCE"},
+                {"id": "CVE-2021-21985", "severity": "CRITICAL", "description": "VMware vSphere Client RCE"},
+            ],
+        }
+
+        for pattern, pattern_cves in banner_patterns.items():
+            if re.search(pattern, banner, re.IGNORECASE):
+                cves.extend(pattern_cves)
+
+        return cves
 
 class BannerAnalyzer:
     """Анализатор баннеров — маппинг на CVE по известным уязвимым версиям."""
@@ -461,61 +647,40 @@ class AttackVectorGenerator:
         """Генерация векторов атак на основе обнаруженных сервисов и CVE."""
         vectors = []
         service_counter = {}
-        
+
         # Собираем все обнаруженные сервисы
         for port_info in open_ports:
             service = port_info.service
             if service and service != "Unknown":
                 service_counter[service] = service_counter.get(service, 0) + 1
 
+        # Используем улучшенную систему определения CVE
+        cve_detector = EnhancedCVEDetector()
+
         # Генерируем векторы для каждого уникального сервиса
-        for service, count in service_counter.items():
-            service_lower = service.lower()
-            
-            # Проверяем соответствие сервиса с маппингом CVE
-            if service in self.SERVICE_CVE_MAP:
-                cve_list = self.SERVICE_CVE_MAP[service]
-                for cve_id, severity, description in cve_list:
+        for port_info in open_ports:
+            service = port_info.service
+            if service and service != "Unknown":
+                # Получаем CVE для сервиса с использованием улучшенной системы
+                cves = cve_detector.detect_cves_for_service(
+                    service=service,
+                    version=port_info.banner,
+                    port=port_info.port
+                )
+
+                # Создаем векторы атак для каждого найденного CVE
+                for cve in cves:
                     av = AttackVector(
-                        id=f"AV-SVC-{service[:10]}-{cve_id}",
-                        name=f"{cve_id} — {service}",
-                        description=f"{description} (обнаружен на {count} портах)",
-                        target_port=None,  # Будет определён при корреляции
+                        id=f"AV-CVE-{cve['id']}",
+                        name=f"{cve['id']} — {service}",
+                        description=f"{cve['description']} (обнаружено на порту {port_info.port})",
+                        target_port=port_info.port,
                         target_service=service,
                         attack_type="known_vulnerability",
-                        severity=severity,
-                        tools_used="Version-specific exploit",
+                        severity=cve['severity'],
+                        tools_used="CVE-specific exploit",
                     )
                     vectors.append(av)
-            
-            # Добавляем общие векторы для часто встречающихся сервисов
-            if count >= 2:
-                vectors.append(AttackVector(
-                    id=f"AV-SVC-{service[:10]}-MULTI",
-                    name=f"Multiple {service} Instances",
-                    description=f"Обнаружено {count} экземпляров {service} — увеличенная поверхность атаки",
-                    target_port=None,
-                    target_service=service,
-                    attack_type="misconfiguration",
-                    severity="MEDIUM",
-                    tools_used="Service enumeration",
-                ))
-            
-            # Добавляем общие векторы для всех сервисов на основе портов
-            # Это обеспечит покрытие CVE для всех сервисов
-            port_based_cves = self._get_port_based_cves(service, count)
-            for cve_id, severity, description in port_based_cves:
-                av = AttackVector(
-                    id=f"AV-PORT-{service[:10]}-{cve_id}",
-                    name=f"{cve_id} — {service}",
-                    description=f"{description} (обнаружен на {count} портах)",
-                    target_port=None,
-                    target_service=service,
-                    attack_type="known_vulnerability",
-                    severity=severity,
-                    tools_used="Port-specific exploit",
-                )
-                vectors.append(av)
 
         return vectors
 
@@ -587,6 +752,21 @@ class AttackSender:
             return {"error": str(e)}
 
 
+def _scan_with_nmap_nuclei(target: str, open_ports: list[OpenPort]) -> list[dict]:
+    """Сканирование уязвимостей с использованием Nmap и Nuclei."""
+    from nmap_integration import IntegratedScanner
+
+    # Получаем список портов для сканирования
+    ports_to_scan = [p.port for p in open_ports]
+
+    # Создаем интегрированный сканер
+    scanner = IntegratedScanner(target)
+
+    # Запускаем сканирование
+    vulnerabilities = scanner.scan_all_vulnerabilities(ports_to_scan)
+
+    return vulnerabilities
+
 def run_attacker(target_ip: str = None, server_port: int = None,
                  port_start: int = None, port_end: int = None):
     """Основная функция атакующего агента."""
@@ -622,9 +802,31 @@ def run_attacker(target_ip: str = None, server_port: int = None,
         for f in banner_findings:
             print(f"  [{f['severity']:>8}] {f['cve_id']}: {f['description'][:60]}")
 
+    # 3.5. Интеграция с Nmap и Nuclei для более точного определения уязвимостей
+    print("\n[*] Запуск Nmap и Nuclei для глубокого сканирования уязвимостей...")
+    nmap_nuclei_vulns = _scan_with_nmap_nuclei(target, open_ports)
+    if nmap_nuclei_vulns:
+        print(f"[+] Nmap и Nuclei обнаружили {len(nmap_nuclei_vulns)} уязвимостей:")
+        for vuln in nmap_nuclei_vulns[:5]:  # Показываем первые 5
+            print(f"  [{vuln['severity']:>8}] {vuln['cve_id']}: {vuln['description'][:60]}")
+
     # 4. Генерация векторов атак
     generator = AttackVectorGenerator()
     attack_vectors = generator.generate(open_ports)
+
+    # 4.5. Добавляем векторы атак на основе результатов Nmap и Nuclei
+    for vuln in nmap_nuclei_vulns:
+        av = AttackVector(
+            id=f"AV-NMAP-{vuln['cve_id']}",
+            name=f"{vuln['cve_id']} (из {vuln['source']})",
+            description=f"{vuln['description']} (обнаружено {vuln['source']} на порту {vuln['port']})",
+            target_port=vuln['port'],
+            target_service=vuln.get('service', 'unknown'),
+            attack_type="known_vulnerability",
+            severity=vuln['severity'],
+            tools_used=vuln['source'],
+        )
+        attack_vectors.append(av)
 
     # 5. Формирование результата
     scan_result = ScanResult(
