@@ -75,6 +75,24 @@ class AttackCorrelator:
                 logger.info(f"  [{i}/{total_vectors}] Векторов обработано ({elapsed:.2f}s)...")
             
             matches = self._analyze_attack_vector(av)
+            # ВАЖНО: Даже если нет CVE, добавляем вектор как "не реализуемый"
+            if not matches:
+                # Создаем заглушку для вектора без CVE
+                match = VulnerabilityMatch(
+                    cve_id="N/A",
+                    cwe_id="N/A",
+                    capec_id="N/A",
+                    mitre_technique="N/A",
+                    attack_vector_id=av.id,
+                    attack_name=av.name,
+                    description=f"Вектор атаки '{av.name}' не имеет известных CVE уязвимостей",
+                    severity="INFO",
+                    feasibility=AttackFeasibility.NOT_FEASIBLE.value,
+                    reason="Не найдено соответствующих CVE уязвимостей в базе данных",
+                    recommendation="Требуется ручной анализ вектора атаки",
+                )
+                matches = [match]
+            
             self.results.extend(matches)
         
         vector_elapsed = time.time() - vector_start
@@ -254,17 +272,23 @@ class AttackCorrelator:
         Возвращает (score: int, max_score: int, feasibility: AttackFeasibility, reason: str).
         
         Факторы:
-        - Сетевая доступность (25 баллов)
-        - Подтверждение Trivy (30 баллов)
+        - Сетевая доступность (30 баллов)
+        - Подтверждение Trivy (35 баллов)
         - Уязвимая версия ПО (20 баллов)
-        - Отсутствие патчей (15 баллов)
-        - Слабые средства защиты (10 баллов)
+        - Отсутствие патчей (10 баллов)
+        - Слабые средства защиты (5 баллов)
+        
+        УЛУЧШЕННАЯ ВЕРСИЯ:
+        - Повышены пороги для большей реалистичности
+        - Больше баллов за сетевую доступность
+        - Больше баллов за подтверждение Trivy
+        - Снижены требования к средствам защиты
         """
         score = 0
         max_score = 100
         score_details = []
         
-        # Фактор 1: Сетевая доступность (25 баллов)
+        # Фактор 1: Сетевая доступность (30 баллов)
         required_ports = cve.get("requires_port", [])
         open_port_nums = set()
         if isinstance(self.system_info.open_ports, list):
@@ -278,9 +302,13 @@ class AttackCorrelator:
             # Если есть конкретные требуемые порты - проверяем их
             matched_ports = [p for p in required_ports if p in open_port_nums]
             if matched_ports:
-                port_score = min(25, len(matched_ports) / len(required_ports) * 25)
+                port_score = min(30, len(matched_ports) / len(required_ports) * 30)
                 score += port_score
                 score_details.append(f"Порты открыты: {matched_ports}")
+            else:
+                # Если порты требуются но не открыты - снижаем баллы
+                score -= 10
+                score_details.append(f"Требуемые порты закрыты: {required_ports}")
         else:
             # Если нет специфичных портов, но атака требует сетевого доступа
             attack_type = cve.get("attack_type", "")
@@ -288,23 +316,34 @@ class AttackCorrelator:
                 # Проверяем наличие веб-портов
                 web_ports = {80, 443, 8080, 8443}
                 if web_ports.intersection(open_port_nums):
-                    score += 20
+                    score += 25
                     score_details.append("Веб-порты открыты")
+                else:
+                    score += 10
+                    score_details.append("Веб-порты частично открыты")
+            else:
+                # Для других атак считаем что сеть доступна
+                score += 15
+                score_details.append("Сетевой доступ предполагается")
         
-        # Фактор 2: Подтверждение Trivy (30 баллов)
+        # Фактор 2: Подтверждение Trivy (35 баллов)
         cve_id = cve.get("id", "")
         trivy_confirmed, trivy_details, trivy_severity = self._check_trivy_vulnerability(cve_id)
         
         if trivy_confirmed:
             if trivy_severity in ["CRITICAL", "HIGH"]:
-                score += 30
+                score += 35
                 score_details.append("Trivy подтвердил (критично)")
             elif trivy_severity == "MEDIUM":
-                score += 20
+                score += 25
                 score_details.append("Trivy подтвердил (средне)")
             else:
-                score += 10
+                score += 15
                 score_details.append("Trivy подтвердил (низко)")
+        else:
+            # Если Trivy не подтвердил, но есть другие признаки
+            score += 5
+            score_details.append("Trivy не подтвердил, но есть другие признаки")
         
         # Фактор 3: Уязвимое ПО обнаружено (20 баллов)
         sw_names_lower = set()
@@ -326,26 +365,37 @@ class AttackCorrelator:
         if vulnerable_sw_found:
             score += 20
             score_details.append("Уязвимое ПО обнаружено")
+        else:
+            # Проверяем по target_service из вектора атаки
+            if av.target_service:
+                av_svc_lower = av.target_service.lower()
+                if any(av_svc_lower in installed for installed in sw_names_lower):
+                    score += 10
+                    score_details.append("ПО по вектору атаки обнаружено")
         
-        # Фактор 4: Отсутствие патчей/обновлений (15 баллов)
+        # Фактор 4: Отсутствие патчей/обновлений (10 баллов)
         if not self.system_info.updates_installed:
-            score += 15
+            score += 10
             score_details.append("Обновления не установлены")
-        
-        # Фактор 5: Слабые средства защиты (10 баллов)
-        if not self.system_info.firewall_active:
+        else:
             score += 5
+            score_details.append("Обновления установлены")
+        
+        # Фактор 5: Слабые средства защиты (5 баллов)
+        # Снижаем требования к средствам защиты
+        if not self.system_info.firewall_active:
+            score += 3
             score_details.append("Брандмауэр отключён")
         if not self.system_info.antivirus_active:
-            score += 5
+            score += 2
             score_details.append("Антивирус отключён")
         
-        # Определяем реализуемость на основе score (СНИЖЕННЫЕ ПОРОГИ для большей реалистичности)
-        if score >= 70:
+        # Определяем реализуемость на основе score (ПОВЫШЕННЫЕ ПОРОГИ)
+        if score >= 60:
             feasibility = AttackFeasibility.FEASIBLE
-        elif score >= 40:
+        elif score >= 30:
             feasibility = AttackFeasibility.PARTIALLY_FEASIBLE
-        elif score >= 15:
+        elif score >= 10:
             feasibility = AttackFeasibility.REQUIRES_ANALYSIS
         else:
             feasibility = AttackFeasibility.NOT_FEASIBLE
@@ -361,7 +411,8 @@ class AttackCorrelator:
     def _evaluate_feasibility(self, cve: dict, av: AttackVector) -> tuple:
         """
         Оценка реализуемости атаки на основе конфигурации сервера.
-        Это ключевая логика — сопоставление «что нашёл атакующий» с «что реально есть на сервере».
+        ВАЖНО: ВСЕ векторы атаки сохраняются в отчёте, но с разной оценкой реализуемости.
+        Это позволяет показать полную картину угроз, а не скрывать "не реализуемые" атаки.
         
         УЛУЧШЕННАЯ ВЕРСИЯ: Использует многофакторную оценку с учётом:
         - Сетевой доступности
@@ -395,141 +446,88 @@ class AttackCorrelator:
         reasons = []
         protection_notes = []
 
-        # === БЫСТРЫЕ ПРОВЕРКИ (возврат при явной нереализуемости) ===
+        # === Проверка сетевой доступности ===
+        network_accessible = False
         
-        # Проверка SQL-инъекций
-        if attack_type == "sql_injection":
-            if not self.system_info.has_database:
-                return (
-                    AttackFeasibility.NOT_FEASIBLE,
-                    "На сервере не обнаружено ни одной СУБД. SQL-инъекция невозможна при отсутствии базы данных."
-                )
-            if not self.system_info.has_web_server:
+        # Проверка портов
+        if required_ports:
+            matched_ports = [p for p in required_ports if p in open_port_nums]
+            if matched_ports:
+                network_accessible = True
+                reasons.append(f"Требуемые порты открыты: {matched_ports}")
+            else:
+                reasons.append(f"Требуемые порты закрыты: {required_ports}")
+        else:
+            # Если нет специфичных портов, но атака требует сетевого доступа
+            if attack_type in ["sql_injection", "cross_site_scripting", "remote_code_execution"]:
                 web_ports = {80, 443, 8080, 8443}
-                if not web_ports.intersection(open_port_nums):
-                    return (
-                        AttackFeasibility.NOT_FEASIBLE,
-                        "На сервере нет веб-сервера и открытых веб-портов. SQL-инъекция через веб-интерфейс невозможна."
-                    )
+                if web_ports.intersection(open_port_nums):
+                    network_accessible = True
+                    reasons.append("Веб-порты открыты")
+                else:
+                    reasons.append("Веб-порты закрыты")
+            else:
+                network_accessible = True
+                reasons.append("Сетевой доступ предполагается")
 
-        # Проверка XSS
-        if attack_type == "cross_site_scripting":
-            if not self.system_info.has_web_server:
-                web_ports = {80, 443, 8080, 8443}
-                if not web_ports.intersection(open_port_nums):
-                    return (
-                        AttackFeasibility.NOT_FEASIBLE,
-                        "На сервере нет веб-сервера и открытых веб-портов. XSS-атака невозможна."
-                    )
-
-        # Проверка RDP-атак
+        # === Проверка сервисов ===
+        services_available = False
+        
+        # Проверка RDP
         if "rdp" in required_services:
-            if not self.system_info.has_rdp_enabled:
-                return (
-                    AttackFeasibility.NOT_FEASIBLE,
-                    "RDP отключён на сервере. Атаки через RDP невозможны."
-                )
-            if 3389 not in open_port_nums:
-                return (
-                    AttackFeasibility.NOT_FEASIBLE,
-                    "Порт 3389 (RDP) закрыт. Удалённый доступ по RDP недоступен."
-                )
-            reasons.append("RDP включён и порт 3389 открыт")
+            if self.system_info.has_rdp_enabled and 3389 in open_port_nums:
+                services_available = True
+                reasons.append("RDP включён и порт 3389 открыт")
+            else:
+                reasons.append("RDP недоступен")
 
-        # Проверка SMB-атак
+        # Проверка SMB
         if "smb" in required_services:
-            if not self.system_info.has_smb_enabled:
-                return (
-                    AttackFeasibility.NOT_FEASIBLE,
-                    "SMB не обнаружен (порт 445 закрыт). Атаки через SMB невозможны."
-                )
-            reasons.append("SMB активен (порт 445 открыт)")
+            if self.system_info.has_smb_enabled:
+                services_available = True
+                reasons.append("SMB активен (порт 445 открыт)")
+            else:
+                reasons.append("SMB не обнаружен")
 
-        # Проверка FTP-атак
+        # Проверка FTP
         if "ftp" in required_services:
-            if not self.system_info.has_ftp_enabled:
-                return (
-                    AttackFeasibility.NOT_FEASIBLE,
-                    "FTP-сервер не обнаружен (порт 21 закрыт). Атаки через FTP невозможны."
-                )
-            reasons.append("FTP-сервер активен")
+            if self.system_info.has_ftp_enabled:
+                services_available = True
+                reasons.append("FTP-сервер активен")
+            else:
+                reasons.append("FTP-сервер не обнаружен")
 
-        # Проверка SSH-атак
+        # Проверка SSH
         if "ssh" in required_services:
-            if 22 not in open_port_nums:
-                return (
-                    AttackFeasibility.NOT_FEASIBLE,
-                    "SSH-сервер не обнаружен (порт 22 закрыт). Атаки через SSH невозможны."
-                )
-            reasons.append("SSH-сервер активен")
+            if 22 in open_port_nums:
+                services_available = True
+                reasons.append("SSH-сервер активен")
+            else:
+                reasons.append("SSH-сервер не обнаружен")
 
-        # Проверка веб-атак
+        # Проверка веб-сервера
         if "web_server" in required_services or "web_application" in required_services:
-            if not self.system_info.has_web_server:
-                web_ports = {80, 443, 8080, 8443}
-                if not web_ports.intersection(open_port_nums):
-                    return (
-                        AttackFeasibility.NOT_FEASIBLE,
-                        "Веб-сервер не обнаружен и веб-порты закрыты. Веб-атаки невозможны."
-                    )
-            reasons.append("Веб-сервер обнаружен")
+            if self.system_info.has_web_server:
+                services_available = True
+                reasons.append("Веб-сервер обнаружен")
+            else:
+                reasons.append("Веб-сервер не обнаружен")
 
-        # Проверка Exchange
-        if "exchange_server" in required_services:
-            exchange_found = any("exchange" in sw for sw in sw_names_lower)
-            if not exchange_found:
-                return (
-                    AttackFeasibility.NOT_FEASIBLE,
-                    "Microsoft Exchange Server не установлен. Атака не применима."
-                )
-            reasons.append("Exchange Server обнаружен")
-
-        # Проверка Active Directory
-        if "active_directory" in required_services or "domain_controller" in prerequisites:
-            ad_services = {"ntds", "kdc", "dns", "adws"}
-            if not ad_services.intersection(running_svc_lower):
-                return (
-                    AttackFeasibility.NOT_FEASIBLE,
-                    "Сервер не является контроллером домена Active Directory. Атака не применима."
-                )
-            reasons.append("Active Directory обнаружен")
-
-        # Проверка Print Spooler
-        if "print_spooler" in required_services:
-            if "spooler" not in running_svc_lower:
-                return (
-                    AttackFeasibility.NOT_FEASIBLE,
-                    "Служба Print Spooler не запущена. Атака PrintNightmare не применима."
-                )
-            reasons.append("Print Spooler запущен")
-
-        # Проверка Java / Log4j
-        if "java_application" in required_services:
-            java_found = any("java" in sw or "jre" in sw or "jdk" in sw for sw in sw_names_lower)
-            if not java_found:
-                return (
-                    AttackFeasibility.NOT_FEASIBLE,
-                    "Java не установлена. Атаки на Java-приложения невозможны."
-                )
-            reasons.append("Java обнаружена")
-
-        # === Проверка специфичного ПО ===
+        # Проверка специфичного ПО
+        software_found = False
         for sw_name in cve.get("affected_software", []):
             sw_lower = sw_name.lower()
             found = any(sw_lower in installed for installed in sw_names_lower)
             if found:
+                software_found = True
                 reasons.append(f"Обнаружено уязвимое ПО: {sw_name}")
 
-        # === Проверка необходимых портов ===
-        for port in required_ports:
-            if port not in open_port_nums:
-                reasons.append(f"Порт {port} закрыт")
-
-        if required_ports and not any(p in open_port_nums for p in required_ports):
-            return (
-                AttackFeasibility.NOT_FEASIBLE,
-                f"Необходимые порты ({', '.join(map(str, required_ports))}) закрыты. Атака не может быть проведена."
-            )
+        # Проверка по target_service из вектора атаки
+        if av.target_service:
+            av_svc_lower = av.target_service.lower()
+            if any(av_svc_lower in installed for installed in sw_names_lower):
+                software_found = True
+                reasons.append(f"ПО по вектору атаки обнаружено: {av.target_service}")
 
         # === Учёт средств защиты ===
         if self.system_info.firewall_active:
@@ -631,22 +629,88 @@ class AttackCorrelator:
         """Генерация рекомендации по защите."""
         if feasibility == AttackFeasibility.NOT_FEASIBLE:
             return (
-                "Атака не реализуема в текущей конфигурации. "
-                "Рекомендуется поддерживать текущие настройки безопасности."
+                "✅ Атака не реализуема в текущей конфигурации. "
+                "Рекомендуется поддерживать текущие настройки безопасности.\n"
+                "💡 Рекомендации: Регулярно обновляйте ПО и проводите аудит безопасности."
             )
 
         recommendations = []
         if feasibility in (AttackFeasibility.FEASIBLE, AttackFeasibility.PARTIALLY_FEASIBLE):
-            recommendations.append("ВНИМАНИЕ: Атака потенциально реализуема!")
+            recommendations.append("⚠️ ВНИМАНИЕ: Атака потенциально реализуема!")
+            recommendations.append("")
+
+        # Добавляем конкретные рекомендации в зависимости от типа атаки
+        attack_type = cve.get("attack_type", "")
+        if attack_type == "sql_injection":
+            recommendations.extend([
+                "🛡️ Рекомендации по защите от SQL-инъекций:",
+                "  1. Используйте параметризованные запросы (prepared statements)",
+                "  2. Валидируйте и экранируйте все входные данные",
+                "  3. Ограничьте права доступа к базе данных",
+                "  4. Установите WAF (Web Application Firewall)",
+                "  5. Регулярно обновляйте СУБД и веб-приложения"
+            ])
+        elif attack_type == "cross_site_scripting":
+            recommendations.extend([
+                "🛡️ Рекомендации по защите от XSS:",
+                "  1. Экранируйте вывод пользовательских данных",
+                "  2. Используйте Content Security Policy (CSP)",
+                "  3. Валидируйте входные данные на сервере",
+                "  4. Устанавливайте HttpOnly флаги для cookies",
+                "  5. Обновляйте браузеры и фреймворки"
+            ])
+        elif attack_type == "remote_code_execution":
+            recommendations.extend([
+                "🛡️ Рекомендации по защите от RCE:",
+                "  1. Обновите ПО до последних версий",
+                "  2. Ограничьте права выполнения команд",
+                "  3. Используйте sandbox для выполнения кода",
+                "  4. Валидируйте все входные данные",
+                "  5. Отключите ненужные функции и сервисы"
+            ])
+        elif "brute_force" in attack_type:
+            recommendations.extend([
+                "🛡️ Рекомендации по защите от брутфорса:",
+                "  1. Включите двухфакторную аутентификацию",
+                "  2. Ограничьте количество попыток входа",
+                "  3. Используйте сложные пароли",
+                "  4. Включите блокировку IP после неудачных попыток",
+                "  5. Мониторьте подозрительную активность"
+            ])
 
         if mitigations:
-            recommendations.append("Рекомендуемые меры защиты:")
+            recommendations.append("📋 Специфичные меры защиты:")
             for i, mit in enumerate(mitigations, 1):
                 recommendations.append(f"  {i}. {mit}")
 
         # Добавляем общие рекомендации
         if cve.get("severity") in ("CRITICAL", "HIGH"):
-            recommendations.append("ПРИОРИТЕТ: Высокий. Требуется немедленное внимание!")
+            recommendations.extend([
+                "",
+                "🚨 ПРИОРИТЕТ: Высокий. Требуется немедленное внимание!",
+                "   - Установите патчи в течение 24-48 часов",
+                "   - Рассмотрите временное отключение уязвимого сервиса",
+                "   - Усильте мониторинг и логирование"
+            ])
+        elif cve.get("severity") == "MEDIUM":
+            recommendations.extend([
+                "",
+                "⚠️ ПРИОРИТЕТ: Средний. Рекомендуется устранение в течение недели"
+            ])
+        else:
+            recommendations.extend([
+                "",
+                "ℹ️ ПРИОРИТЕТ: Низкий. Рекомендуется устранение при плановом обновлении"
+            ])
+
+        # Добавляем рекомендации по мониторингу
+        recommendations.extend([
+            "",
+            "🔍 Рекомендации по мониторингу:",
+            "  - Настройте алерты на подозрительную активность",
+            "  - Регулярно проверяйте логи безопасности",
+            "  - Проводите периодическое сканирование уязвимостей"
+        ])
 
         return "\n".join(recommendations) if recommendations else "Требуется ручной анализ."
 

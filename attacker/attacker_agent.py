@@ -234,16 +234,19 @@ class OSDetector:
 class AttackVectorGenerator:
     """Генерация векторов атак для обнаруженных портов и сервисов."""
 
+    # Улучшенные шаблоны атак с привязкой к CVE
     ATTACK_TEMPLATES = {
         21: [
             AttackVector("AV-FTP-ANON", "FTP Anonymous Login", "Попытка анонимного входа на FTP", 21, "FTP", "information_disclosure", Severity.MEDIUM.value, "Nmap, Metasploit"),
             AttackVector("AV-FTP-BRUTE", "FTP Brute Force", "Подбор учётных данных FTP", 21, "FTP", "brute_force", Severity.MEDIUM.value, "Hydra, Medusa"),
             AttackVector("AV-FTP-BOUNCE", "FTP Bounce Attack", "Использование FTP для сканирования внутренней сети", 21, "FTP", "network_reconnaissance", Severity.LOW.value, "Nmap"),
+            AttackVector("AV-FTP-CLEAR", "FTP Cleartext Credentials", "Перехват учётных данных в открытом тексте", 21, "FTP", "credential_theft", Severity.HIGH.value, "Wireshark, tcpdump"),
         ],
         22: [
             AttackVector("AV-SSH-BRUTE", "SSH Brute Force", "Подбор учётных данных SSH", 22, "SSH", "brute_force", Severity.MEDIUM.value, "Hydra, Medusa"),
             AttackVector("AV-SSH-ENUM", "SSH User Enumeration", "Перечисление пользователей через SSH", 22, "SSH", "information_disclosure", Severity.LOW.value, "Metasploit"),
             AttackVector("AV-SSH-WEAK-KEY", "SSH Weak Key Exchange", "Использование слабых алгоритмов обмена ключами", 22, "SSH", "protocol_attack", Severity.MEDIUM.value, "ssh-audit"),
+            AttackVector("AV-SSH-OLD", "SSH Protocol Version 1", "Использование устаревшего протокола SSH v1", 22, "SSH", "protocol_attack", Severity.HIGH.value, "Nmap, ssh-audit"),
         ],
         23: [
             AttackVector("AV-TELNET-BRUTE", "Telnet Brute Force", "Подбор учётных данных Telnet (открытый текст)", 23, "Telnet", "brute_force", Severity.HIGH.value, "Hydra"),
@@ -262,6 +265,10 @@ class AttackVectorGenerator:
             AttackVector("AV-HTTP-XSS", "Cross-Site Scripting (HTTP)", "XSS через веб-приложение", 80, "HTTP", "cross_site_scripting", Severity.MEDIUM.value, "Burp Suite, OWASP ZAP"),
             AttackVector("AV-HTTP-DIR", "Directory Traversal", "Обход директорий веб-сервера", 80, "HTTP", "path_traversal", Severity.MEDIUM.value, "DirBuster, Gobuster"),
             AttackVector("AV-HTTP-VERB", "HTTP Verb Tampering", "Использование нестандартных HTTP-методов", 80, "HTTP", "misconfiguration", Severity.LOW.value, "curl, Burp Suite"),
+            AttackVector("AV-HTTP-LFI", "Local File Inclusion", "Включение локальных файлов через веб-приложение", 80, "HTTP", "path_traversal", Severity.HIGH.value, "Burp Suite, fimap"),
+            AttackVector("AV-HTTP-RFI", "Remote File Inclusion", "Включение удалённых файлов через веб-приложение", 80, "HTTP", "remote_code_execution", Severity.CRITICAL.value, "Burp Suite"),
+            AttackVector("AV-HTTP-CSRF", "Cross-Site Request Forgery", "Подделка межсайтовых запросов", 80, "HTTP", "csrf", Severity.MEDIUM.value, "Burp Suite, OWASP ZAP"),
+            AttackVector("AV-HTTP-UPLOAD", "Malicious File Upload", "Загрузка вредоносных файлов", 80, "HTTP", "remote_code_execution", Severity.HIGH.value, "Burp Suite, curl"),
         ],
         110: [
             AttackVector("AV-POP3-BRUTE", "POP3 Brute Force", "Подбор учётных данных POP3", 110, "POP3", "brute_force", Severity.MEDIUM.value, "Hydra"),
@@ -282,12 +289,19 @@ class AttackVectorGenerator:
             AttackVector("AV-HTTPS-SSRF", "Server-Side Request Forgery", "SSRF через веб-приложение", 443, "HTTPS", "ssrf", Severity.HIGH.value, "Burp Suite"),
             AttackVector("AV-HTTPS-SSL", "SSL/TLS Vulnerability", "Атака на уязвимости SSL/TLS протокола", 443, "HTTPS", "protocol_attack", Severity.MEDIUM.value, "SSLScan, testssl.sh"),
             AttackVector("AV-HTTPS-HEART", "Heartbleed Check", "Проверка уязвимости Heartbleed (CVE-2014-0160)", 443, "HTTPS", "information_disclosure", Severity.CRITICAL.value, "Nmap, sslscan"),
+            AttackVector("AV-HTTPS-POODLE", "POODLE Attack", "Атака POODLE на SSL 3.0 (CVE-2014-3566)", 443, "HTTPS", "protocol_attack", Severity.MEDIUM.value, "sslscan, testssl.sh"),
+            AttackVector("AV-HTTPS-BEAST", "BEAST Attack", "Атака BEAST на TLS 1.0", 443, "HTTPS", "protocol_attack", Severity.MEDIUM.value, "sslscan, testssl.sh"),
+            AttackVector("AV-HTTPS-CERT", "Certificate Misconfiguration", "Некорректная настройка SSL-сертификата", 443, "HTTPS", "misconfiguration", Severity.LOW.value, "sslscan, nmap"),
+            AttackVector("AV-HTTPS-ROBOT", "ROBOT Attack", "Атака ROBOT на RSA (CVE-2017-13099)", 443, "HTTPS", "protocol_attack", Severity.HIGH.value, "testssl.sh"),
         ],
         445: [
             AttackVector("AV-SMB-ETERNAL", "EternalBlue (MS17-010)", "Эксплуатация CVE-2017-0144 через SMB", 445, "SMB", "remote_code_execution", Severity.CRITICAL.value, "Metasploit, EternalBlue"),
             AttackVector("AV-SMB-RELAY", "SMB Relay Attack", "Перенаправление аутентификации SMB", 445, "SMB", "credential_theft", Severity.HIGH.value, "Impacket, Responder"),
             AttackVector("AV-SMB-ENUM", "SMB Enumeration", "Перечисление ресурсов через SMB", 445, "SMB", "information_disclosure", Severity.LOW.value, "Enum4linux, SMBClient"),
             AttackVector("AV-SMB-SIGN", "SMB Signing Disabled", "Подпись SMB не обязательна — MITM возможен", 445, "SMB", "man_in_the_middle", Severity.MEDIUM.value, "CrackMapExec"),
+            AttackVector("AV-SMB-NULL", "SMB Null Session", "Анонимный доступ к SMB сессии", 445, "SMB", "information_disclosure", Severity.MEDIUM.value, "rpcclient, enum4linux"),
+            AttackVector("AV-SMB-ETERNALCHAMP", "EternalChampion (MS17-010)", "Эксплуатация CVE-2017-0146 через SMB", 445, "SMB", "remote_code_execution", Severity.CRITICAL.value, "Metasploit"),
+            AttackVector("AV-SMB-ETERNALROMANCE", "EternalRomance (MS17-010)", "Эксплуатация CVE-2017-0147 через SMB", 445, "SMB", "remote_code_execution", Severity.CRITICAL.value, "Metasploit"),
         ],
         1433: [
             AttackVector("AV-MSSQL-BRUTE", "MSSQL Brute Force", "Подбор учётных данных MSSQL", 1433, "MSSQL", "brute_force", Severity.HIGH.value, "Hydra"),
@@ -301,24 +315,78 @@ class AttackVectorGenerator:
             AttackVector("AV-RDP-BRUTE", "RDP Brute Force", "Подбор учётных данных RDP", 3389, "RDP", "brute_force", Severity.HIGH.value, "Hydra, Crowbar"),
             AttackVector("AV-RDP-BLUEKEEP", "BlueKeep (CVE-2019-0708)", "Эксплуатация CVE-2019-0708 через RDP", 3389, "RDP", "remote_code_execution", Severity.CRITICAL.value, "Metasploit"),
             AttackVector("AV-RDP-NLA", "RDP NLA Bypass Check", "Проверка наличия Network Level Authentication", 3389, "RDP", "authentication_bypass", Severity.MEDIUM.value, "rdp-sec-check"),
+            AttackVector("AV-RDP-DESKTOPBRIDGE", "DesktopBridge (CVE-2019-0708)", "Атака через RDP без аутентификации", 3389, "RDP", "authentication_bypass", Severity.CRITICAL.value, "Metasploit"),
+            AttackVector("AV-RDP-CRYPT", "RDP Weak Encryption", "Слабое шифрование RDP сессии", 3389, "RDP", "protocol_attack", Severity.MEDIUM.value, "rdp-sec-check"),
         ],
         5432: [
             AttackVector("AV-PGSQL-BRUTE", "PostgreSQL Brute Force", "Подбор учётных данных PostgreSQL", 5432, "PostgreSQL", "brute_force", Severity.HIGH.value, "Hydra"),
+            AttackVector("AV-PGSQL-INJECT", "PostgreSQL Injection", "SQL-инъекция через PostgreSQL", 5432, "PostgreSQL", "sql_injection", Severity.HIGH.value, "SQLMap, sqlninja"),
+            AttackVector("AV-PGSQL-CMD", "PostgreSQL Command Execution", "Выполнение команд через PostgreSQL", 5432, "PostgreSQL", "remote_code_execution", Severity.CRITICAL.value, "Metasploit"),
         ],
         5900: [
             AttackVector("AV-VNC-BRUTE", "VNC Brute Force", "Подбор пароля VNC", 5900, "VNC", "brute_force", Severity.HIGH.value, "Hydra, Crowbar"),
             AttackVector("AV-VNC-NOAUTH", "VNC No Authentication", "VNC без аутентификации", 5900, "VNC", "authentication_bypass", Severity.CRITICAL.value, "vncviewer"),
+            AttackVector("AV-VNC-BYPASS", "VNC Authentication Bypass", "Обход аутентификации VNC", 5900, "VNC", "authentication_bypass", Severity.HIGH.value, "Metasploit"),
         ],
         6379: [
             AttackVector("AV-REDIS-NOAUTH", "Redis No Authentication", "Redis без пароля — полный доступ", 6379, "Redis", "authentication_bypass", Severity.CRITICAL.value, "redis-cli"),
             AttackVector("AV-REDIS-RCE", "Redis RCE via Lua", "Выполнение кода через Lua sandbox escape", 6379, "Redis", "remote_code_execution", Severity.CRITICAL.value, "redis-cli"),
+            AttackVector("AV-REDIS-CONFIG", "Redis Configuration Manipulation", "Изменение конфигурации Redis для записи файлов", 6379, "Redis", "misconfiguration", Severity.HIGH.value, "redis-cli"),
+            AttackVector("AV-REDIS-SSRF", "Redis SSRF via Gopher", "SSRF атака через Redis и протокол Gopher", 6379, "Redis", "ssrf", Severity.HIGH.value, "gopherus"),
         ],
         8080: [
             AttackVector("AV-PROXY-SQLI", "SQL Injection (Proxy)", "SQL-инъекция через прокси/приложение", 8080, "HTTP-Proxy", "sql_injection", Severity.HIGH.value, "SQLMap"),
             AttackVector("AV-PROXY-RCE", "Remote Code Execution (Proxy)", "RCE через веб-приложение на порту 8080", 8080, "HTTP-Proxy", "remote_code_execution", Severity.CRITICAL.value, "Metasploit"),
+            AttackVector("AV-PROXY-SSRF", "SSRF via Proxy", "SSRF через прокси-сервер", 8080, "HTTP-Proxy", "ssrf", Severity.HIGH.value, "Burp Suite"),
+            AttackVector("AV-PROXY-AJAX", "AJAX Interface Exploitation", "Эксплуатация AJAX-интерфейсов", 8080, "HTTP-Proxy", "cross_site_scripting", Severity.MEDIUM.value, "Burp Suite"),
         ],
         27017: [
             AttackVector("AV-MONGO-NOAUTH", "MongoDB No Authentication", "MongoDB без аутентификации", 27017, "MongoDB", "authentication_bypass", Severity.CRITICAL.value, "mongosh"),
+            AttackVector("AV-MONGO-INJECT", "MongoDB Injection", "NoSQL-инъекция через MongoDB", 27017, "MongoDB", "sql_injection", Severity.HIGH.value, "NoSQLmap"),
+            AttackVector("AV-MONGO-RCE", "MongoDB RCE via JavaScript", "Выполнение кода через JavaScript в MongoDB", 27017, "MongoDB", "remote_code_execution", Severity.CRITICAL.value, "mongosh"),
+        ],
+    }
+
+    # Маппинг сервисов на CVE для автоматической генерации векторов
+    SERVICE_CVE_MAP = {
+        "Apache": [
+            ("CVE-2021-41773", "CRITICAL", "Apache 2.4.49 — Path Traversal/RCE"),
+            ("CVE-2021-42013", "CRITICAL", "Apache 2.4.50 — Path Traversal/RCE"),
+            ("CVE-2021-44790", "HIGH", "Apache < 2.4.51 — mod_lua buffer overflow"),
+        ],
+        "nginx": [
+            ("CVE-2021-23017", "HIGH", "Nginx < 1.18 — DNS resolver vulnerability"),
+        ],
+        "OpenSSH": [
+            ("CVE-2020-15778", "MEDIUM", "OpenSSH < 8.0 — command injection via scp"),
+            ("CVE-2023-38408", "HIGH", "OpenSSH < 8.8 — PKCS#11 vulnerability"),
+        ],
+        "Microsoft-IIS": [
+            ("CVE-2021-31166", "CRITICAL", "IIS — HTTP Protocol Stack RCE"),
+        ],
+        "ProFTPD": [
+            ("CVE-2019-12815", "CRITICAL", "ProFTPD 1.3.x — file copy/RCE"),
+        ],
+        "vsftpd": [
+            ("CVE-2011-2523", "CRITICAL", "vsftpd 2.3.4 — backdoor"),
+        ],
+        "MySQL": [
+            ("CVE-2012-2122", "HIGH", "MySQL 5.x — authentication bypass"),
+        ],
+        "PostgreSQL": [
+            ("CVE-2019-10164", "HIGH", "PostgreSQL < 11.8 — stack buffer overrun"),
+        ],
+        "SMB": [
+            ("CVE-2017-0144", "CRITICAL", "EternalBlue — SMB RCE"),
+        ],
+        "Exim": [
+            ("CVE-2019-10149", "CRITICAL", "Exim 4.87-4.91 — RCE"),
+        ],
+        "Dovecot": [
+            ("CVE-2019-11500", "HIGH", "Dovecot — IMAP literal handling vulnerability"),
+        ],
+        "Redis": [
+            ("CVE-2022-0543", "CRITICAL", "Redis < 6.0 — Lua sandbox escape"),
         ],
     }
 
@@ -327,12 +395,17 @@ class AttackVectorGenerator:
         print("\n[*] Генерация векторов атак...")
         vectors = []
 
+        # 1. Стандартные векторы по портам
         for port_info in open_ports:
             port = port_info.port
             if port in self.ATTACK_TEMPLATES:
                 vectors.extend(self.ATTACK_TEMPLATES[port])
 
-        # Добавляем атаки на основе анализа баннеров
+        # 2. Автоматическая генерация векторов по сервисам и CVE
+        service_vectors = self._generate_service_based_vectors(open_ports)
+        vectors.extend(service_vectors)
+
+        # 3. Добавляем атаки на основе анализа баннеров
         banner_findings = BannerAnalyzer.analyze(open_ports)
         for finding in banner_findings:
             av = AttackVector(
@@ -347,7 +420,7 @@ class AttackVectorGenerator:
             )
             vectors.append(av)
 
-        # Общие атаки для любого открытого сервиса
+        # 4. Общие атаки для любого открытого сервиса
         if open_ports:
             vectors.append(AttackVector(
                 "AV-DOS-GENERIC", "Denial of Service",
@@ -365,9 +438,119 @@ class AttackVectorGenerator:
                     Severity.MEDIUM.value, "Firewall configuration"
                 ))
 
+        # 5. Добавляем атаки на основе обнаруженной ОС
+        os_info = OSDetector.detect("", open_ports) if open_ports else ""
+        if "Windows" in os_info:
+            vectors.extend([
+                AttackVector("AV-WIN-SAM", "SAM Database Extraction", "Извлечение базы SAM с хешами паролей", None, "Windows", "credential_theft", Severity.HIGH.value, "Mimikatz, secretsdump"),
+                AttackVector("AV-WIN-PASSBACK", "NTLM Hash Passback", "Перехват NTLM-хешей через SMB", 445, "Windows SMB", "credential_theft", Severity.HIGH.value, "Responder, Impacket"),
+                AttackVector("AV-WIN-KERBEROAST", "Kerberoasting", "Атака на сервисные учётные записи Kerberos", None, "Windows AD", "credential_theft", Severity.HIGH.value, "Rubeus, Invoke-Kerberoast"),
+            ])
+        elif "Linux" in os_info:
+            vectors.extend([
+                AttackVector("AV-LIN-PRIVESC", "Linux Privilege Escalation", "Повышение привилегий через уязвимости ядра", None, "Linux", "privilege_escalation", Severity.HIGH.value, "LinPEAS, linux-exploit-suggester"),
+                AttackVector("AV-LIN-CRON", "Cron Job Exploitation", "Эксплуатация задач cron с повышенными привилегиями", None, "Linux", "privilege_escalation", Severity.MEDIUM.value, "LinPEAS"),
+                AttackVector("AV-LIN-SUID", "SUID Binary Exploitation", "Эксплуатация SUID-бинарников", None, "Linux", "privilege_escalation", Severity.HIGH.value, "GTFOBins, LinPEAS"),
+            ])
+
         print(f"[+] Сгенерировано {len(vectors)} возможных векторов атак "
-              f"(в т.ч. {len(banner_findings)} по баннерам)")
+              f"(в т.ч. {len(banner_findings)} по баннерам, {len(service_vectors)} по сервисам)")
         return vectors
+
+    def _generate_service_based_vectors(self, open_ports: list[OpenPort]) -> list[AttackVector]:
+        """Генерация векторов атак на основе обнаруженных сервисов и CVE."""
+        vectors = []
+        service_counter = {}
+        
+        # Собираем все обнаруженные сервисы
+        for port_info in open_ports:
+            service = port_info.service
+            if service and service != "Unknown":
+                service_counter[service] = service_counter.get(service, 0) + 1
+
+        # Генерируем векторы для каждого уникального сервиса
+        for service, count in service_counter.items():
+            service_lower = service.lower()
+            
+            # Проверяем соответствие сервиса с маппингом CVE
+            if service in self.SERVICE_CVE_MAP:
+                cve_list = self.SERVICE_CVE_MAP[service]
+                for cve_id, severity, description in cve_list:
+                    av = AttackVector(
+                        id=f"AV-SVC-{service[:10]}-{cve_id}",
+                        name=f"{cve_id} — {service}",
+                        description=f"{description} (обнаружен на {count} портах)",
+                        target_port=None,  # Будет определён при корреляции
+                        target_service=service,
+                        attack_type="known_vulnerability",
+                        severity=severity,
+                        tools_used="Version-specific exploit",
+                    )
+                    vectors.append(av)
+            
+            # Добавляем общие векторы для часто встречающихся сервисов
+            if count >= 2:
+                vectors.append(AttackVector(
+                    id=f"AV-SVC-{service[:10]}-MULTI",
+                    name=f"Multiple {service} Instances",
+                    description=f"Обнаружено {count} экземпляров {service} — увеличенная поверхность атаки",
+                    target_port=None,
+                    target_service=service,
+                    attack_type="misconfiguration",
+                    severity="MEDIUM",
+                    tools_used="Service enumeration",
+                ))
+            
+            # Добавляем общие векторы для всех сервисов на основе портов
+            # Это обеспечит покрытие CVE для всех сервисов
+            port_based_cves = self._get_port_based_cves(service, count)
+            for cve_id, severity, description in port_based_cves:
+                av = AttackVector(
+                    id=f"AV-PORT-{service[:10]}-{cve_id}",
+                    name=f"{cve_id} — {service}",
+                    description=f"{description} (обнаружен на {count} портах)",
+                    target_port=None,
+                    target_service=service,
+                    attack_type="known_vulnerability",
+                    severity=severity,
+                    tools_used="Port-specific exploit",
+                )
+                vectors.append(av)
+
+        return vectors
+
+    def _get_port_based_cves(self, service: str, count: int) -> list:
+        """Получение CVE на основе сервиса и порта."""
+        # Маппинг сервисов на порты для автоматического определения CVE
+        port_cve_map = {
+            # SSH (порт 22)
+            "SSH": [
+                ("CVE-2020-15778", "MEDIUM", "OpenSSH < 8.0 — command injection via scp"),
+                ("CVE-2023-38408", "HIGH", "OpenSSH < 8.8 — PKCS#11 vulnerability"),
+            ],
+            # HTTP (порт 80)
+            "HTTP": [
+                ("CVE-2021-41773", "CRITICAL", "Apache 2.4.49 — Path Traversal/RCE"),
+                ("CVE-2021-42013", "CRITICAL", "Apache 2.4.50 — Path Traversal/RCE"),
+                ("CVE-2021-23017", "HIGH", "Nginx < 1.18 — DNS resolver vulnerability"),
+            ],
+            # HTTPS (порт 443)
+            "HTTPS": [
+                ("CVE-2014-0160", "CRITICAL", "Heartbleed — OpenSSL buffer over-read"),
+                ("CVE-2014-3566", "MEDIUM", "POODLE — SSL 3.0 vulnerability"),
+                ("CVE-2017-13099", "HIGH", "ROBOT — RSA vulnerability"),
+            ],
+            # MySQL (порт 3306)
+            "MySQL": [
+                ("CVE-2012-2122", "HIGH", "MySQL 5.x — authentication bypass"),
+            ],
+            # Redis (порт 6379)
+            "Redis": [
+                ("CVE-2022-0543", "CRITICAL", "Redis < 6.0 — Lua sandbox escape"),
+            ],
+        }
+        
+        return port_cve_map.get(service, [])
 
 
 class AttackSender:

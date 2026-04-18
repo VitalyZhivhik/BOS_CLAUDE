@@ -152,18 +152,31 @@ class RequestHandler(BaseHTTPRequestHandler):
         logger.info(f"[HTTP-IN] POST {self.path} от {client_ip}")
 
         if self.path == "/analyze":
-            if not state.ready or not state.system_info or not state.vuln_db:
-                parts = []
-                if not state.system_info:
-                    parts.append("анализ системы не выполнен")
-                if not state.vuln_db:
-                    parts.append("базы данных не загружены")
-                reason = "; ".join(parts) if parts else "сервер не готов"
-                logger.warning(f"[HTTP-IN] POST /analyze от {client_ip}: НЕ ГОТОВ ({reason})")
+            # Проверяем готовность сервера
+            if not state.system_info:
+                logger.warning(f"[HTTP-IN] POST /analyze от {client_ip}: НЕ ГОТОВ (анализ системы не выполнен)")
                 self._respond(503, {
-                    "error": f"Сервер не готов: {reason}",
+                    "error": "Сервер не готов: анализ системы не выполнен",
                     "ready": False,
-                    "hint": "Выполните: 1) Анализ системы, 2) Загрузка баз, 3) Запуск сервера"
+                    "hint": "Выполните: 1) Анализ системы"
+                })
+                return
+            
+            if not state.vuln_db:
+                logger.warning(f"[HTTP-IN] POST /analyze от {client_ip}: НЕ ГОТОВ (базы данных не загружены)")
+                self._respond(503, {
+                    "error": "Сервер не готов: базы данных не загружены",
+                    "ready": False,
+                    "hint": "Выполните: 2) Загрузка баз данных"
+                })
+                return
+            
+            if not state.ready:
+                logger.warning(f"[HTTP-IN] POST /analyze от {client_ip}: НЕ ГОТОВ (сервер не запущен)")
+                self._respond(503, {
+                    "error": "Сервер не готов: сервер не запущен",
+                    "ready": False,
+                    "hint": "Выполните: 3) Запуск сервера"
                 })
                 return
 
