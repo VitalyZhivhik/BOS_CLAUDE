@@ -249,6 +249,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         var sysData = __SYS_DATA__;
         var summaryData = __SUMMARY_DATA__;
         var atkDefData = __ATK_DEF_DATA__;
+        var softwareDb = __SW_DB__ || {};
         var network = null;
         var detailsMap = {};
 
@@ -667,7 +668,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             } 
             // 2. Если кликнули на целевое ПО
             else if (nodeInfo.type === 'sw') {
-                contentDiv.innerHTML = `
+                var swName = r.sw || '';
+                var swInfo = null;
+                var swNameLower = swName.toLowerCase();
+                
+                // Поиск ПО в базе данных
+                for (var key in softwareDb) {
+                    if (swNameLower.includes(key) || key.includes(swNameLower)) {
+                        swInfo = softwareDb[key];
+                        break;
+                    }
+                }
+                
+                var html = `
                     <div class="modal-header">
                         <h2 style="margin: 0; font-size: 20px; color: #fff;">🎯 Анализ Целевого Компонента</h2>
                     </div>
@@ -675,10 +688,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <div class="grid-info" style="grid-template-columns: 1fr;">
                             <div class="grid-item"><span>Обнаруженное программное обеспечение:</span><strong style="font-size: 18px; color: #fff;">${r.sw}</strong></div>
                             <div class="grid-item"><span>Открытый порт:</span><strong style="font-size: 16px; color: #58a6ff;">${r.port}</strong></div>
-                        </div>
-                        <p style="color:#8b949e; font-size:13px; margin-top: 10px;">* Это реальная служба или системный компонент, который был просканирован OVAL-движком на вашем сервере.</p>
-                    </div>
-                `;
+                        </div>`;
+                
+                if (swInfo) {
+                    html += `
+                        <div style="margin-top: 15px; padding: 15px; background: #0d1117; border-radius: 6px; border: 1px solid #30363d;">
+                            <h4 style="color:#58a6ff; margin: 0 0 10px 0;">📋 Описание ПО</h4>
+                            <p style="font-size: 14px; margin-bottom: 10px;">${swInfo.description || 'Описание недоступно.'}</p>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                                <div><span style="color:#8b949e; font-size:12px;">Производитель:</span><br><strong>${swInfo.vendor || 'Неизвестно'}</strong></div>
+                                <div><span style="color:#8b949e; font-size:12px;">Тип:</span><br><strong>${swInfo.type || 'Неизвестно'}</strong></div>
+                                <div><span style="color:#8b949e; font-size:12px;">Уровень риска:</span><br><strong style="color: ${swInfo.risk_level === 'CRITICAL' ? '#da3633' : (swInfo.risk_level === 'HIGH' ? '#d29922' : '#3fb950')}">${swInfo.risk_level || 'Неизвестно'}</strong></div>
+                                <div><span style="color:#8b949e; font-size:12px;">Версии:</span><br><strong>${(swInfo.versions || []).join(', ') || 'Неизвестно'}</strong></div>
+                            </div>
+                            ${swInfo.common_cve && swInfo.common_cve.length > 0 ? '<div style="margin-top:10px;"><span style="color:#8b949e; font-size:12px;">Связанные CVE:</span><br><code style="color:#58a6ff; font-size:12px;">' + swInfo.common_cve.slice(0, 5).join(', ') + '</code></div>' : ''}
+                            ${swInfo.recommended_actions ? '<div style="margin-top:10px; padding:10px; background:rgba(35,134,54,0.1); border-radius:4px; border-left:3px solid #238636;"><span style="color:#3fb950; font-size:12px;">Рекомендации:</span><br><span style="font-size:13px;">' + swInfo.recommended_actions + '</span></div>' : ''}
+                        </div>`;
+                } else {
+                    html += `<p style="color:#8b949e; font-size:13px; margin-top: 10px;">* Это реальная служба или системный компонент, который был просканирован OVAL-движком на вашем сервере.</p>`;
+                }
+                
+                html += `</div>`;
+                contentDiv.innerHTML = html;
             } 
             // 3. Стандартная карточка (Клик по вектору атаки или агрегации)
             else {
@@ -894,6 +925,7 @@ class ReportGenerator:
         self.capec_db = self._load_local_db("databases/capec_database.json")
         self.cve_db = self._load_local_db("databases/cve_database.json")
         self.defense_db = self._load_local_db("databases/defense_database.json")
+        self.software_db = self._load_local_db("databases/software_database.json")
 
         self.raw_results = correlation_results
 
@@ -1274,12 +1306,21 @@ class ReportGenerator:
             "ports_count": self.system_summary.get('open_ports_count', 0)
         }
         
+        # 5. Подготовка базы данных ПО для обогащения информации в отчёте
+        sw_db_list = self.software_db if isinstance(self.software_db, list) else []
+        sw_db_dict = {}
+        for sw in sw_db_list:
+            sw_name = sw.get('name', '').lower()
+            if sw_name:
+                sw_db_dict[sw_name] = sw
+        
         with open(filepath, "w", encoding="utf-8") as f:
             html = HTML_TEMPLATE.replace('__REPORT_DATA__', json.dumps(js_data, ensure_ascii=False))
             html = html.replace('__RAW_CVE_DATA__', json.dumps(raw_js_data, ensure_ascii=False))
             html = html.replace('__SYS_DATA__', json.dumps(sys_data, ensure_ascii=False))
             html = html.replace('__SUMMARY_DATA__', json.dumps(summary_data, ensure_ascii=False))
             html = html.replace('__ATK_DEF_DATA__', json.dumps(atk_def_data, ensure_ascii=False))
+            html = html.replace('__SW_DB__', json.dumps(sw_db_dict, ensure_ascii=False))
             f.write(html)
 
         return filepath

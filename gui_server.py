@@ -298,6 +298,24 @@ class ServerGUI(QMainWindow):
         t.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
         t.setStyleSheet("color:#999;padding:8px 0;letter-spacing:2px;")
         ll.addWidget(t)
+        # Информационная панель этапов работы
+        info_panel = QLabel(
+            "📋 ЭТАПЫ РАБОТЫ:\n"
+            "1. Анализ системы — сбор данных об ОС, ПО, службах\n"
+            "2. Загрузить базы — CVE/CWE/CAPEC/MITRE ATT&CK\n"
+            "2б. Загрузить инструменты — команды атак/защиты\n"
+            "3. Локальный скан — проверка конфигурации\n"
+            "3б. Trivy — сканирование ПО на CVE\n"
+            "4. Запустить сервер — API для атакующего агента"
+        )
+        info_panel.setStyleSheet(
+            "background:#1a2a1a;border:1px solid #2a4a2a;border-radius:4px;"
+            "padding:8px;color:#7a9a7a;font-size:9px;line-height:1.4;"
+        )
+        info_panel.setWordWrap(True)
+        info_panel.setFont(QFont("Segoe UI", 9))
+        ll.addWidget(info_panel)
+
         # Статус
         self.status_frame = QFrame()
         self.status_frame.setStyleSheet(
@@ -338,25 +356,37 @@ class ServerGUI(QMainWindow):
 
         self.btn_analyze = QPushButton("1. Анализ системы")
         self.btn_analyze.setStyleSheet(btn_style)
+        self.btn_analyze.setToolTip("Собирает информацию об ОС, установленном ПО, запущенных службах и средствах защиты")
         self.btn_analyze.clicked.connect(self._start_analysis)
+        self.btn_analyze.enterEvent = lambda e: self.statusBar().showMessage("Анализ системы: сбор данных об ОС, ПО, службах, портах и защите")
+        self.btn_analyze.leaveEvent = lambda e: self.statusBar().showMessage("Готов к работе")
         cl.addWidget(self.btn_analyze)
 
         self.btn_load_db = QPushButton("2. Загрузить базы CVE/CWE/CAPEC/MITRE")
         self.btn_load_db.setStyleSheet(btn_style)
+        self.btn_load_db.setToolTip("Загружает базы данных уязвимостей (CVE), типов слабостей (CWE), паттернов атак (CAPEC) и тактик MITRE ATT&CK")
         self.btn_load_db.setEnabled(False)
         self.btn_load_db.clicked.connect(self._load_databases)
+        self.btn_load_db.enterEvent = lambda e: self.statusBar().showMessage("Загрузка баз: CVE (уязвимости), CWE (слабости), CAPEC (атаки), MITRE ATT&CK (тактики)")
+        self.btn_load_db.leaveEvent = lambda e: self.statusBar().showMessage("Готов к работе")
         cl.addWidget(self.btn_load_db)
 
         self.btn_load_toolkit = QPushButton("2б. Загрузить базу инструментов")
         self.btn_load_toolkit.setStyleSheet(btn_style)
+        self.btn_load_toolkit.setToolTip("Загружает базу инструментов атаки и защиты с командами для эксплуатации и устранения уязвимостей")
         self.btn_load_toolkit.setEnabled(False)
         self.btn_load_toolkit.clicked.connect(self._load_toolkit)
+        self.btn_load_toolkit.enterEvent = lambda e: self.statusBar().showMessage("База инструментов: команды для атак и защиты, используется в отчётах")
+        self.btn_load_toolkit.leaveEvent = lambda e: self.statusBar().showMessage("Готов к работе")
         cl.addWidget(self.btn_load_toolkit)
 
         self.btn_vuln_scan = QPushButton("3. Локальное сканирование уязвимостей")
         self.btn_vuln_scan.setStyleSheet(btn_style)
+        self.btn_vuln_scan.setToolTip("Запускает локальное сканирование системы на наличие известных уязвимостей конфигурации и настроек безопасности")
         self.btn_vuln_scan.setEnabled(False)
         self.btn_vuln_scan.clicked.connect(self._start_vuln_scan)
+        self.btn_vuln_scan.enterEvent = lambda e: self.statusBar().showMessage("Локальное сканирование: проверка конфигурации, настроек безопасности, слабых мест")
+        self.btn_vuln_scan.leaveEvent = lambda e: self.statusBar().showMessage("Готов к работе")
         cl.addWidget(self.btn_vuln_scan)
 
         self.vuln_progress = QProgressBar()
@@ -367,8 +397,11 @@ class ServerGUI(QMainWindow):
         # Кнопка Trivy
         self.btn_trivy_scan = QPushButton("3б. Сканирование Trivy (CVE/CWE/CAPEC)")
         self.btn_trivy_scan.setStyleSheet(btn_style)
+        self.btn_trivy_scan.setToolTip("Запускает Trivy для сканирования установленного ПО на наличие известных CVE уязвимостей с привязкой к CWE и CAPEC")
         self.btn_trivy_scan.setEnabled(False)
         self.btn_trivy_scan.clicked.connect(self._start_trivy_scan)
+        self.btn_trivy_scan.enterEvent = lambda e: self.statusBar().showMessage("Trivy: сканирование ПО на CVE уязвимости, автоматическая корреляция с CWE/CAPEC")
+        self.btn_trivy_scan.leaveEvent = lambda e: self.statusBar().showMessage("Готов к работе")
         cl.addWidget(self.btn_trivy_scan)
 
         self.trivy_progress = QProgressBar()
@@ -378,8 +411,11 @@ class ServerGUI(QMainWindow):
 
         self.btn_server = QPushButton("4. Запустить сервер")
         self.btn_server.setStyleSheet(btn_style + "QPushButton { background: #2a4a2a; }")
+        self.btn_server.setToolTip("Запускает HTTP API сервер для приёма данных от атакующего агента и выполнения корреляции атак")
         self.btn_server.setEnabled(False)
         self.btn_server.clicked.connect(self._toggle_server)
+        self.btn_server.enterEvent = lambda e: self.statusBar().showMessage("HTTP API сервер: принимает данные от атакующего, выполняет корреляцию, генерирует отчёты")
+        self.btn_server.leaveEvent = lambda e: self.statusBar().showMessage("Готов к работе")
         cl.addWidget(self.btn_server)
 
         ll.addWidget(cg)
@@ -404,7 +440,10 @@ class ServerGUI(QMainWindow):
         small_btn_style = "QPushButton { padding: 4px 10px; font-size: 10px; min-height: 24px; }"
         self.btn_check_port = QPushButton("Проверить порт")
         self.btn_check_port.setStyleSheet(small_btn_style)
+        self.btn_check_port.setToolTip("Проверяет, свободен ли указанный порт для запуска HTTP API сервера")
         self.btn_check_port.clicked.connect(self._check_port_availability)
+        self.btn_check_port.enterEvent = lambda e: self.statusBar().showMessage("Проверка порта: убедитесь, что порт свободен перед запуском сервера")
+        self.btn_check_port.leaveEvent = lambda e: self.statusBar().showMessage("Готов к работе")
         pl.addWidget(self.btn_check_port)
 
         self.port_status_label = QLabel("")
@@ -422,20 +461,28 @@ class ServerGUI(QMainWindow):
 
         self.btn_open_report = QPushButton("Открыть последний отчёт")
         self.btn_open_report.setStyleSheet(small_btn_style)
+        self.btn_open_report.setToolTip("Открывает последний сгенерированный HTML отчёт в браузере")
         self.btn_open_report.setEnabled(False)
         self.btn_open_report.clicked.connect(self._open_report)
+        self.btn_open_report.enterEvent = lambda e: self.statusBar().showMessage("Открыть отчёт: просмотр последнего HTML отчёта с результатами корреляции")
+        self.btn_open_report.leaveEvent = lambda e: self.statusBar().showMessage("Готов к работе")
         rl.addWidget(self.btn_open_report)
 
         self.btn_generate_manual = QPushButton("Сгенерировать отчёт вручную")
         self.btn_generate_manual.setStyleSheet(small_btn_style)
         self.btn_generate_manual.setEnabled(False)
-        self.btn_generate_manual.setToolTip("Сгенерировать отчёт на основе выбранного вектора атаки")
+        self.btn_generate_manual.setToolTip("Генерирует отчёт на основе последних результатов корреляции или выбранного вектора атаки")
         self.btn_generate_manual.clicked.connect(self._generate_manual_report)
+        self.btn_generate_manual.enterEvent = lambda e: self.statusBar().showMessage("Ручная генерация: создаёт отчёт из текущих данных без ожидания атакующего")
+        self.btn_generate_manual.leaveEvent = lambda e: self.statusBar().showMessage("Готов к работе")
         rl.addWidget(self.btn_generate_manual)
 
         self.btn_export_log = QPushButton("Экспорт лога")
         self.btn_export_log.setStyleSheet(small_btn_style)
+        self.btn_export_log.setToolTip("Сохраняет системный лог в текстовый файл для анализа или архивирования")
         self.btn_export_log.clicked.connect(self._export_log)
+        self.btn_export_log.enterEvent = lambda e: self.statusBar().showMessage("Экспорт лога: сохранение всех системных сообщений в файл")
+        self.btn_export_log.leaveEvent = lambda e: self.statusBar().showMessage("Готов к работе")
         rl.addWidget(self.btn_export_log)
         ll.addWidget(rg)
         ll.addStretch()

@@ -666,6 +666,12 @@ class AttackerGUI(QMainWindow):
         logger.info(_log_result_line("История:", HISTORY_DIR))
         logger.info("")
 
+    def _add_tooltip(self, widget, tooltip, status_msg):
+        """Добавляет подсказку и контекстную подсказку в статус-бар."""
+        widget.setToolTip(tooltip)
+        widget.enterEvent = lambda e: self.statusBar().showMessage(status_msg)
+        widget.leaveEvent = lambda e: self.statusBar().showMessage("Готов к работе")
+
     # ──────────── UI ────────────
 
     def _build_ui(self):
@@ -719,6 +725,23 @@ class AttackerGUI(QMainWindow):
         t.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
         t.setStyleSheet("color:#888;padding:6px 0;letter-spacing:2px;")
         ll.addWidget(t)
+
+        # Информационная панель этапов работы
+        info_panel = QLabel(
+            "📋 ЭТАПЫ РАБОТЫ:\n"
+            "1. Проверить связь — убедиться, что сервер готов\n"
+            "2. Сканировать порты — найти открытые службы\n"
+            "3. Nuclei — поиск веб-уязвимостей (XSS, SQLi...)\n"
+            "4. Nmap — анализ сетевых протоколов\n"
+            "5. Отправить на сервер — корреляция и отчёт"
+        )
+        info_panel.setStyleSheet(
+            "background:#1a2a1a;border:1px solid #2a4a2a;border-radius:4px;"
+            "padding:8px;color:#7a9a7a;font-size:9px;line-height:1.4;"
+        )
+        info_panel.setWordWrap(True)
+        info_panel.setFont(QFont("Segoe UI", 9))
+        ll.addWidget(info_panel)
 
         # Статус соединения
         self.conn_frame = QFrame()
@@ -797,23 +820,35 @@ class AttackerGUI(QMainWindow):
         self.btn_check = QPushButton("1. Проверить связь с сервером")
         self.btn_check.setStyleSheet(action_btn_style)
         self.btn_check.clicked.connect(self._check_connection)
+        self._add_tooltip(self.btn_check, 
+            "Проверяет доступность серверного агента по указанному IP и порту",
+            "Проверка связи: отправляет запрос /ping на сервер для проверки готовности API")
         al.addWidget(self.btn_check)
 
         self.btn_scan = QPushButton("2. Сканировать порты")
         self.btn_scan.setStyleSheet(action_btn_style)
         self.btn_scan.clicked.connect(self._start_scan)
+        self._add_tooltip(self.btn_scan,
+            "Сканирует диапазон портов цели на наличие открытых служб",
+            "Сканирование портов: многопоточное сканирование с фингерпринтингом служб")
         al.addWidget(self.btn_scan)
 
         self.btn_nuclei = QPushButton("3. Веб-уязвимости (Nuclei)  ➕")
         self.btn_nuclei.setStyleSheet(action_btn_style)
         self.btn_nuclei.setEnabled(False)
         self.btn_nuclei.clicked.connect(self._start_nuclei)
+        self._add_tooltip(self.btn_nuclei,
+            "Запускает сканер Nuclei для поиска веб-уязвимостей на открытых портах",
+            "Nuclei: сканирование по шаблонам на XSS, SQLi, RCE, misconfigurations и др.")
         al.addWidget(self.btn_nuclei)
 
         self.btn_nmap = QPushButton("4. Сетевые протоколы (Nmap)  ➕")
         self.btn_nmap.setStyleSheet(action_btn_style)
         self.btn_nmap.setEnabled(False)
         self.btn_nmap.clicked.connect(self._start_nmap)
+        self._add_tooltip(self.btn_nmap,
+            "Запускает Nmap с NSE скриптами для поиска уязвимостей в сетевых службах",
+            "Nmap: глубокое сканирование с определением версий и проверкой на уязвимости")
         al.addWidget(self.btn_nmap)
 
         # Кнопка параллельного сканирования
@@ -827,6 +862,9 @@ class AttackerGUI(QMainWindow):
         self.btn_parallel_scan.setToolTip("Запускает Nuclei + Nmap одновременно для экономии времени")
         self.btn_parallel_scan.setEnabled(False)
         self.btn_parallel_scan.clicked.connect(self._start_parallel_scan)
+        self._add_tooltip(self.btn_parallel_scan,
+            "Запускает Nuclei и Nmap одновременно для ускорения сканирования",
+            "Параллельное сканирование: экономит время, запуская оба сканера одновременно")
         al.addWidget(self.btn_parallel_scan)
 
         self.progress_bar = QProgressBar()
@@ -838,6 +876,9 @@ class AttackerGUI(QMainWindow):
         self.btn_send.setStyleSheet(action_btn_style + "QPushButton { background: #2a4a2a; }")
         self.btn_send.setEnabled(False)
         self.btn_send.clicked.connect(self._send_results)
+        self._add_tooltip(self.btn_send,
+            "Отправляет собранные данные на сервер для корреляции и анализа уязвимостей",
+            "Анализ на сервере: корреляция атак, определение реализуемости, генерация отчёта")
         al.addWidget(self.btn_send)
 
         sep = QFrame()
@@ -849,11 +890,17 @@ class AttackerGUI(QMainWindow):
         self.btn_clear_vectors = QPushButton("🗑  Очистить таблицу векторов")
         self.btn_clear_vectors.setStyleSheet(small_btn_style)
         self.btn_clear_vectors.clicked.connect(self._clear_vectors)
+        self._add_tooltip(self.btn_clear_vectors,
+            "Очищает таблицу векторов атак (порты остаются)",
+            "Очистка векторов: удаляет все найденные уязвимости, порты сохраняются")
         al.addWidget(self.btn_clear_vectors)
 
         self.btn_export = QPushButton("📥 Экспорт лога")
         self.btn_export.setStyleSheet(small_btn_style)
         self.btn_export.clicked.connect(self._export_log)
+        self._add_tooltip(self.btn_export,
+            "Сохраняет системный лог в текстовый файл",
+            "Экспорт лога: сохраняет все системные сообщения в .txt файл")
         al.addWidget(self.btn_export)
 
         ll.addWidget(ag)
@@ -964,18 +1011,30 @@ class AttackerGUI(QMainWindow):
         hist_btns = QHBoxLayout()
         self.btn_load_history = QPushButton("📂 Загрузить (заменить таблицу)")
         self.btn_load_history.clicked.connect(lambda: self._load_selected_history(merge=False))
+        self._add_tooltip(self.btn_load_history,
+            "Загружает выбранную запись истории, заменяя текущие данные",
+            "Загрузка истории: заменяет все таблицы данными из сохранённого сканирования")
         hist_btns.addWidget(self.btn_load_history)
 
         self.btn_merge_history = QPushButton("➕ Добавить к текущей таблице")
         self.btn_merge_history.clicked.connect(lambda: self._load_selected_history(merge=True))
+        self._add_tooltip(self.btn_merge_history,
+            "Добавляет выбранную запись истории к текущим данным без дубликатов",
+            "Добавление истории: мёржит данные из файла с текущими результатами")
         hist_btns.addWidget(self.btn_merge_history)
 
         htl.addLayout(hist_btns)
 
         self.btn_expand_all = QPushButton("▼ Развернуть всё")
         self.btn_expand_all.clicked.connect(self._expand_history)
+        self._add_tooltip(self.btn_expand_all,
+            "Разворачивает все узлы дерева истории",
+            "Развернуть дерево: показывает все серверы, даты и сканирования")
         self.btn_collapse_all = QPushButton("▲ Свернуть всё")
         self.btn_collapse_all.clicked.connect(self._collapse_history)
+        self._add_tooltip(self.btn_collapse_all,
+            "Сворачивает все узлы дерева истории",
+            "Свернуть дерево: скрывает вложенные элементы дерева")
         exp_row = QHBoxLayout()
         exp_row.addWidget(self.btn_expand_all)
         exp_row.addWidget(self.btn_collapse_all)
