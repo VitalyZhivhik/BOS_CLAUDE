@@ -54,8 +54,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -76,8 +76,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -96,8 +96,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -118,8 +118,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -165,9 +165,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "ssh",
       "macos_os",
-      "linux_os"
+      "linux_os",
+      "ssh"
     ],
     "detection": "",
     "mitigations": []
@@ -185,9 +185,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -205,8 +205,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -246,9 +246,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -270,9 +270,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -300,10 +300,10 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "ssh",
       "macos_os",
-      "linux_os"
+      "windows_os",
+      "linux_os",
+      "ssh"
     ],
     "detection": "",
     "mitigations": []
@@ -392,9 +392,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "powershell",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "powershell"
     ],
     "detection": "",
     "mitigations": []
@@ -429,8 +429,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -451,8 +451,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -590,9 +590,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -611,8 +611,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -664,10 +664,10 @@
     "requires_service": [
       "rdp",
       "macos_os",
-      "ssh",
-      "windows_os",
       "api_service",
       "smb",
+      "windows_os",
+      "ssh",
       "linux_os"
     ],
     "detection": "",
@@ -689,8 +689,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "active_directory",
-      "windows_os"
+      "windows_os",
+      "active_directory"
     ],
     "detection": "",
     "mitigations": [
@@ -729,8 +729,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -759,9 +759,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -804,9 +804,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
+      "macos_os",
       "smb",
       "windows_os",
-      "macos_os",
       "linux_os"
     ],
     "detection": "",
@@ -828,9 +828,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -850,10 +850,10 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "database",
       "macos_os",
-      "linux_os"
+      "windows_os",
+      "linux_os",
+      "database"
     ],
     "detection": "",
     "mitigations": []
@@ -871,9 +871,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -939,9 +939,9 @@
       "CAPEC-17"
     ],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -1000,10 +1000,10 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "powershell",
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "powershell",
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -1024,9 +1024,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -1046,8 +1046,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -1067,8 +1067,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "smb",
       "api_service",
+      "smb",
       "windows_os"
     ],
     "detection": "",
@@ -1105,8 +1105,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -1127,9 +1127,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -1169,9 +1169,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -1247,8 +1247,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "api_service",
-      "macos_os"
+      "macos_os",
+      "api_service"
     ],
     "detection": "",
     "mitigations": []
@@ -1266,9 +1266,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -1288,9 +1288,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -1321,8 +1321,8 @@
     "requires_service": [
       "rdp",
       "macos_os",
-      "windows_os",
       "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -1385,8 +1385,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -1430,8 +1430,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -1493,8 +1493,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -1530,9 +1530,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": []
@@ -1572,8 +1572,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -1648,8 +1648,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -1669,9 +1669,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -1827,9 +1827,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -1865,8 +1865,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -1923,9 +1923,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
+      "macos_os",
       "smb",
       "windows_os",
-      "macos_os",
       "linux_os"
     ],
     "detection": "",
@@ -1948,8 +1948,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -1990,8 +1990,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "api_service",
       "macos_os",
+      "api_service",
       "linux_os"
     ],
     "detection": "",
@@ -2012,9 +2012,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "active_directory",
       "powershell",
-      "windows_os"
+      "windows_os",
+      "active_directory"
     ],
     "detection": "",
     "mitigations": []
@@ -2053,8 +2053,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -2145,10 +2145,10 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "database",
       "macos_os",
-      "linux_os"
+      "windows_os",
+      "linux_os",
+      "database"
     ],
     "detection": "",
     "mitigations": []
@@ -2168,8 +2168,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -2192,8 +2192,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -2228,10 +2228,10 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "database",
       "macos_os",
-      "linux_os"
+      "windows_os",
+      "linux_os",
+      "database"
     ],
     "detection": "",
     "mitigations": [
@@ -2256,8 +2256,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -2277,8 +2277,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "active_directory",
-      "windows_os"
+      "windows_os",
+      "active_directory"
     ],
     "detection": "",
     "mitigations": []
@@ -2334,8 +2334,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -2407,8 +2407,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "active_directory",
-      "windows_os"
+      "windows_os",
+      "active_directory"
     ],
     "detection": "",
     "mitigations": [
@@ -2435,10 +2435,10 @@
       "CAPEC-163"
     ],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "office365",
-      "windows_os"
+      "windows_os",
+      "linux_os",
+      "office365"
     ],
     "detection": "",
     "mitigations": [
@@ -2458,8 +2458,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -2484,9 +2484,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -2545,9 +2545,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -2626,8 +2626,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -2672,8 +2672,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -2731,8 +2731,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -2774,9 +2774,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -2798,8 +2798,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "active_directory",
-      "windows_os"
+      "windows_os",
+      "active_directory"
     ],
     "detection": "",
     "mitigations": [
@@ -2822,10 +2822,10 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "database",
       "macos_os",
-      "linux_os"
+      "windows_os",
+      "linux_os",
+      "database"
     ],
     "detection": "",
     "mitigations": [
@@ -2851,8 +2851,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -2874,8 +2874,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -2894,8 +2894,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "api_service",
-      "macos_os"
+      "macos_os",
+      "api_service"
     ],
     "detection": "",
     "mitigations": []
@@ -2929,8 +2929,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -3053,9 +3053,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -3077,9 +3077,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
+      "macos_os",
       "powershell",
       "windows_os",
-      "macos_os",
       "linux_os"
     ],
     "detection": "",
@@ -3120,8 +3120,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -3161,9 +3161,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -3203,8 +3203,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "web_server",
       "macos_os",
+      "web_server",
       "linux_os"
     ],
     "detection": "",
@@ -3228,9 +3228,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -3308,9 +3308,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "ssh",
       "macos_os",
-      "linux_os"
+      "linux_os",
+      "ssh"
     ],
     "detection": "",
     "mitigations": [
@@ -3376,8 +3376,8 @@
       "CAPEC-578"
     ],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -3396,9 +3396,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": []
@@ -3416,8 +3416,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -3461,8 +3461,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -3531,9 +3531,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -3555,8 +3555,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -3610,10 +3610,10 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "database",
       "macos_os",
-      "linux_os"
+      "windows_os",
+      "linux_os",
+      "database"
     ],
     "detection": "",
     "mitigations": [
@@ -3651,8 +3651,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "api_service",
-      "macos_os"
+      "macos_os",
+      "api_service"
     ],
     "detection": "",
     "mitigations": [
@@ -3706,8 +3706,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -3728,9 +3728,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
+      "macos_os",
       "smb",
       "windows_os",
-      "macos_os",
       "linux_os"
     ],
     "detection": "",
@@ -3756,8 +3756,8 @@
       "CAPEC-187"
     ],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -3825,8 +3825,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -3868,9 +3868,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
+      "macos_os",
       "smb",
       "windows_os",
-      "macos_os",
       "linux_os"
     ],
     "detection": "",
@@ -3891,8 +3891,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -3910,8 +3910,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "api_service",
       "macos_os",
+      "api_service",
       "linux_os"
     ],
     "detection": "",
@@ -4037,9 +4037,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -4062,9 +4062,9 @@
     "requires_service": [
       "rdp",
       "macos_os",
-      "ssh",
-      "windows_os",
       "smb",
+      "windows_os",
+      "ssh",
       "linux_os"
     ],
     "detection": "",
@@ -4107,9 +4107,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": []
@@ -4146,9 +4146,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -4191,8 +4191,8 @@
       "CAPEC-564"
     ],
     "requires_service": [
-      "api_service",
-      "macos_os"
+      "macos_os",
+      "api_service"
     ],
     "detection": "",
     "mitigations": []
@@ -4229,9 +4229,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -4287,9 +4287,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
+      "macos_os",
       "api_service",
-      "ssh",
-      "macos_os"
+      "ssh"
     ],
     "detection": "",
     "mitigations": [
@@ -4310,8 +4310,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -4337,10 +4337,10 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "web_server",
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "web_server",
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -4360,8 +4360,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -4382,9 +4382,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -4405,8 +4405,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "api_service",
       "macos_os",
+      "api_service",
       "linux_os"
     ],
     "detection": "",
@@ -4429,9 +4429,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "rdp",
       "macos_os",
+      "rdp",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -4543,9 +4543,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
+      "macos_os",
       "powershell",
       "windows_os",
-      "macos_os",
       "linux_os"
     ],
     "detection": "",
@@ -4566,8 +4566,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "ssh",
-      "windows_os"
+      "windows_os",
+      "ssh"
     ],
     "detection": "",
     "mitigations": []
@@ -4585,8 +4585,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -4643,10 +4643,10 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "database",
       "macos_os",
-      "linux_os"
+      "windows_os",
+      "linux_os",
+      "database"
     ],
     "detection": "",
     "mitigations": [
@@ -4667,8 +4667,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -4713,9 +4713,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -4773,10 +4773,10 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
       "rdp",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -4821,8 +4821,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -4852,13 +4852,13 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "macos_os",
-      "ssh",
       "web_server",
-      "windows_os",
-      "database",
+      "macos_os",
       "api_service",
       "smb",
+      "windows_os",
+      "ssh",
+      "database",
       "linux_os"
     ],
     "detection": "",
@@ -4886,9 +4886,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -4914,8 +4914,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -4941,8 +4941,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -4964,8 +4964,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -5008,8 +5008,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -5049,8 +5049,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -5071,8 +5071,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -5126,9 +5126,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -5177,9 +5177,9 @@
     "related_capec": [],
     "requires_service": [
       "macos_os",
+      "api_service",
       "powershell",
       "windows_os",
-      "api_service",
       "linux_os"
     ],
     "detection": "",
@@ -5220,8 +5220,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -5243,8 +5243,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -5269,9 +5269,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -5310,8 +5310,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -5354,9 +5354,9 @@
     "related_capec": [],
     "requires_service": [
       "macos_os",
+      "api_service",
       "windows_os",
       "database",
-      "api_service",
       "linux_os"
     ],
     "detection": "",
@@ -5375,9 +5375,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -5457,9 +5457,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -5499,9 +5499,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
+      "macos_os",
       "powershell",
       "windows_os",
-      "macos_os",
       "linux_os"
     ],
     "detection": "",
@@ -5520,9 +5520,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -5541,8 +5541,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -5563,9 +5563,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
+      "macos_os",
       "powershell",
       "windows_os",
-      "macos_os",
       "linux_os"
     ],
     "detection": "",
@@ -5590,8 +5590,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": [
@@ -5615,9 +5615,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "linux_os",
       "macos_os",
-      "windows_os"
+      "windows_os",
+      "linux_os"
     ],
     "detection": "",
     "mitigations": []
@@ -5655,9 +5655,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
-      "api_service",
       "macos_os",
+      "api_service",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -5694,8 +5694,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -5753,8 +5753,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -5808,9 +5808,9 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "ssh",
       "macos_os",
-      "linux_os"
+      "linux_os",
+      "ssh"
     ],
     "detection": "",
     "mitigations": [
@@ -5854,8 +5854,8 @@
     "related_cwe": [],
     "related_capec": [],
     "requires_service": [
-      "windows_os",
       "macos_os",
+      "windows_os",
       "linux_os"
     ],
     "detection": "",
@@ -5920,9 +5920,9 @@
     "requires_service": [
       "rdp",
       "macos_os",
-      "ssh",
-      "windows_os",
       "smb",
+      "windows_os",
+      "ssh",
       "linux_os"
     ],
     "detection": "",
@@ -5969,6 +5969,425 @@
       "Многофакторная аутентификация (MFA) повышает безопасность, требуя от пользователей предоставить как минимум две формы проверки для подтверждения своей личности перед предоставлением доступа. Эти факторы обычно включают в себя: - *Что-то, что вы знаете*: пароли, PIN-коды. - *Что-то, что у вас есть*: физические токены, приложения для проверки подлинности на смартфоне. - *Что-то, чем вы являетесь*: биометрические данные, такие как отпечатки пальцев, распознавание лиц или сканирование сетчатки. Внедрение MFA во всех критически важных системах и службах обеспечивает надежную защиту от захвата учетных записей и несанкционированного доступа. Это смягчение можно реализовать с помощью следующих мер: Управление идентификацией и доступом (IAM): — используйте решения IAM, такие как Azure Active Directory, Okta или AWS IAM, для применения политик MFA для всех входов пользователей, особенно для привилегированных ролей. – Включите политики условного доступа, чтобы обеспечить применение MFA для рискованных входов в систему (например, с незнакомых устройств, геолокации). — Включите политики условного доступа, чтобы разрешить вход в систему только с доверенных устройств, например тех, которые зарегистрированы в Intune или подключены через Hybrid/Entra. Инструменты и методы аутентификации: - Используйте приложения для аутентификации, такие как Google Authenticator, Microsoft Authenticator или Authy, для одноразовых паролей на основе времени (TOTP). - Разверните аппаратные токены, такие как YubiKey, RSA SecurID или смарт-карты, для дополнительной безопасности. - Обеспечить биометрическую аутентификацию для совместимых устройств и приложений. Безопасные устаревшие системы: - Интегрируйте решения MFA со старыми системами с помощью сторонних инструментов, таких как Duo Security или Thales SafeNet. - Включите серверы RADIUS/NPS, чтобы облегчить MFA для VPN, RDP и других сетевых входов. Мониторинг и оповещение: — Используйте инструменты SIEM для отслеживания неудачных попыток MFA, аномалий входа в систему или попыток грубого подбора систем MFA. - Внедряйте оповещения о подозрительных действиях MFA, таких как повторяющиеся неудачные коды или регистрации новых устройств. Обучение и обеспечение соблюдения политик: - Расскажите сотрудникам о важности MFA и безопасном использовании средств аутентификации. - Применяйте политики, требующие MFA, на всех критически важных системах, особенно для удаленного доступа, привилегированных учетных записей и облачных приложений.",
       "Управление привилегированными учетными записями фокусируется на внедрении политик, элементов управления и инструментов для безопасного управления привилегированными учетными записями (например, СИСТЕМНЫМИ, корневыми или административными учетными записями). Это включает в себя ограничение доступа, ограничение объема разрешений, мониторинг использования привилегированных учетных записей и обеспечение подотчетности посредством ведения журналов и аудита. Это смягчение может быть реализовано с помощью следующих мер: Разрешения и роли учетной записи: - Внедрите RBAC и принципы наименьших привилегий для безопасного распределения разрешений. - Используйте такие инструменты, как групповые политики Active Directory, для обеспечения соблюдения ограничений доступа. Безопасность учетных данных: - Разверните инструменты хранилища паролей, такие как CyberArk, HashiCorp Vault или KeePass, для безопасного хранения и ротации учетных данных. - Обеспечьте соблюдение политик сложности, уникальности и срока действия паролей с помощью таких инструментов, как объекты групповой политики Microsoft (GPO). Многофакторная аутентификация (MFA): — Примените MFA для всех привилегированных учетных записей с помощью Duo Security, Okta или Microsoft Azure AD MFA. Управление привилегированным доступом (PAM): - Используйте решения PAM, такие как CyberArk, BeyondTrust или Thycotic, для управления, мониторинга и аудита привилегированного доступа. Аудит и мониторинг: - Интегрируйте мониторинг активности в вашу SIEM (например, Splunk или QRadar) для обнаружения и оповещения об аномальном использовании привилегированных учетных записей. Доступ по принципу «точно в срок»: — Разверните JIT-решения, такие как Azure Privileged Identity Management (PIM), или настройте эфемерные роли в AWS и GCP для предоставления ограниченных по времени повышенных разрешений. *Инструменты для реализации* Управление привилегированным доступом (PAM): - CyberArk, BeyondTrust, Thycotic, HashiCorp Vault. Управление учетными данными: - Microsoft LAPS (решение для паролей локального администратора), Password Safe, HashiCorp Vault, KeePass. Многофакторная аутентификация: — Duo Security, Okta, Microsoft Azure MFA, Google Authenticator. Управление привилегиями Linux: — конфигурация sudo, SELinux, AppArmor. Моментальный доступ: — Azure Privileged Identity Management (PIM), роли AWS IAM с ограничениями сеанса, прокси-сервер GCP, поддерживающий идентификацию.",
       "Используйте сетевые устройства и программное обеспечение конечных точек для фильтрации входящего, исходящего и параллельного сетевого трафика. Сюда входит фильтрация на основе протоколов, соблюдение правил брандмауэра, а также блокировка или ограничение трафика на основе заранее определенных условий для ограничения движения злоумышленников и кражи данных. Это смягчение может быть реализовано с помощью следующих мер: Фильтрация входящего трафика: - Вариант использования: настройте сетевые брандмауэры так, чтобы пропускать трафик только с авторизованных IP-адресов на общедоступные серверы. - Реализация: ограничить трафик SSH (порт 22) и RDP (порт 3389) определенными диапазонами IP-адресов. Фильтрация исходящего трафика: - Вариант использования: используйте межсетевые экраны или программное обеспечение для обеспечения безопасности конечных точек для блокировки несанкционированного исходящего трафика, чтобы предотвратить утечку данных и обмен данными по управлению и контролю (C2). - Реализация: блокировать исходящий трафик на известные вредоносные IP-адреса или регионы, где связь неожиданна. Фильтрация на основе протоколов: - Вариант использования: Ограничьте использование определенных протоколов, которыми обычно злоупотребляют злоумышленники, таких как SMB, RPC или Telnet, в зависимости от потребностей бизнеса. - Реализация: отключите SMBv1 на конечных точках, чтобы предотвратить такие эксплойты, как EternalBlue. Сегментация сети: - Вариант использования: создайте сегменты сети для критически важных систем и ограничьте связь между сегментами, если это явно не разрешено. - Реализация: внедрение VLAN для изоляции устройств IoT или гостевых сетей от основных бизнес-систем. Фильтрация уровня приложений: - Вариант использования: используйте прокси-серверы или брандмауэры веб-приложений (WAF) для проверки и блокировки вредоносного трафика HTTP/S. - Реализация: настройте WAF для блокировки попыток внедрения SQL или других методов использования веб-приложений."
+    ]
+  },
+  {
+    "id": "T1608.002",
+    "name": "Инструмент загрузки",
+    "tactic": "Resource Development",
+    "description": "Злоумышленники могут загружать инструменты в стороннюю или контролируемую злоумышленником инфраструктуру, чтобы сделать ее доступной во время таргетинга. Инструменты могут быть с открытым или закрытым исходным кодом, бесплатными или коммерческими. Инструменты могут использоваться злоумышленником в злонамеренных целях, но (в отличие от вредоносного ПО) не предназначены для использования в этих целях (например: [PsExec](https://attack.mitre.org/software/S0029)). Злоумышленники могут загружать инструменты для поддержки своих операций, например сделать инструмент доступным для сети жертвы для включения [Ingress Tool Transfer] (https://attack.mitre.org/techniques/T1105), разместив его на доступном в Интернете веб-сервере. Инструменты могут быть размещены в инфраструктуре, которая была ранее куплена/арендована злоумышленником ([Acquire Infrastructure](https://attack.mitre.org/techniques/T1583)) или была им иным образом скомпрометирована ([Compromise Infrastructure](https://attack.mitre.org/techniques/T1584)). (Цитата: Dell TG-3390). Инструменты также могут быть размещены на веб-сервисах, таких как репозиторий GitHub, контролируемый злоумышленником, или предложения «Платформа как услуга», которые позволяют пользователям легко предоставлять приложения. repo), включая исходный хостинг инструмента.",
+    "platforms": [
+      "PRE"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [
+      "web_server"
+    ],
+    "detection": "",
+    "mitigations": [
+      "Меры по смягчению последствий перед компрометацией включают в себя упреждающие меры и средства защиты, которые не позволяют злоумышленникам успешно выявлять и использовать слабые места на этапах разведки и разработки ресурсов атаки. Эти действия сосредоточены на уменьшении поверхности атаки организации, выявлении усилий противника по подготовке и усложнении проведения успешных операций злоумышленниками. Это смягчение может быть реализовано с помощью следующих мер: Ограничить раскрытие информации: - Регулярно проверять и очищать общедоступные данные, включая объявления о вакансиях, веб-сайты и социальные сети. - Используйте такие инструменты, как платформы OSINT-мониторинга (например, SpiderFoot, Recon-ng), для выявления утечки информации. Защитите домен и инфраструктуру DNS: - Включите DNSSEC и используйте защиту конфиденциальности WHOIS. - Отслеживайте захват доменов или похожие домены с помощью таких сервисов, как RiskIQ или DomainTools. Внешний мониторинг: — Используйте такие инструменты, как Shodan, Censys, для мониторинга внешней поверхности атаки. - Развертывание внешних сканеров уязвимостей для активного устранения слабых мест. Аналитика угроз: - Используйте такие платформы, как MISP, Recorded Future или Anomali, для отслеживания состязательной инфраструктуры, инструментов и активности. Защита контента и электронной почты: - Используйте решения для обеспечения безопасности электронной почты, такие как Proofpoint, Microsoft Defender для Office 365 или Mimecast. - Применяйте политики SPF/DKIM/DMARC для защиты от подделки электронной почты. Обучение и повышение осведомленности: - Обучите сотрудников выявлению попыток фишинга, обеспечению безопасности социальных сетей и предотвращению утечек информации."
+    ]
+  },
+  {
+    "id": "T1547.005",
+    "name": "Поставщик поддержки безопасности",
+    "tactic": "Persistence",
+    "description": "Злоумышленники могут злоупотреблять поставщиками поддержки безопасности (SSP) для выполнения DLL при загрузке системы. Библиотеки Windows SSP загружаются в процесс локального органа безопасности (LSA) при запуске системы. После загрузки в LSA библиотеки DLL SSP получают доступ к зашифрованным и открытым текстовым паролям, которые хранятся в Windows, например, к паролям домена любого вошедшего в систему пользователя или PIN-кодам смарт-карт. Конфигурация SSP хранится в двух разделах реестра: HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\Security Packages и HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\OSConfig\\Security Packages. Злоумышленник может изменить эти ключи реестра, чтобы добавить новые SSP, которые будут загружены при следующей загрузке системы или при вызове функции Windows API AddSecurityPackage. (Цитата: Graeber 2014).",
+    "platforms": [
+      "Windows"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [
+      "api_service",
+      "windows_os"
+    ],
+    "detection": "",
+    "mitigations": [
+      "Целостность привилегированных процессов направлена ​​на защиту процессов с высоким уровнем привилегий (например, системных служб, антивируса или процессов аутентификации) от несанкционированного вмешательства, внедрения или компрометации со стороны злоумышленников. Эти процессы часто взаимодействуют с критически важными компонентами, что делает их основной мишенью для таких методов, как внедрение кода, повышение привилегий и манипулирование процессами. Это смягчение может быть реализовано с помощью следующих мер: Механизмы защищенных процессов: - Включите RunAsPPL в системах Windows для защиты LSASS и других критических процессов. - Используйте изменения реестра для обеспечения соблюдения настроек защищенного процесса: `HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\RunAsPPL` Защита от внедрения и памяти: - Включите Control Flow Guard (CFG), DEP и ASLR для защиты от несанкционированного доступа к памяти процесса. - Разверните инструменты защиты конечных точек, которые активно блокируют попытки внедрения процессов. Проверка подписи кода: — Внедрите политики для управления приложениями Защитника Windows (WDAC) или AppLocker для принудительного выполнения подписанных двоичных файлов. - Убедитесь, что критически важные процессы подписаны действительными сертификатами. Контроль доступа: - Используйте списки DACL и MIC, чтобы ограничить количество пользователей и процессов, которые могут взаимодействовать с привилегированными процессами. - Отключите ненужные возможности отладки для процессов с высоким уровнем привилегий. Защита на уровне ядра: — Убедитесь, что в системах Windows включена защита от исправлений ядра (PatchGuard). - Используйте SELinux или AppArmor в Linux для обеспечения соблюдения политик безопасности на уровне ядра. *Инструменты для реализации* Protected Process Light (PPL): - RunAsPPL (Windows) - Целостность и подписание кода защиты учетных данных Защитника Windows: - Контроль приложений Защитника Windows (WDAC) - AppLocker - Защита памяти SELinux/AppArmor (Linux): - Control Flow Guard (CFG), предотвращение выполнения данных (DEP), изоляция/песочница процессов ASLR: - Firejail (Linux) Песочница) - Песочница Windows - Изоляция на основе QEMU/KVM Защита ядра: - PatchGuard (защита от исправлений ядра Windows) - SELinux (обязательный контроль доступа для Linux) - AppArmor"
+    ]
+  },
+  {
+    "id": "T1036.011",
+    "name": "Перезаписать аргументы процесса",
+    "tactic": "Defense Evasion",
+    "description": "Злоумышленники могут изменить аргументы процесса в памяти, чтобы изменить его имя, чтобы он выглядел как законный или безопасный процесс. В Linux операционная система сохраняет аргументы командной строки в стеке процесса и передает их функции main() в виде массива argv. Первый элемент, `argv[0]`, обычно содержит имя или путь процесса — по умолчанию это команда, используемая для фактического запуска процесса (например, `cat /etc/passwd`). По умолчанию файловая система Linux `/proc` использует это значение для представления имени процесса. Файл `/proc//cmdline` отражает содержимое этой памяти, и такие инструменты, как `ps`, используют его для отображения информации о процессе. Поскольку аргументы сохраняются в памяти пользовательского пространства при запуске, эту модификацию можно выполнить без повышенных привилегий. Во время выполнения злоумышленники могут стереть память, используемую всеми аргументами командной строки процесса, перезаписав каждую строку аргумента нулевыми байтами. Это удаляет доказательства того, как процесс был первоначально запущен. Затем они могут записать поддельную строку в область памяти, ранее занятую argv[0], чтобы имитировать безопасную команду, например cat resolv.conf. Новая строка командной строки отображается в `/proc//cmdline` и отображается такими инструментами, как `ps`. (Цитата: Sandfly BPFDoor 2022) (Цитата: Microsoft XorDdos Linux Stealth 2022)",
+    "platforms": [
+      "Linux"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [
+      "linux_os"
+    ],
+    "detection": "",
+    "mitigations": [
+      "Аудит — это процесс регистрации активности, а также систематического просмотра и анализа активности и конфигураций системы. Основная цель аудита — обнаружить аномалии и выявить потенциальные угрозы или слабые места в среде. Правильные конфигурации аудита также могут помочь обеспечить соответствие требованиям. Процесс аудита включает в себя регулярный анализ поведения пользователей и системных журналов в поддержку превентивных мер безопасности. Аудит применим ко всем системам, используемым в организации, от входной двери здания до доступа к файлу на файловом сервере. Это считается более критичным для регулируемых отраслей, таких как здравоохранение, финансы и правительство, где требования соответствия требуют строгого отслеживания активности пользователей и систем. Это смягчение может быть реализовано с помощью следующих мер: Аудит системы: - Вариант использования: Регулярно оценивайте конфигурации системы для обеспечения соответствия политикам безопасности организации. - Реализация: использовать инструменты для поиска отклонений от установленных контрольных показателей. Аудит разрешений: - Вариант использования: просмотрите права доступа к файлам и папкам, чтобы свести к минимуму риск несанкционированного доступа или повышения привилегий. - Реализация: запускайте проверки доступа для выявления пользователей или групп с чрезмерными разрешениями. Аудит программного обеспечения: - Вариант использования: выявление устаревшего, неподдерживаемого или небезопасного программного обеспечения, которое может служить вектором атаки. - Реализация: использовать инструменты инвентаризации и сканирования уязвимостей для обнаружения устаревших версий и рекомендации безопасных альтернатив. Аудит конфигурации: - Вариант использования: оцените конфигурации системы и сети для обеспечения безопасности настроек (например, отключен SMBv1, включен MFA). - Реализация: внедрить инструменты автоматического сканирования конфигурации, такие как SCAP (протокол автоматизации контента безопасности), для выявления несоответствующих систем. Аудит сети: - Вариант использования: проверка сетевого трафика, правил брандмауэра и связи конечных точек для выявления несанкционированных или небезопасных подключений. - Реализация: используйте такие инструменты, как Wireshark или Zeek, для мониторинга и регистрации подозрительного поведения сети.",
+      "Управление учетными записями пользователей включает в себя внедрение и обеспечение соблюдения политик на протяжении всего жизненного цикла учетных записей пользователей, включая создание, изменение и деактивацию. Правильное управление учетными записями уменьшает поверхность атаки за счет ограничения несанкционированного доступа, управления привилегиями учетных записей и обеспечения использования учетных записей в соответствии с политиками организации. Это смягчение может быть реализовано с помощью следующих мер: Обеспечение соблюдения принципа наименьших привилегий – реализация: назначайте пользователям только минимальные разрешения, необходимые для выполнения их рабочих функций. Регулярно проверяйте учетные записи, чтобы убедиться, что не предоставлены лишние разрешения. - Вариант использования: снижает риск повышения привилегий, гарантируя, что учетные записи не смогут выполнять несанкционированные действия. Реализация политики надежных паролей. Реализация: обеспечить соблюдение требований к сложности пароля (например, к длине, типам символов). Требовать истечения срока действия пароля каждые 90 дней и запрещать повторное использование пароля. - Вариант использования: предотвращает получение злоумышленниками несанкционированного доступа посредством подбора пароля или атак методом перебора. Управление неактивными и потерянными учетными записями. Реализация: внедрить автоматизированные рабочие процессы для отключения учетных записей после установленного периода бездействия (например, 30 дней). Удаляйте потерянные учетные записи (например, учетные записи без назначенного владельца) во время регулярных проверок учетных записей. - Вариант использования: устраняет неактивные учетные записи, которые могут быть использованы злоумышленниками. Политики блокировки учетных записей — реализация: настройка пороговых значений блокировки учетных записей (например, блокировка учетных записей после пяти неудачных попыток входа в систему). Установите продолжительность блокировки минимум на 15 минут. - Вариант использования: смягчает методы автоматических атак, основанные на повторных попытках входа в систему. Многофакторная аутентификация (MFA) для учетных записей с высоким уровнем риска. Реализация: требовать MFA для всех административных учетных записей и пользователей с высоким уровнем риска. Используйте механизмы MFA, такие как аппаратные токены, приложения для проверки подлинности или биометрические данные. - Вариант использования: предотвращает несанкционированный доступ, даже если учетные данные украдены. Ограничение интерактивного входа в систему — реализация: Ограничьте интерактивный вход в систему для привилегированных учетных записей определенными безопасными системами или консолями управления. Используйте групповые политики для обеспечения соблюдения ограничений входа в систему. - Вариант использования: защищает конфиденциальные учетные записи от неправильного использования или эксплуатации. *Инструменты для реализации* Встроенные инструменты: - Microsoft Active Directory (AD): централизованное управление учетными записями и применение RBAC. - Объект групповой политики (GPO): обеспечивает соблюдение политик паролей, ограничений входа в систему и политик блокировки учетных записей. Инструменты управления идентификацией и доступом (IAM): - Okta: централизованная подготовка пользователей, интеграция MFA и SSO. - Microsoft Azure Active Directory: обеспечивает расширенное управление жизненным циклом учетной записи, доступ на основе ролей и политики условного доступа. Управление привилегированными учетными записями (PAM): - CyberArk, BeyondTrust, Thycotic: управление и мониторинг использования привилегированных учетных записей, обеспечение записи сеансов и JIT-доступа.",
+      "Обучение пользователей включает в себя обучение сотрудников и подрядчиков распознаванию, сообщению и предотвращению киберугроз, которые зависят от человеческого взаимодействия, таких как фишинг, социальная инженерия и другие манипулятивные методы. Комплексные программы обучения создают человеческий брандмауэр, предоставляя пользователям возможность быть активным компонентом защиты кибербезопасности организации. Это смягчение может быть реализовано с помощью следующих мер: Создайте комплексные программы обучения: - Разработайте учебные модули, адаптированные к профилю рисков организации и охватывающие такие темы, как фишинг, управление паролями и отчеты об инцидентах. - Обеспечить специальное обучение для сотрудников из группы высокого риска, таких как сотрудники службы поддержки или руководители. Используйте моделируемые упражнения: - Проведите моделирование фишинга, чтобы измерить восприимчивость пользователей и обеспечить целевое последующее обучение. - Проведите учения по социальной инженерии, чтобы оценить реакцию сотрудников и укрепить протоколы. Используйте геймификацию и взаимодействие: - Внедряйте интерактивные методы обучения, такие как викторины, игровые задачи и вознаграждения за успешное обнаружение и сообщение об угрозах. Включите политику безопасности в процесс адаптации: - Включите обучение кибербезопасности в процесс адаптации новых сотрудников. - Предоставлять простые для понимания материалы, описывающие политику приемлемого использования и процедуры отчетности. Регулярные курсы повышения квалификации: - Обновление учебных материалов с учетом новых угроз и методов, используемых злоумышленниками. - Обеспечьте, чтобы все сотрудники проходили периодические курсы повышения квалификации, чтобы оставаться в курсе. Особое внимание уделите реальным сценариям: - Используйте тематические исследования недавних атак, чтобы продемонстрировать последствия успешного фишинга или социальной инженерии. - Обсудите, как конкретные действия сотрудников могут предотвратить или смягчить такие атаки.",
+      "Подписание кода — это процесс безопасности, который обеспечивает подлинность и целостность программного обеспечения путем цифровой подписи исполняемых файлов, сценариев и других артефактов кода. Он предотвращает выполнение ненадежного или вредоносного кода путем проверки цифровых подписей на доверенные источники. Подписание кода защищает от подделки, выдачи себя за другое лицо и распространения неавторизованного или вредоносного программного обеспечения, образуя критическую защиту от атак на цепочку поставок и эксплуатации программного обеспечения. Это смягчение может быть реализовано с помощью следующих мер: Принудительное выполнение подписанного кода: - Реализация: настройте операционные системы (например, Windows с AppLocker или Linux с безопасной загрузкой), чтобы разрешить выполнение только подписанного кода. - Вариант использования: предотвратите выполнение вредоносных сценариев PowerShell, потребовав, чтобы все сценарии были подписаны доверенным сертификатом. Принудительное применение драйверов, подписанных поставщиком: - Реализация: включите подписывание кода в режиме ядра, чтобы гарантировать возможность загрузки только драйверов, подписанных доверенными поставщиками. - Вариант использования: вредоносный драйвер, пытающийся изменить системную память, не загружается из-за отсутствия действительной подписи. Управление отзывом сертификатов: - Реализация: используйте протокол онлайн-статуса сертификатов (OCSP) или списки отзыва сертификатов (CRL) для блокировки сертификатов, связанных со скомпрометированным или устаревшим кодом. - Вариант использования: скомпрометированный сертификат, использованный для подписи вредоносного обновления, отменяется, что предотвращает дальнейшее выполнение программного обеспечения. Проверка стороннего программного обеспечения: - Реализация: перед развертыванием требуется, чтобы программное обеспечение от внешних поставщиков было подписано действительными сертификатами. - Вариант использования: организация развертывает только подписанное и проверенное стороннее программное обеспечение для предотвращения атак в цепочке поставок. Целостность сценариев в конвейерах CI/CD: - Реализация: интеграция подписи кода в конвейеры CI/CD для подписи и проверки артефактов кода перед выпуском рабочей версии. - Вариант использования: компания-разработчик программного обеспечения гарантирует, что все производственные сборки подписаны, предотвращая попадание поддельных сборок к клиентам. **Ключевые компоненты подписи кода** — Проверка цифровой подписи: проверяет подлинность кода, гарантируя, что он подписан доверенным лицом. - Управление сертификатами: использует инфраструктуру открытых ключей (PKI) для управления сертификатами подписи и списками отзыва. - Принудительная политика для неподписанного кода: предотвращает выполнение неподписанных или ненадежных двоичных файлов и сценариев. - Проверка целостности хеша: подтверждает, что код не был изменен с момента подписания, путем сравнения криптографических хешей.",
+      "Предотвращение поведения на конечной точке подразумевает использование технологий и стратегий для обнаружения и блокировки потенциально вредоносных действий путем анализа поведения процессов, файлов, вызовов API и других событий конечной точки. Вместо того, чтобы полагаться исключительно на известные сигнатуры, этот подход использует эвристику, машинное обучение и мониторинг в реальном времени для выявления аномальных закономерностей, указывающих на атаку. Это смягчение может быть реализовано с помощью следующих мер: Подозрительное поведение процессов: - Реализация: используйте инструменты обнаружения и реагирования на конечные точки (EDR) для мониторинга и блокировки процессов, демонстрирующих необычное поведение, таких как попытки повышения привилегий. - Вариант использования: злоумышленник использует известную уязвимость для запуска привилегированного процесса из приложения пользовательского уровня. Инструмент конечной точки обнаруживает ненормальные отношения между родительским и дочерним процессами и блокирует действие. Несанкционированный доступ к файлам: - Реализация: используйте систему предотвращения потери данных (DLP) или инструменты конечных точек для блокировки процессов, пытающихся получить доступ к конфиденциальным файлам без надлежащей авторизации. - Вариант использования: процесс пытается прочитать или изменить конфиденциальный файл, расположенный в каталоге с ограниченным доступом, например /etc/shadow в Linux или кусте реестра SAM в Windows. Инструмент конечной точки выявляет это аномальное поведение и предотвращает его. Аномальные вызовы API: - Реализация: внедрить инструменты анализа времени выполнения для мониторинга вызовов API и блокировки вызовов, связанных с вредоносными действиями. - Вариант использования: процесс динамически внедряется в другой процесс, чтобы перехватить его выполнение. Конечная точка обнаруживает ненормальное использование API-интерфейсов, таких как OpenProcess и WriteProcessMemory, и завершает нарушающий процесс. Предотвращение эксплойтов: - Реализация: использовать инструменты предотвращения поведенческих эксплойтов для обнаружения и блокировки эксплойтов, пытающихся получить несанкционированный доступ. - Вариант использования: эксплойт переполнения буфера запускается против уязвимого приложения. Конечная точка обнаруживает аномальную операцию записи в память и останавливает процесс.",
+      "Ограничение прав доступа к файлам и каталогам включает настройку контроля доступа на уровне файловой системы, чтобы ограничить круг пользователей, групп или процессов, которые могут читать, записывать или выполнять файлы. Настраивая разрешения соответствующим образом, организации могут уменьшить поверхность атаки для злоумышленников, пытающихся получить доступ к конфиденциальным данным, внедрить вредоносный код или подделать системные файлы. Примените разрешения с наименьшими привилегиями: — Удалите ненужные разрешения на запись для конфиденциальных файлов и каталогов. - Используйте права собственности на файлы и группы для управления доступом для определенных ролей. Пример (Windows): щелкните правой кнопкой мыши общую папку → Свойства → вкладка «Безопасность» → Настройте разрешения для списков управления доступом NTFS. Усиление общих папок: — Отключите анонимный доступ к общим папкам. - Обеспечить разрешения NTFS для общих папок в Windows. Пример: установите разрешения, чтобы ограничить доступ на запись к критически важным файлам, таким как системные исполняемые файлы (например, `/bin` или `/sbin` в Linux). Используйте такие инструменты, как chown и chmod, чтобы назначить владельца файла и ограничить доступ. В Linux примените: `chmod 750 /etc/sensitivity.conf` `chown root:admin /etc/sensitivity.conf` Мониторинг целостности файлов (FIM): - Используйте такие инструменты, как Tripwire, Wazuh или OSSEC, для мониторинга изменений критических прав доступа к файлам. Аудит доступа к файловой системе: — Включите аудит для отслеживания изменений разрешений или попыток несанкционированного доступа. - Используйте Auditd (Linux) или Event Viewer (Windows) для регистрации действий. Ограничить каталоги запуска: — Настройте разрешения для предотвращения несанкционированной записи в такие каталоги, как «C:\\ProgramData\\Microsoft\\Windows\\Start Menu». Пример: Ограничьте доступ на запись к критически важным каталогам, таким как `/etc/`, `/usr/local/`, и каталогам Windows, таким как `C:\\Windows\\System32`. - В Windows используйте icacls для изменения разрешений: `icacls \"C:\\Windows\\System32\" /inheritance:r /grant:r SYSTEM:(OI)(CI)F` - В Linux отслеживайте разрешения с помощью таких инструментов, как `lsattr` или `auditd`.",
+      "Решения для защиты от вирусов и вредоносных программ используют сигнатуры, эвристику и поведенческий анализ для обнаружения, блокирования и устранения вредоносного программного обеспечения, включая вирусы, трояны, программы-вымогатели и шпионские программы. Эти решения постоянно отслеживают конечные точки и системы на предмет известных вредоносных шаблонов и подозрительного поведения, указывающего на компрометацию. Антивирусное и антивирусное программное обеспечение должно быть установлено на всех устройствах с автоматическими обновлениями, чтобы обеспечить защиту от новейших угроз. Это смягчение может быть реализовано с помощью следующих мер: Обнаружение на основе сигнатур: - Реализация: использование предопределенных сигнатур для идентификации известных вредоносных программ на основе уникальных шаблонов, таких как хэши файлов, последовательности байтов или аргументы командной строки. Этот метод эффективен против известных угроз. - Вариант использования: при обнаружении вредоносного ПО, такого как «Emotet», его сигнатура (например, хэш определенного файла) соответствует известной базе данных вредоносного ПО, вызывая оповещение и позволяя немедленно поместить зараженный файл в карантин. Эвристическое обнаружение: - Реализация: развертывание эвристических алгоритмов, которые анализируют поведение и характеристики файлов и процессов для выявления потенциальных вредоносных программ, даже если они не соответствуют известной сигнатуре. - Вариант использования: если программа пытается изменить несколько важных системных файлов или инициировать подозрительные сетевые соединения, эвристический анализ может пометить ее как потенциально вредоносную, даже если конкретная сигнатура вредоносного ПО недоступна. Поведенческое обнаружение (предотвращение поведения): - Реализация: используйте поведенческий анализ для обнаружения закономерностей аномальных действий, таких как необычные системные вызовы, несанкционированное шифрование файлов или попытки повышения привилегий. - Вариант использования: поведенческий анализ позволяет заранее обнаружить атаки программ-вымогателей, определяя такое поведение, как массовое шифрование файлов, даже до того, как будет идентифицирована конкретная сигнатура программы-вымогателя. Сканирование в реальном времени: - Реализация: включите сканирование в реальном времени для автоматической проверки файлов и сетевого трафика на наличие признаков вредоносного ПО при доступе к ним, загрузке или выполнении. - Вариант использования: когда пользователь загружает вложение электронной почты, антивирусное решение сканирует файл в режиме реального времени, проверяя его как по сигнатурам, так и по эвристике, чтобы обнаружить любое вредоносное содержимое, прежде чем его можно будет открыть. Облачная аналитика угроз: - Реализация: используйте облачную аналитику угроз, чтобы обеспечить антивирусному решению доступ к новейшим определениям вредоносных программ и потокам угроз в реальном времени из глобальной базы данных о возникающих угрозах. - Вариант использования: облачные антивирусные решения быстро выявляют вновь обнаруженные вредоносные программы путем перекрестных ссылок на глобальные базы данных угроз, обеспечивая защиту в режиме реального времени от атак нулевого дня. **Инструменты для реализации**: - Платформы Endpoint Security: используйте такие решения, как EDR, для комплексной защиты от вирусов и вредоносных программ во всех системах. - Централизованное управление: внедрение централизованных консолей антивирусного управления, которые обеспечивают видимость активности угроз, обеспечивают соблюдение политик и автоматизируют обновления. - Инструменты поведенческого анализа: используйте решения с расширенными возможностями поведенческого анализа для обнаружения моделей вредоносной активности, которые не основаны на известных сигнатурах.",
+      "Предотвратите выполнение несанкционированного или вредоносного кода в системах, внедрив контроль приложений, блокировку сценариев и другие механизмы предотвращения выполнения. Это гарантирует выполнение только надежного и авторизованного кода, что снижает риск вредоносного ПО и несанкционированных действий. Это смягчение может быть реализовано с помощью следующих мер: Контроль приложений: - Вариант использования: используйте такие инструменты, как AppLocker или Контроль приложений Защитника Windows (WDAC), для создания белых списков авторизованных приложений и блокировки неавторизованных. В Linux используйте такие инструменты, как SELinux или AppArmor, чтобы определить политики обязательного контроля доступа для выполнения приложений. - Реализация: разрешить выполнение на серверах и конечных точках только приложений с цифровой подписью или предварительно одобренных приложений. (например, `New-AppLockerPolicy -PolicyType Enforced -FilePath \"C:\\Policies\\AppLocker.xml\"`) Блокировка сценариев: - Вариант использования: используйте механизмы управления сценариями для блокировки несанкционированного выполнения сценариев, таких как PowerShell или JavaScript. Веб-браузеры: используйте расширения или настройки браузера, чтобы заблокировать выполнение JavaScript из ненадежных источников. - Реализация: настройте PowerShell для обеспечения соблюдения режима ограниченного языка для пользователей, не являющихся администраторами. (например, `Set-ExecutionPolicy AllSigned`) Блокировка исполняемых файлов: - Вариант использования: запретить выполнение двоичных файлов из подозрительных мест, таких как каталоги `%TEMP%` или `%APPDATA%`. - Реализация: блокировать выполнение файлов .exe, .bat или .ps1 из каталогов, доступных для записи пользователем. Предотвращение динамического анализа: - Вариант использования: используйте инструменты предотвращения выполнения на основе поведения для выявления и блокировки вредоносной активности в режиме реального времени. - Реализация: используйте решения EDR, которые анализируют поведение во время выполнения и блокируют выполнение подозрительного кода."
+    ]
+  },
+  {
+    "id": "T1004",
+    "name": "DLL-помощник Winlogon",
+    "tactic": "Persistence",
+    "description": "Winlogon.exe — это компонент Windows, отвечающий за действия при входе в систему и выходе из нее, а также за безопасную последовательность действий (SAS), запускаемую сочетанием клавиш Ctrl-Alt-Delete. Записи реестра в HKLM\\Software\\[Wow6432Node\\]Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\ и HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\ используются для управления дополнительными вспомогательными программами и функциями, поддерживающими Winlogon. (Цитата: Cylance Reg Persistence, сентябрь 2013 г.) Вредоносные изменения этих разделов реестра могут привести к тому, что Winlogon загрузит и запустит вредоносные библиотеки DLL и/или исполняемые файлы. В частности, известно, что следующие подразделы потенциально уязвимы для злоупотреблений: (Цитата: Cylance Reg Persistence, сентябрь 2013 г.) * Winlogon\\Notify — указывает на библиотеки DLL пакета уведомлений, которые обрабатывают события Winlogon * Winlogon\\Userinit — указывает на userinit.exe, программу инициализации пользователя, выполняемую при входе пользователя в систему * Winlogon\\Shell — указывает на explorer.exe, системную оболочку, выполняемую при входе пользователя в систему Злоумышленники могут воспользоваться этими функциями для многократного выполнения вредоносного кода и установления стойкости.",
+    "platforms": [
+      "Windows"
+    ],
+    "related_cwe": [],
+    "related_capec": [
+      "CAPEC-579"
+    ],
+    "requires_service": [
+      "windows_os"
+    ],
+    "detection": "",
+    "mitigations": []
+  },
+  {
+    "id": "T1009",
+    "name": "Двоичное заполнение",
+    "tactic": "Defense Evasion",
+    "description": "Злоумышленники могут использовать двоичное заполнение для добавления ненужных данных и изменения представления вредоносного ПО на диске, не влияя на функциональность или поведение двоичного файла. Это часто приводит к увеличению размера двоичного файла сверх того, что могут обработать некоторые инструменты безопасности из-за ограничений размера файла. Двоичное заполнение эффективно изменяет контрольную сумму файла, а также может использоваться для предотвращения создания черных списков на основе хеша и статических антивирусных сигнатур. (Цитата: ESET OceanLotus). Используемое заполнение обычно генерируется функцией для создания ненужных данных, а затем добавляется в конец или применяется к разделам вредоносного ПО. (Цитата: Securelist Malware Tricks, апрель 2017 г.) Увеличение размера файла может снизить эффективность некоторых инструментов и возможностей обнаружения, которые не предназначены для этого. или настроен для сканирования больших файлов. Это также может снизить вероятность сбора данных для анализа. Общедоступные службы сканирования файлов, такие как VirusTotal, ограничивают максимальный размер загружаемого файла для анализа. (Цитата: Часто задаваемые вопросы VirusTotal)",
+    "platforms": [
+      "Linux",
+      "macOS",
+      "Windows"
+    ],
+    "related_cwe": [],
+    "related_capec": [
+      "CAPEC-572"
+    ],
+    "requires_service": [
+      "macos_os",
+      "windows_os",
+      "linux_os"
+    ],
+    "detection": "",
+    "mitigations": []
+  },
+  {
+    "id": "T1550",
+    "name": "Используйте альтернативный материал аутентификации",
+    "tactic": "Defense Evasion",
+    "description": "Злоумышленники могут использовать альтернативные материалы для аутентификации, такие как хэши паролей, билеты Kerberos и токены доступа к приложениям, чтобы перемещаться в горизонтальном направлении внутри среды и обойти обычные средства контроля доступа к системе. Процессы аутентификации обычно требуют действительного удостоверения личности (например, имени пользователя) вместе с одним или несколькими факторами аутентификации (например, паролем, PIN-кодом, физической смарт-картой, генератором токенов и т. д.). Материалы альтернативной аутентификации законно генерируются системами после того, как пользователь или приложение успешно проходит аутентификацию, предоставив действительный идентификатор и необходимые факторы аутентификации. Материал альтернативной аутентификации также может быть создан в процессе создания удостоверения. (Цитата: Аутентификация NIST) (Цитата: NIST MFA) Кэширование материала альтернативной аутентификации позволяет системе проверять успешность аутентификации личности, не прося пользователя повторно ввести фактор(ы) аутентификации. Поскольку альтернативная аутентификация должна поддерживаться системой — либо в памяти, либо на диске — она может быть украдена с помощью методов [Доступ к учетным данным] (https://attack.mitre.org/tactics/TA0006). Похищая альтернативные материалы аутентификации, злоумышленники могут обойти средства контроля доступа к системе и пройти аутентификацию в системах, не зная открытого пароля или каких-либо дополнительных факторов аутентификации.",
+    "platforms": [
+      "Windows",
+      "SaaS",
+      "IaaS",
+      "Containers",
+      "Identity Provider",
+      "Office Suite",
+      "Linux"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [
+      "windows_os",
+      "linux_os"
+    ],
+    "detection": "",
+    "mitigations": [
+      "Аудит — это процесс регистрации активности, а также систематического просмотра и анализа активности и конфигураций системы. Основная цель аудита — обнаружить аномалии и выявить потенциальные угрозы или слабые места в среде. Правильные конфигурации аудита также могут помочь обеспечить соответствие требованиям. Процесс аудита включает в себя регулярный анализ поведения пользователей и системных журналов в поддержку превентивных мер безопасности. Аудит применим ко всем системам, используемым в организации, от входной двери здания до доступа к файлу на файловом сервере. Это считается более критичным для регулируемых отраслей, таких как здравоохранение, финансы и правительство, где требования соответствия требуют строгого отслеживания активности пользователей и систем. Это смягчение может быть реализовано с помощью следующих мер: Аудит системы: - Вариант использования: Регулярно оценивайте конфигурации системы для обеспечения соответствия политикам безопасности организации. - Реализация: использовать инструменты для поиска отклонений от установленных контрольных показателей. Аудит разрешений: - Вариант использования: просмотрите права доступа к файлам и папкам, чтобы свести к минимуму риск несанкционированного доступа или повышения привилегий. - Реализация: запускайте проверки доступа для выявления пользователей или групп с чрезмерными разрешениями. Аудит программного обеспечения: - Вариант использования: выявление устаревшего, неподдерживаемого или небезопасного программного обеспечения, которое может служить вектором атаки. - Реализация: использовать инструменты инвентаризации и сканирования уязвимостей для обнаружения устаревших версий и рекомендации безопасных альтернатив. Аудит конфигурации: - Вариант использования: оцените конфигурации системы и сети для обеспечения безопасности настроек (например, отключен SMBv1, включен MFA). - Реализация: внедрить инструменты автоматического сканирования конфигурации, такие как SCAP (протокол автоматизации контента безопасности), для выявления несоответствующих систем. Аудит сети: - Вариант использования: проверка сетевого трафика, правил брандмауэра и связи конечных точек для выявления несанкционированных или небезопасных подключений. - Реализация: используйте такие инструменты, как Wireshark или Zeek, для мониторинга и регистрации подозрительного поведения сети.",
+      "Устанавливайте и применяйте политики безопасности паролей для учетных записей, чтобы снизить вероятность несанкционированного доступа. Политика надежных паролей включает в себя обеспечение сложности паролей, требование регулярной смены паролей и предотвращение повторного использования паролей. Это смягчение может быть реализовано с помощью следующих мер: Системы Windows: - Используйте консоль управления групповыми политиками (GPMC) для настройки: - Минимальной длины пароля (например, 12+ символов). - Требования к сложности пароля. - История паролей (например, запретить последние 24 пароля). - Продолжительность и пороговые значения блокировки учетной записи. Системы Linux: - Настройте подключаемые модули аутентификации (PAM): - Используйте `pam_pwquality` для обеспечения соблюдения требований к сложности и длине. - Внедрите pam_tally2 или pam_faillock для блокировки учетных записей. - Используйте pwunconv, чтобы отключить повторное использование пароля. Менеджеры паролей: — Обеспечьте использование корпоративных менеджеров паролей (например, Bitwarden, 1Password, LastPass) для создания и хранения надежных паролей. Черный список паролей: — Используйте такие инструменты, как проверка паролей «Я был взломан» или решения для черных списков на основе NIST, чтобы запретить пользователям устанавливать скомпрометированные пароли. Регулярный аудит: - Периодически проверяйте политику паролей и конфигурации учетных записей, чтобы обеспечить соответствие требованиям, используя такие инструменты, как LAPS (Local Admin Password Solution) и сканеры уязвимостей. *Инструменты для реализации* Windows: - Консоль управления групповыми политиками (GPMC): принудительное применение политик паролей. - Решение для паролей локального администратора Microsoft (LAPS): применяйте случайные уникальные пароли администратора. Linux/macOS: — Модули PAM (pam_pwquality, pam_tally2, pam_faillock): обеспечивают соблюдение правил паролей. - Lynis: аудит политик паролей и конфигураций системы. Кроссплатформенность: - Менеджеры паролей (Bitwarden, 1Password, KeePass): управляйте надежными паролями и применяйте их принудительно. - API-интерфейс «Я был взломан»: предотвращение использования взломанных паролей. - Инструменты, соответствующие требованиям NIST SP 800-63B: соблюдение правил использования паролей и внесение в черный список.",
+      "Политики использования учетных записей помогают уменьшить несанкционированный доступ путем настройки и обеспечения соблюдения правил, которые определяют, как и когда можно использовать учетные записи. Эти политики включают в себя применение механизмов блокировки учетных записей, ограничение времени входа в систему и установку тайм-аутов бездействия. Правильная настройка этих политик снижает риск атак методом перебора, кражи учетных данных и несанкционированного доступа, ограничивая возможности злоумышленников использовать учетные записи. Это смягчение может быть реализовано с помощью следующих мер: Политики блокировки учетной записи: - Реализация: настройте параметры блокировки учетной записи так, чтобы после определенного количества неудачных попыток входа в систему (например, 3–5 попыток) учетная запись блокировалась на определенный период времени (например, 15 минут) или требовала, чтобы администратор разблокировал ее. - Вариант использования: это предотвращает атаки методом перебора, ограничивая количество попыток неправильного пароля, прежде чем учетная запись будет временно отключена, что снижает вероятность того, что злоумышленник успешно угадает пароль. Ограничения времени входа: - Реализация: настройте политики времени входа, чтобы ограничить возможность входа пользователей или групп в системы. Например, разрешить вход в систему только в стандартные рабочие часы (например, с 8:00 до 18:00) для неадминистративных учетных записей. - Вариант использования: это предотвращает несанкционированный доступ за пределами утвержденного рабочего времени, когда попытки входа в систему могут быть более подозрительными или их сложнее отслеживать. Например, если учетная запись, которая должна быть активна только в течение дня, входит в систему в 2 часа ночи, она должна подать предупреждение или быть заблокирована. Тайм-аут бездействия и завершение сеанса: - Реализация: принудительно устанавливать тайм-ауты сеанса после периода бездействия (например, 10–15 минут) и требовать от пользователей повторной аутентификации, если они хотят возобновить сеанс. - Вариант использования: эта политика не позволяет злоумышленникам перехватывать активные сеансы, оставленные без присмотра. Например, если сотрудник отойдет от своего компьютера, не заблокировав его, злоумышленник, имеющий физический доступ к системе, не сможет использовать сеанс. Политика устаревания паролей: - Реализация: обеспечить соблюдение правил устаревания паролей, требующих от пользователей менять свои пароли через определенный период (например, 90 дней) и гарантировать, что пароли не будут использоваться повторно, путем ведения истории паролей. - Вариант использования: это ограничивает риск использования скомпрометированных паролей на неопределенный срок. Регулярная смена паролей затрудняет повторное использование украденных учетных данных злоумышленниками. Срок действия и деактивация учетной записи: - Реализация: настройте учетные записи пользователей, особенно для временных или контрактных работников, на автоматическое прекращение действия после установленной даты или события. Учетные записи, которые остаются неиспользованными в течение определенного периода, должны быть деактивированы автоматически. - Вариант использования: это предотвращает превращение неактивных учетных записей в вектор атаки. Например, злоумышленник может использовать неиспользуемые учетные записи, если они не контролируются должным образом или не деактивируются. **Инструменты для реализации**: - Объекты групповой политики (GPO) в Windows: для обеспечения соблюдения пороговых значений блокировки учетной записи, ограничений времени входа в систему, таймаутов сеансов и политик паролей. - Решения для управления идентификацией и доступом (IAM): для централизованного управления учетными записями пользователей, политиками сеансов и автоматической деактивации учетных записей. - Платформы управления информацией о безопасности и событиями (SIEM): для мониторинга и оповещения о необычных действиях при входе в систему, таких как неудачные входы в систему или попытки доступа в нерабочее время. - Инструменты многофакторной аутентификации (MFA): для дальнейшего обеспечения безопасности попыток входа в систему, предотвращения атак методом грубой силы или подстановки учетных данных.",
+      "Управление привилегированными учетными записями фокусируется на внедрении политик, элементов управления и инструментов для безопасного управления привилегированными учетными записями (например, СИСТЕМНЫМИ, корневыми или административными учетными записями). Это включает в себя ограничение доступа, ограничение объема разрешений, мониторинг использования привилегированных учетных записей и обеспечение подотчетности посредством ведения журналов и аудита. Это смягчение может быть реализовано с помощью следующих мер: Разрешения и роли учетной записи: - Внедрите RBAC и принципы наименьших привилегий для безопасного распределения разрешений. - Используйте такие инструменты, как групповые политики Active Directory, для обеспечения соблюдения ограничений доступа. Безопасность учетных данных: - Разверните инструменты хранилища паролей, такие как CyberArk, HashiCorp Vault или KeePass, для безопасного хранения и ротации учетных данных. - Обеспечьте соблюдение политик сложности, уникальности и срока действия паролей с помощью таких инструментов, как объекты групповой политики Microsoft (GPO). Многофакторная аутентификация (MFA): — Примените MFA для всех привилегированных учетных записей с помощью Duo Security, Okta или Microsoft Azure AD MFA. Управление привилегированным доступом (PAM): - Используйте решения PAM, такие как CyberArk, BeyondTrust или Thycotic, для управления, мониторинга и аудита привилегированного доступа. Аудит и мониторинг: - Интегрируйте мониторинг активности в вашу SIEM (например, Splunk или QRadar) для обнаружения и оповещения об аномальном использовании привилегированных учетных записей. Доступ по принципу «точно в срок»: — Разверните JIT-решения, такие как Azure Privileged Identity Management (PIM), или настройте эфемерные роли в AWS и GCP для предоставления ограниченных по времени повышенных разрешений. *Инструменты для реализации* Управление привилегированным доступом (PAM): - CyberArk, BeyondTrust, Thycotic, HashiCorp Vault. Управление учетными данными: - Microsoft LAPS (решение для паролей локального администратора), Password Safe, HashiCorp Vault, KeePass. Многофакторная аутентификация: — Duo Security, Okta, Microsoft Azure MFA, Google Authenticator. Управление привилегиями Linux: — конфигурация sudo, SELinux, AppArmor. Моментальный доступ: — Azure Privileged Identity Management (PIM), роли AWS IAM с ограничениями сеанса, прокси-сервер GCP, поддерживающий идентификацию.",
+      "Внедряйте надежные конфигурации Active Directory (AD) с помощью групповых политик для защиты учетных записей пользователей, контроля доступа и минимизации поверхности атаки. Конфигурации AD обеспечивают централизованный контроль над настройками учетной записи, политиками входа и разрешениями, снижая риск несанкционированного доступа и горизонтального перемещения внутри сети. Это смягчение может быть реализовано с помощью следующих мер: Конфигурация учетной записи: - Реализация: используйте учетные записи домена вместо локальных учетных записей, чтобы использовать централизованное управление AD, включая групповые политики, аудит и контроль доступа. - Вариант использования: ИТ-персоналу, управляющему общими ресурсами, предоставьте учетные записи домена, которые позволят ИТ-командам централизованно входить в систему, снижая риск появления неуправляемых мошеннических локальных учетных записей на отдельных компьютерах. Ограничения интерактивного входа: - Реализация: настройте групповые политики для ограничения интерактивного входа (например, прямого физического входа или входа по RDP) для учетных записей служб или привилегированных учетных записей, которым не требуется такой доступ. - Вариант использования: запретить учетным записям служб, например учетным записям SQL Server, иметь права интерактивного входа в систему. Это снижает риск использования этих счетов для бокового движения в случае взлома. Настройки удаленного рабочего стола: - Реализация: ограничить доступ по протоколу удаленного рабочего стола (RDP) к определенным авторизованным учетным записям. Используйте групповые политики, чтобы обеспечить это, позволяя только необходимым пользователям устанавливать сеансы RDP. - Вариант использования: на конфиденциальных серверах (например, контроллерах домена или финансовых базах данных) ограничьте доступ RDP только для учетных записей администратора, в то время как всем остальным пользователям будет отказано в доступе. Выделенные административные учетные записи: - Реализация: создать административные учетные записи для всего домена, которые ограничены в интерактивном входе в систему и предназначены исключительно для задач высокого уровня (например, установка программного обеспечения, установка исправлений). - Вариант использования: создайте отдельные учетные записи администратора для разных целей, например один набор учетных записей для установки, а другой — для управления доступом к хранилищу. Это ограничивает воздействие и помогает уменьшить векторы атак. Бункеры аутентификации: - Реализация: настройте бункеры аутентификации в AD, используя групповые политики для создания зон доступа с ограничениями на основе членства, таких как группа безопасности «Защищенные пользователи». Это ограничивает доступ к важным учетным записям и сводит к минимуму подверженность потенциальным угрозам. - Вариант использования: поместите учетные записи с высоким риском или высокой стоимостью, такие как учетные записи руководителей или администраторов, в бункер аутентификации с дополнительными элементами управления, ограничивая их доступ только к необходимым системам. Это снижает риск неправильного использования или злоупотребления учетными данными, если эти учетные записи будут скомпрометированы. **Инструменты для реализации**: - Групповые политики Active Directory: используйте консоль управления групповыми политиками (GPMC) для настройки, развертывания и применения политик в средах AD. - PowerShell: автоматизируйте настройку учетной записи, ограничения входа и применение политик с помощью сценариев PowerShell. - Центр администрирования AD: управляйте хранилищами аутентификации и настраивайте политики высокого уровня для критически важных групп пользователей в AD.",
+      "Руководство для разработчиков приложений направлено на предоставление разработчикам знаний, инструментов и передового опыта, необходимых для написания безопасного кода, уменьшения уязвимостей и реализации принципов безопасного проектирования. За счет интеграции безопасности на протяжении всего жизненного цикла разработки программного обеспечения (SDLC) это смягчение направлено на предотвращение появления уязвимых мест в приложениях, системах и API. Это смягчение может быть реализовано с помощью следующих мер: Предотвращение SQL-инъекций (практика безопасного кодирования): - Реализация: научите разработчиков использовать параметризованные запросы или подготовленные инструкции вместо прямого внедрения пользовательского ввода в SQL-запросы. - Вариант использования: веб-приложение принимает вводимые пользователем данные для поиска в базе данных. Обеззараживая и проверяя вводимые пользователем данные, разработчики могут предотвратить внедрение злоумышленниками вредоносных команд SQL. Меры по устранению последствий межсайтового скриптинга (XSS): - Реализация: потребовать от разработчиков реализовать кодирование вывода для всего пользовательского контента, отображаемого на веб-странице. - Вариант использования: сайт электронной коммерции позволяет пользователям оставлять отзывы о продуктах. Правильное кодирование и экранирование вводимых пользователем данных предотвращает выполнение вредоносных сценариев в браузерах других пользователей. Безопасная разработка API: - Реализация: научите разработчиков проверять подлинность всех конечных точек API и избегать раскрытия конфиденциальной информации в ответах API. - Вариант использования: приложение мобильного банкинга использует API для управления счетами. Применяя аутентификацию на основе токенов для каждого вызова API, разработчики снижают риск несанкционированного доступа. Статический анализ кода в конвейере сборки: - Реализация: включение инструментов в конвейеры CI/CD для автоматического сканирования уязвимостей во время процесса сборки. - Вариант использования: финтех-компания интегрирует инструменты статического анализа для обнаружения жестко запрограммированных учетных данных в исходном коде перед развертыванием. Моделирование угроз на этапе проектирования: - Реализация: используйте такие платформы, как STRIDE (подмена, подделка, отказ, раскрытие информации, отказ в обслуживании, повышение привилегий) для оценки угроз во время разработки приложения. - Вариант использования: перед запуском клиентского портала SaaS-компания выявляет потенциальные случаи злоупотреблений, такие как перехват сеанса, и разрабатывает меры по смягчению последствий, такие как безопасное управление сеансами. **Инструменты для реализации**: - Инструменты статического анализа кода: используйте инструменты, которые могут сканировать известные уязвимости в исходном коде. - Динамическое тестирование безопасности приложений (DAST): используйте такие инструменты, как Burp Suite или OWASP ZAP, для моделирования атак во время выполнения и выявления уязвимостей. - Платформы безопасности: рекомендуйте платформы безопасности по умолчанию (например, Django для Python, Spring Security для Java), которые обеспечивают соблюдение лучших практик безопасности.",
+      "Управление учетными записями пользователей включает в себя внедрение и обеспечение соблюдения политик на протяжении всего жизненного цикла учетных записей пользователей, включая создание, изменение и деактивацию. Правильное управление учетными записями уменьшает поверхность атаки за счет ограничения несанкционированного доступа, управления привилегиями учетных записей и обеспечения использования учетных записей в соответствии с политиками организации. Это смягчение может быть реализовано с помощью следующих мер: Обеспечение соблюдения принципа наименьших привилегий – реализация: назначайте пользователям только минимальные разрешения, необходимые для выполнения их рабочих функций. Регулярно проверяйте учетные записи, чтобы убедиться, что не предоставлены лишние разрешения. - Вариант использования: снижает риск повышения привилегий, гарантируя, что учетные записи не смогут выполнять несанкционированные действия. Реализация политики надежных паролей. Реализация: обеспечить соблюдение требований к сложности пароля (например, к длине, типам символов). Требовать истечения срока действия пароля каждые 90 дней и запрещать повторное использование пароля. - Вариант использования: предотвращает получение злоумышленниками несанкционированного доступа посредством подбора пароля или атак методом перебора. Управление неактивными и потерянными учетными записями. Реализация: внедрить автоматизированные рабочие процессы для отключения учетных записей после установленного периода бездействия (например, 30 дней). Удаляйте потерянные учетные записи (например, учетные записи без назначенного владельца) во время регулярных проверок учетных записей. - Вариант использования: устраняет неактивные учетные записи, которые могут быть использованы злоумышленниками. Политики блокировки учетных записей — реализация: настройка пороговых значений блокировки учетных записей (например, блокировка учетных записей после пяти неудачных попыток входа в систему). Установите продолжительность блокировки минимум на 15 минут. - Вариант использования: смягчает методы автоматических атак, основанные на повторных попытках входа в систему. Многофакторная аутентификация (MFA) для учетных записей с высоким уровнем риска. Реализация: требовать MFA для всех административных учетных записей и пользователей с высоким уровнем риска. Используйте механизмы MFA, такие как аппаратные токены, приложения для проверки подлинности или биометрические данные. - Вариант использования: предотвращает несанкционированный доступ, даже если учетные данные украдены. Ограничение интерактивного входа в систему — реализация: Ограничьте интерактивный вход в систему для привилегированных учетных записей определенными безопасными системами или консолями управления. Используйте групповые политики для обеспечения соблюдения ограничений входа в систему. - Вариант использования: защищает конфиденциальные учетные записи от неправильного использования или эксплуатации. *Инструменты для реализации* Встроенные инструменты: - Microsoft Active Directory (AD): централизованное управление учетными записями и применение RBAC. - Объект групповой политики (GPO): обеспечивает соблюдение политик паролей, ограничений входа в систему и политик блокировки учетных записей. Инструменты управления идентификацией и доступом (IAM): - Okta: централизованная подготовка пользователей, интеграция MFA и SSO. - Microsoft Azure Active Directory: обеспечивает расширенное управление жизненным циклом учетной записи, доступ на основе ролей и политики условного доступа. Управление привилегированными учетными записями (PAM): - CyberArk, BeyondTrust, Thycotic: управление и мониторинг использования привилегированных учетных записей, обеспечение записи сеансов и JIT-доступа."
+    ]
+  },
+  {
+    "id": "T1076",
+    "name": "Протокол удаленного рабочего стола",
+    "tactic": "Lateral Movement",
+    "description": "Удаленный рабочий стол — обычная функция операционных систем. Это позволяет пользователю войти в интерактивный сеанс с графическим пользовательским интерфейсом рабочего стола системы в удаленной системе. Microsoft называет свою реализацию протокола удаленного рабочего стола (RDP) службами удаленных рабочих столов (RDS). (Цитата: Службы удаленных рабочих столов TechNet) Существуют другие реализации и сторонние инструменты, обеспечивающие графический доступ к [Удаленные службы] (https://attack.mitre.org/techniques/T1021), аналогичные RDS. Злоумышленники могут подключиться к удаленной системе через RDP/RDS, чтобы расширить доступ, если служба включена и разрешает доступ к учетным записям с известными учетными данными. Злоумышленники, скорее всего, будут использовать методы доступа к учетным данным для получения учетных данных для использования с RDP. Злоумышленники также могут использовать RDP в сочетании с методом [Accessibility Features](https://attack.mitre.org/techniques/T1015) для обеспечения стойкости. (Цитата: Alperovitch Malware) Злоумышленники также могут осуществлять перехват сеанса RDP, что включает в себя кражу удаленного сеанса законного пользователя. Обычно пользователь получает уведомление, когда кто-то другой пытается украсть его сеанс, и задает вопрос. Имея системные разрешения и используя консоль служб терминалов, c:\\windows\\system32\\tscon.exe [номер сеанса, который будет украден], злоумышленник может перехватить сеанс без необходимости ввода учетных данных или запросов пользователю. (Цитата: RDP Hijacking Korznikov) Это можно сделать удаленно или локально, с активными или отключенными сеансами. (Цитата: RDP Hijacking Medium) Это также может привести к [удаленному обнаружению системы] (https://attack.mitre.org/techniques/T1018) и повышению привилегий путем кражи сеанса учетной записи администратора домена или учетной записи с более высокими привилегиями. Все это можно сделать с помощью собственных команд Windows, но это также было добавлено как функция в RedSnarf. (Цитата: Кали Редснарф)",
+    "platforms": [
+      "Windows"
+    ],
+    "related_cwe": [],
+    "related_capec": [
+      "CAPEC-555"
+    ],
+    "requires_service": [
+      "rdp",
+      "windows_os"
+    ],
+    "detection": "",
+    "mitigations": []
+  },
+  {
+    "id": "T1597.001",
+    "name": "Угроза поставщикам Intel",
+    "tactic": "Reconnaissance",
+    "description": "Злоумышленники могут искать в частных данных поставщиков аналитических данных об угрозах информацию, которую можно использовать при нацеливании. Поставщики средств анализа угроз могут предлагать платные каналы или порталы, которые предлагают больше данных, чем сообщается публично. Хотя конфиденциальные данные (такие как имена клиентов и другие идентификаторы) могут быть отредактированы, эта информация может содержать тенденции, касающиеся нарушений, такие как целевые отрасли, заявления об атрибуции и успешные TTP/контрмеры. Если злоумышленник ищет информацию о своей собственной деятельности, это подпадает под [Поиск данных о поставщиках угроз] (https://attack.mitre.org/techniques/T1681). Информация, сообщаемая поставщиками, также может раскрывать возможности других форм разведки (например: [Поиск на открытых веб-сайтах/доменах](https://attack.mitre.org/techniques/T1593)), создания оперативных ресурсов (например: [Разработка возможностей](https://attack.mitre.org/techniques/T1587) или [Получить Возможности](https://attack.mitre.org/techniques/T1588)) и/или первоначальный доступ (например: [Использование общедоступного приложения](https://attack.mitre.org/techniques/T1190) или [Внешние удаленные службы](https://attack.mitre.org/techniques/T1133)).",
+    "platforms": [
+      "PRE"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [],
+    "detection": "",
+    "mitigations": [
+      "Меры по смягчению последствий перед компрометацией включают в себя упреждающие меры и средства защиты, которые не позволяют злоумышленникам успешно выявлять и использовать слабые места на этапах разведки и разработки ресурсов атаки. Эти действия сосредоточены на уменьшении поверхности атаки организации, выявлении усилий противника по подготовке и усложнении проведения успешных операций злоумышленниками. Это смягчение может быть реализовано с помощью следующих мер: Ограничить раскрытие информации: - Регулярно проверять и очищать общедоступные данные, включая объявления о вакансиях, веб-сайты и социальные сети. - Используйте такие инструменты, как платформы OSINT-мониторинга (например, SpiderFoot, Recon-ng), для выявления утечки информации. Защитите домен и инфраструктуру DNS: - Включите DNSSEC и используйте защиту конфиденциальности WHOIS. - Отслеживайте захват доменов или похожие домены с помощью таких сервисов, как RiskIQ или DomainTools. Внешний мониторинг: — Используйте такие инструменты, как Shodan, Censys, для мониторинга внешней поверхности атаки. - Развертывание внешних сканеров уязвимостей для активного устранения слабых мест. Аналитика угроз: - Используйте такие платформы, как MISP, Recorded Future или Anomali, для отслеживания состязательной инфраструктуры, инструментов и активности. Защита контента и электронной почты: - Используйте решения для обеспечения безопасности электронной почты, такие как Proofpoint, Microsoft Defender для Office 365 или Mimecast. - Применяйте политики SPF/DKIM/DMARC для защиты от подделки электронной почты. Обучение и повышение осведомленности: - Обучите сотрудников выявлению попыток фишинга, обеспечению безопасности социальных сетей и предотвращению утечек информации."
+    ]
+  },
+  {
+    "id": "T1011",
+    "name": "Эксфильтрация через другую сетевую среду",
+    "tactic": "Exfiltration",
+    "description": "Злоумышленники могут попытаться получить данные через другую сетевую среду, отличную от канала управления и контроля. Если сеть управления и контроля представляет собой проводное подключение к Интернету, утечка может произойти, например, через соединение Wi-Fi, модем, сотовую связь для передачи данных, Bluetooth или другой радиочастотный (РЧ) канал. Злоумышленники могут сделать это, если у них есть достаточный доступ или близость, и соединение может быть не защищено или защищено так же, как основной канал, подключенный к Интернету, поскольку оно не маршрутизируется через ту же корпоративную сеть.",
+    "platforms": [
+      "Linux",
+      "macOS",
+      "Windows"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [
+      "macos_os",
+      "windows_os",
+      "linux_os"
+    ],
+    "detection": "",
+    "mitigations": [
+      "Отключите или удалите ненужное и потенциально уязвимое программное обеспечение, функции или службы, чтобы уменьшить поверхность атаки и предотвратить злоупотребления со стороны злоумышленников. Это включает в себя выявление программного обеспечения или функций, которые больше не нужны или которые могут быть использованы, и обеспечение их удаления или правильного отключения. Это смягчение может быть реализовано с помощью следующих мер: Удаление устаревшего программного обеспечения: - Вариант использования: отключение или удаление старых версий программного обеспечения, которые больше не получают обновления или исправления безопасности (например, устаревшая Java, Adobe Flash). - Реализация: компания удаляет Flash Player из всех систем сотрудников после того, как истек срок его эксплуатации. Отключите неиспользуемые функции: - Вариант использования: отключите ненужные функции операционной системы, такие как SMBv1, Telnet или RDP, если они не требуются. - Реализация: отключите SMBv1 в среде Windows, чтобы устранить такие уязвимости, как EternalBlue. Контролируйте приложения, установленные пользователями: - Вариант использования: запретите пользователям устанавливать несанкционированное программное обеспечение с помощью групповых политик или других инструментов управления. - Реализация: блокировать установку пользователем несанкционированных приложений для обмена файлами (например, клиентов BitTorrent) в корпоративной среде. Удалите ненужные службы: - Вариант использования: определите и отключите ненужные службы по умолчанию, работающие на конечных точках, серверах или сетевых устройствах. - Реализация: отключите неиспользуемые общие административные ресурсы (например, C$, ADMIN$) на рабочих станциях. Ограничьте надстройки и плагины: - Вариант использования: удалите или отключите плагины и надстройки браузера, которые не нужны для деловых целей. - Реализация: отключите плагины Java и ActiveX в веб-браузерах, чтобы предотвратить атаки типа Drive-by.",
+      "Конфигурация операционной системы включает в себя настройку параметров системы и усиление настроек операционной системы (ОС) по умолчанию для предотвращения использования злоумышленниками и злоупотреблений функциями системы. Правильные конфигурации ОС устраняют уязвимости безопасности, ограничивают возможности атак и обеспечивают надежную защиту от широкого спектра методов. Это смягчение можно реализовать с помощью следующих мер: Отключите неиспользуемые функции: - Отключите SMBv1, LLMNR и NetBIOS там, где они не нужны. - Отключите удаленный реестр и ненужные службы. Обеспечьте защиту на уровне ОС: - Включите предотвращение выполнения данных (DEP), рандомизацию макета адресного пространства (ASLR) и защиту потока управления (CFG) в Windows. - Используйте AppArmor или SELinux в Linux для обязательного контроля доступа. Настройки безопасного доступа: - Включите контроль учетных записей пользователей (UAC) для Windows. — Ограничьте доступ root/sudo в Linux/macOS и обеспечьте строгие разрешения с помощью файлов sudoers. Укрепление файловой системы: — Внедрить доступ с наименьшими привилегиями к критически важным файлам и системным каталогам. - Регулярно проверяйте разрешения с помощью таких инструментов, как icacls (Windows) или getfacl/chmod (Linux/macOS). Безопасный удаленный доступ: - Ограничьте RDP, SSH и VNC авторизованными IP-адресами с помощью правил брандмауэра. - Включите NLA для RDP и применяйте строгие политики паролей и блокировки. Усиление конфигурации загрузки: - Включите безопасную загрузку и включите защиту паролем UEFI/BIOS. - Используйте BitLocker или LUKS для шифрования загрузочных дисков. Регулярные аудиты: - Периодически проверяйте конфигурации ОС с помощью таких инструментов, как CIS Benchmarks или SCAP. *Инструменты для реализации* Windows: - Объекты групповой политики Microsoft (GPO): централизованное применение настроек безопасности ОС. - Windows Defender Exploit Guard: встроенная защита ОС от эксплойтов. - CIS-CAT Pro: аудит конфигураций безопасности Windows на основе тестов CIS. Linux/macOS: — AppArmor/SELinux: обеспечивает обязательный контроль доступа. - Линис: проведение комплексного аудита безопасности. - Руководство по безопасности SCAP: автоматизируйте усиление конфигурации с помощью протокола автоматизации содержимого безопасности. Кроссплатформенность: - Ansible или Chef/Puppet: автоматизируйте усиление конфигурации в масштабе. - OpenSCAP: выполнение проверок соответствия и конфигурации."
+    ]
+  },
+  {
+    "id": "T1602.002",
+    "name": "Дамп конфигурации сетевого устройства",
+    "tactic": "Collection",
+    "description": "Злоумышленники могут получить доступ к файлам конфигурации сети для сбора конфиденциальных данных об устройстве и сети. Конфигурация сети представляет собой файл, содержащий параметры, определяющие работу устройства. Устройство обычно сохраняет копию конфигурации в памяти во время работы и отдельную конфигурацию в энергонезависимом хранилище для загрузки после перезагрузки устройства. Злоумышленники могут проверять файлы конфигурации, чтобы выявить информацию о целевой сети и ее структуре, сетевом устройстве и его программном обеспечении или идентифицировать законные учетные записи и учетные данные для последующего использования. Злоумышленники могут использовать общие инструменты и протоколы управления, такие как простой протокол управления сетью (SNMP) и интеллектуальную установку (SMI), для доступа к файлам конфигурации сети.",
+    "platforms": [
+      "Network Devices"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [],
+    "detection": "",
+    "mitigations": [
+      "Защитите конфиденциальную информацию при хранении, передаче и во время обработки с помощью надежных алгоритмов шифрования. Шифрование обеспечивает конфиденциальность и целостность данных, предотвращая несанкционированный доступ или подделку. Это смягчение может быть реализовано с помощью следующих мер: Шифрование хранящихся данных: - Вариант использования: используйте полнодисковое шифрование или шифрование на уровне файлов для защиты конфиденциальных данных, хранящихся на устройствах. - Реализация: внедрите BitLocker для систем Windows или FileVault для устройств MacOS для шифрования жестких дисков. Шифрование передаваемых данных: - Вариант использования: используйте безопасные протоколы связи (например, TLS, HTTPS) для шифрования конфиденциальных данных при их передаче по сети. - Реализация: включите HTTPS для всех веб-приложений и настройте почтовые серверы для принудительного использования STARTTLS для шифрования электронной почты. Шифрование резервных копий: - Вариант использования: убедитесь, что данные резервных копий зашифрованы как во время хранения, так и при передаче, чтобы предотвратить несанкционированный доступ. - Реализация: шифруйте облачные резервные копии с помощью AES-256 перед их загрузкой в ​​Amazon S3 или Google Cloud. Шифрование секретов приложений: - Вариант использования: храните конфиденциальные учетные данные, ключи API и файлы конфигурации в зашифрованных хранилищах. - Реализация: используйте HashiCorp Vault или AWS Secrets Manager для управления секретами и их шифрования. Шифрование базы данных: - Вариант использования: включите прозрачное шифрование данных (TDE) или шифрование на уровне столбца в системах управления базами данных. - Реализация: используйте встроенные функции шифрования MySQL для шифрования конфиденциальных полей базы данных, таких как номера социального страхования.",
+      "Сегментация сети предполагает разделение сети на более мелкие изолированные сегменты для контроля и ограничения потока трафика между устройствами, системами и приложениями. Сегментируя сети, организации могут уменьшить поверхность атаки, ограничить горизонтальное перемещение злоумышленников и защитить критически важные активы от компрометации. Эффективная сегментация сети использует сочетание физических границ, логического разделения через VLAN и политики контроля доступа, реализуемые сетевыми устройствами, такими как межсетевые экраны, маршрутизаторы и облачные конфигурации. Это смягчение может быть реализовано с помощью следующих мер: Сегментируйте критические системы: - Идентифицируйте и группируйте системы на основе их функций, чувствительности и риска. Примеры включают платежные системы, базы данных кадровых ресурсов, производственные системы и серверы с выходом в Интернет. - Используйте VLAN, межсетевые экраны или маршрутизаторы для обеспечения логического разделения. Внедрите DMZ для общедоступных служб: — Разместите веб-серверы, DNS-серверы и серверы электронной почты в DMZ, чтобы ограничить их доступ к внутренним системам. - Применяйте строгие правила брандмауэра для фильтрации трафика между DMZ и внутренними сетями. Используйте облачную сегментацию: — В облачных средах используйте VPC, подсети и группы безопасности для изоляции приложений и обеспечения соблюдения правил трафика. — Примените AWS Transit Gateway или пиринг виртуальной сети Azure для контролируемого подключения между облачными сегментами. Применяйте микросегментацию для рабочих нагрузок. — Используйте инструменты программно-определяемой сети (SDN) для реализации сегментации на уровне рабочей нагрузки и предотвращения горизонтального смещения. Ограничьте трафик с помощью списков ACL и брандмауэров: — Примените списки контроля доступа (ACL) к сетевым устройствам, чтобы обеспечить соблюдение политик «запретить по умолчанию». - Используйте брандмауэры для ограничения трафика как с севера на юг (внешний-внутренний), так и с востока на запад (внутренний-внутренний). Мониторинг и аудит сегментированных сетей: - Регулярно проверяйте правила брандмауэра, списки управления доступом и политики сегментации. - Отслеживайте сетевые потоки на предмет аномалий, чтобы обеспечить эффективность сегментации. Тестирование эффективности сегментации: - Выполняйте периодические тесты на проникновение, чтобы убедиться, что несанкционированный доступ заблокирован между сегментами сети.",
+      "Используйте сигнатуры обнаружения вторжений для блокировки трафика на границах сети.",
+      "Конфигурация программного обеспечения подразумевает внесение ориентированных на безопасность корректировок в настройки приложений, промежуточного программного обеспечения, баз данных или другого программного обеспечения для снижения потенциальных угроз. Эти изменения помогают уменьшить поверхность атаки, внедрить лучшие практики и защитить конфиденциальные данные. Это смягчение может быть реализовано с помощью следующих мер: Проведите проверку безопасности настроек приложения: - Просмотрите документацию по программному обеспечению, чтобы определить рекомендуемые конфигурации безопасности. - Сравните настройки по умолчанию с политиками организации и требованиями соответствия. Внедрите средства контроля доступа и разрешения: - Ограничьте доступ к конфиденциальным функциям или данным в программном обеспечении. - Обеспечьте соблюдение принципов наименьших привилегий для всех ролей и учетных записей, взаимодействующих с программным обеспечением. Включите ведение журнала и мониторинг: — Настройте подробное журналирование ключевых событий приложения, таких как сбои аутентификации, изменения конфигурации или необычная активность. - Интегрируйте журналы с решением централизованного мониторинга, например SIEM. Регулярно обновляйте и исправляйте программное обеспечение: - Обеспечьте актуальность программного обеспечения с использованием новейших исправлений безопасности для устранения известных уязвимостей. - Используйте автоматизированные инструменты управления исправлениями для оптимизации процесса обновления. Отключите ненужные функции или службы. — Отключите неиспользуемые функции или компоненты, которые могут создавать уязвимости, например интерфейсы отладки или устаревшие API. Тестирование изменений конфигурации: — Выполняйте изменения конфигурации в промежуточной среде, прежде чем применять их в рабочей среде. - Проводить регулярные проверки, чтобы гарантировать соответствие настроек политикам безопасности. *Инструменты для реализации* Инструменты управления конфигурацией: - Ansible: автоматизирует изменение конфигурации в нескольких приложениях и средах. - Chef: обеспечивает согласованность настроек приложения посредством управления конфигурацией на основе кода. - Puppet: автоматизирует конфигурацию программного обеспечения и проверяет изменения на предмет соответствия. Инструменты тестирования безопасности: - CIS-CAT: обеспечивает тесты и аудит безопасных конфигураций программного обеспечения. - Aqua Security Trivy: сканирует контейнерные приложения на наличие проблем с конфигурацией. Решения по управлению уязвимостями: - Nessus: выявляет неправильные конфигурации и предлагает корректирующие действия. Инструменты ведения журнала и мониторинга: - Splunk: объединяет и анализирует журналы приложений для обнаружения подозрительной активности.",
+      "Используйте сетевые устройства и программное обеспечение конечных точек для фильтрации входящего, исходящего и параллельного сетевого трафика. Сюда входит фильтрация на основе протоколов, соблюдение правил брандмауэра, а также блокировка или ограничение трафика на основе заранее определенных условий для ограничения движения злоумышленников и кражи данных. Это смягчение может быть реализовано с помощью следующих мер: Фильтрация входящего трафика: - Вариант использования: настройте сетевые брандмауэры так, чтобы пропускать трафик только с авторизованных IP-адресов на общедоступные серверы. - Реализация: ограничить трафик SSH (порт 22) и RDP (порт 3389) определенными диапазонами IP-адресов. Фильтрация исходящего трафика: - Вариант использования: используйте межсетевые экраны или программное обеспечение для обеспечения безопасности конечных точек для блокировки несанкционированного исходящего трафика, чтобы предотвратить утечку данных и обмен данными по управлению и контролю (C2). - Реализация: блокировать исходящий трафик на известные вредоносные IP-адреса или регионы, где связь неожиданна. Фильтрация на основе протоколов: - Вариант использования: Ограничьте использование определенных протоколов, которыми обычно злоупотребляют злоумышленники, таких как SMB, RPC или Telnet, в зависимости от потребностей бизнеса. - Реализация: отключите SMBv1 на конечных точках, чтобы предотвратить такие эксплойты, как EternalBlue. Сегментация сети: - Вариант использования: создайте сегменты сети для критически важных систем и ограничьте связь между сегментами, если это явно не разрешено. - Реализация: внедрение VLAN для изоляции устройств IoT или гостевых сетей от основных бизнес-систем. Фильтрация уровня приложений: - Вариант использования: используйте прокси-серверы или брандмауэры веб-приложений (WAF) для проверки и блокировки вредоносного трафика HTTP/S. - Реализация: настройте WAF для блокировки попыток внедрения SQL или других методов использования веб-приложений.",
+      "Обновления программного обеспечения обеспечивают защиту систем от известных уязвимостей путем применения исправлений и обновлений, предоставляемых поставщиками. Регулярные обновления уменьшают поверхность атаки и не позволяют злоумышленникам использовать известные бреши в безопасности. Сюда входит исправление операционных систем, приложений, драйверов и встроенного ПО. Это смягчение можно реализовать с помощью следующих мер: Регулярные обновления операционной системы. Реализация: ежемесячно применяйте последние обновления безопасности Windows с помощью WSUS (службы обновления сервера Windows) или аналогичного решения для управления исправлениями. Настройте системы на автоматическую проверку обновлений и планирование перезагрузок во время периодов обслуживания. - Вариант использования: предотвращает использование уязвимостей ОС, таких как повышение привилегий или удаленное выполнение кода. Исправление приложений — реализация: отслеживайте примечания к выпуску обновлений Apache на наличие исправлений безопасности, устраняющих уязвимости. Запланируйте обновления в часы непиковой нагрузки, чтобы избежать простоев и обеспечить соблюдение требований безопасности. - Вариант использования: предотвращает использование уязвимостей веб-приложений, например тех, которые приводят к несанкционированному доступу или утечке данных. Обновления встроенного ПО. Реализация. Регулярно проверяйте веб-сайт поставщика на наличие обновлений встроенного ПО, устраняющих уязвимости. Планируйте развертывание обновлений во время планового обслуживания, чтобы свести к минимуму сбои в работе бизнеса. - Вариант использования: защищает от уязвимостей, которые злоумышленники могут использовать для получения доступа к сетевым устройствам или внедрения вредоносного трафика. Аварийное развертывание исправлений — реализация. Используйте функцию аварийного развертывания исправлений инструмента управления исправлениями организации, чтобы применить обновления ко всем затронутым серверам Exchange в течение 24 часов. - Вариант использования: снижает риск эксплуатации за счет быстрого устранения критических уязвимостей. Централизованное управление исправлениями — реализация. Внедрите централизованную систему управления исправлениями, например SCCM или ManageEngine, для автоматизации и отслеживания развертывания исправлений во всех средах. Создавайте регулярные отчеты о соответствии требованиям, чтобы обеспечить обновление всех систем. - Вариант использования: оптимизирует процессы установки исправлений и гарантирует, что ни одна критически важная система не будет пропущена. *Инструменты для внедрения* Инструменты управления исправлениями: - WSUS: управление обновлениями Microsoft и их развертывание в организации. - ManageEngine Patch Manager Plus: автоматизируйте развертывание исправлений для ОС и сторонних приложений. - Ansible: автоматизируйте обновления на нескольких платформах, включая Linux и Windows. Инструменты сканирования уязвимостей: - OpenVAS: сканирование уязвимостей с открытым исходным кодом для выявления отсутствующих исправлений."
+    ]
+  },
+  {
+    "id": "T1589",
+    "name": "Соберите информацию о личности жертвы",
+    "tactic": "Reconnaissance",
+    "description": "Злоумышленники могут собирать информацию о личности жертвы, которую можно использовать при нацеливании. Информация о личности может включать в себя различные сведения, в том числе личные данные (например, имена сотрудников, адреса электронной почты, ответы на секретные вопросы и т. д.), а также конфиденциальные сведения, такие как учетные данные или конфигурации многофакторной аутентификации (MFA). Злоумышленники могут собирать эту информацию различными способами, например, путем прямого сбора информации с помощью [фишинга информации] (https://attack.mitre.org/techniques/T1598). Информация о пользователях также может быть пронумерована с помощью других активных средств (например, [Активное сканирование](https://attack.mitre.org/techniques/T1595)) таких как исследование и анализ ответов от служб аутентификации, которые могут выявить действительные имена пользователей в системе или разрешенные MFA/методы, связанные с этими именами пользователей. (Цитата: GrimBlog UsernameEnum) (Цитата: Obsidian SSPR Abuse 2023) Информация о жертвах также может быть раскрыта злоумышленникам через Интернет или другие доступные наборы данных (например: [Социальные сети](https://attack.mitre.org/techniques/T1593/001) или [Поиск на веб-сайтах, принадлежащих жертвам](https://attack.mitre.org/techniques/T1594)). Uber)(Цитирование: Detectify Slack Tokens)(Цитирование: Forbes GitHub Creds)(Цитирование: GitHub truffleHog)(Цитирование: GitHub Gitrob)(Цитирование: CNET Leaks) Сбор этой информации может открыть возможности для других форм разведки (например: [Search Open) Веб-сайты/домены] (https://attack.mitre.org/techniques/T1593) или [Фишинг информации] (https://attack.mitre.org/techniques/T1598)), создание операционных ресурсов (например: [Компрометированные учетные записи] (https://attack.mitre.org/techniques/T1586)) и/или первоначальный доступ (например: [Фишинг](https://attack.mitre.org/techniques/T1566) или [Действительные аккаунты](https://attack.mitre.org/techniques/T1078)).",
+    "platforms": [
+      "PRE"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [],
+    "detection": "",
+    "mitigations": [
+      "Меры по смягчению последствий перед компрометацией включают в себя упреждающие меры и средства защиты, которые не позволяют злоумышленникам успешно выявлять и использовать слабые места на этапах разведки и разработки ресурсов атаки. Эти действия сосредоточены на уменьшении поверхности атаки организации, выявлении усилий противника по подготовке и усложнении проведения успешных операций злоумышленниками. Это смягчение может быть реализовано с помощью следующих мер: Ограничить раскрытие информации: - Регулярно проверять и очищать общедоступные данные, включая объявления о вакансиях, веб-сайты и социальные сети. - Используйте такие инструменты, как платформы OSINT-мониторинга (например, SpiderFoot, Recon-ng), для выявления утечки информации. Защитите домен и инфраструктуру DNS: - Включите DNSSEC и используйте защиту конфиденциальности WHOIS. - Отслеживайте захват доменов или похожие домены с помощью таких сервисов, как RiskIQ или DomainTools. Внешний мониторинг: — Используйте такие инструменты, как Shodan, Censys, для мониторинга внешней поверхности атаки. - Развертывание внешних сканеров уязвимостей для активного устранения слабых мест. Аналитика угроз: - Используйте такие платформы, как MISP, Recorded Future или Anomali, для отслеживания состязательной инфраструктуры, инструментов и активности. Защита контента и электронной почты: - Используйте решения для обеспечения безопасности электронной почты, такие как Proofpoint, Microsoft Defender для Office 365 или Mimecast. - Применяйте политики SPF/DKIM/DMARC для защиты от подделки электронной почты. Обучение и повышение осведомленности: - Обучите сотрудников выявлению попыток фишинга, обеспечению безопасности социальных сетей и предотвращению утечек информации."
+    ]
+  },
+  {
+    "id": "T1131",
+    "name": "Пакет аутентификации",
+    "tactic": "Persistence",
+    "description": "Библиотеки пакета проверки подлинности Windows загружаются процессом локального центра безопасности (LSA) при запуске системы. Они обеспечивают поддержку нескольких процессов входа в систему и нескольких протоколов безопасности операционной системы. (Цитата: Пакеты аутентификации MSDN) Злоумышленники могут использовать механизм автозапуска, предоставляемый пакетами аутентификации LSA, для сохранения, разместив ссылку на двоичный файл в папке реестра Windows HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\ со значением ключа «Пакеты аутентификации»= . Двоичный файл будет затем выполнен системой при загрузке пакетов аутентификации.",
+    "platforms": [
+      "Windows"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [
+      "windows_os"
+    ],
+    "detection": "",
+    "mitigations": []
+  },
+  {
+    "id": "T1181",
+    "name": "Дополнительная инъекция оконной памяти",
+    "tactic": "Defense Evasion",
+    "description": "Перед созданием окна графические процессы на базе Windows должны прописать или зарегистрировать класс окна, который определяет внешний вид и поведение (через процедуры Windows, которые представляют собой функции, обрабатывающие ввод/вывод данных). (Цитата: Классы окон Microsoft) Регистрация новых классов окон может включать запрос на добавление до 40 байт дополнительной оконной памяти (EWM) к выделенной памяти каждого экземпляра этого класса. Этот EWM предназначен для хранения данных, относящихся к этому окну, и имеет специальные функции интерфейса прикладного программирования (API) для установки и получения их значения. (Цитата: функция Microsoft GetWindowLong) (Цитата: функция Microsoft SetWindowLong) Несмотря на небольшой размер, EWM достаточно велик для хранения 32-битного указателя и часто используется для указания на процедуру Windows. Вредоносное ПО может использовать эту область памяти в рамках цепочки атак, которая включает в себя запись кода в общие разделы памяти процесса, размещение указателя на код в EWM, а затем вызов выполнения путем возврата управления выполнением по адресу в EWM процесса. Выполнение, предоставленное посредством внедрения EWM, может происходить в адресном пространстве отдельного действующего процесса. Подобно [Внедрению процесса](https://attack.mitre.org/techniques/T1055), это может обеспечить доступ как к памяти целевого процесса, так и, возможно, к повышенным привилегиям. Запись полезных данных в общие разделы также позволяет избежать использования тщательно отслеживаемых вызовов API, таких как WriteProcessMemory и CreateRemoteThread. (Цитата: Elastic Process Injection, июль 2017 г.) Более сложные образцы вредоносного ПО также могут потенциально обходить механизмы защиты, такие как предотвращение выполнения данных (DEP), запуская комбинацию процедур Windows и других системных функций, которые переписывают вредоносную полезную нагрузку внутри исполняемой части целевого процесса. (Цитата: MalwareTech Power Loader, август 2013 г.) (Цитата: WeLiveSecurity Gapz и Redyms, март 2013 г.)",
+    "platforms": [
+      "Windows"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [
+      "api_service",
+      "windows_os"
+    ],
+    "detection": "",
+    "mitigations": []
+  },
+  {
+    "id": "T1562.004",
+    "name": "Отключить или изменить системный брандмауэр",
+    "tactic": "Defense Evasion",
+    "description": "Злоумышленники могут отключать или модифицировать системные брандмауэры, чтобы обойти средства контроля, ограничивающие использование сети. Изменения могут включать отключение всего механизма, а также добавление, удаление или изменение отдельных правил. Это можно сделать разными способами в зависимости от операционной системы, в том числе через командную строку, редактирование ключей реестра Windows и панель управления Windows. Изменение или отключение системного брандмауэра может привести к тому, что злоумышленник сможет осуществлять связь C2, горизонтальное перемещение и/или утечку данных, что в противном случае было бы невозможно. Например, злоумышленники могут добавить новое правило межсетевого экрана для известного протокола (например, RDP), используя нетрадиционный и потенциально менее защищенный порт (например, [Нестандартный порт](https://attack.mitre.org/techniques/T1571)). (Цитата:change_rdp_port_conti). Злоумышленники также могут изменять настройки сети хоста, которые косвенно манипулируют системными межсетевыми экранами, например пропускной способностью интерфейса. или пороговые значения запросов на сетевое подключение. (Цитата: Huntress BlackCat) Настройки, связанные с включением злоупотреблений различными [Удаленными службами] (https://attack.mitre.org/techniques/T1021), также могут косвенно изменять правила брандмауэра. В ESXi правила брандмауэра можно изменить напрямую через интерфейс командной строки esxcli (например, через `esxcli network firewall set`) или через пользовательский интерфейс vCenter. (Цитата: Trellix Rnasomhouse 2024) (Цитата: Broadcom ESXi Firewall)",
+    "platforms": [
+      "ESXi",
+      "Linux",
+      "macOS",
+      "Network Devices",
+      "Windows"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [
+      "macos_os",
+      "rdp",
+      "windows_os",
+      "linux_os"
+    ],
+    "detection": "",
+    "mitigations": [
+      "Аудит — это процесс регистрации активности, а также систематического просмотра и анализа активности и конфигураций системы. Основная цель аудита — обнаружить аномалии и выявить потенциальные угрозы или слабые места в среде. Правильные конфигурации аудита также могут помочь обеспечить соответствие требованиям. Процесс аудита включает в себя регулярный анализ поведения пользователей и системных журналов в поддержку превентивных мер безопасности. Аудит применим ко всем системам, используемым в организации, от входной двери здания до доступа к файлу на файловом сервере. Это считается более критичным для регулируемых отраслей, таких как здравоохранение, финансы и правительство, где требования соответствия требуют строгого отслеживания активности пользователей и систем. Это смягчение может быть реализовано с помощью следующих мер: Аудит системы: - Вариант использования: Регулярно оценивайте конфигурации системы для обеспечения соответствия политикам безопасности организации. - Реализация: использовать инструменты для поиска отклонений от установленных контрольных показателей. Аудит разрешений: - Вариант использования: просмотрите права доступа к файлам и папкам, чтобы свести к минимуму риск несанкционированного доступа или повышения привилегий. - Реализация: запускайте проверки доступа для выявления пользователей или групп с чрезмерными разрешениями. Аудит программного обеспечения: - Вариант использования: выявление устаревшего, неподдерживаемого или небезопасного программного обеспечения, которое может служить вектором атаки. - Реализация: использовать инструменты инвентаризации и сканирования уязвимостей для обнаружения устаревших версий и рекомендации безопасных альтернатив. Аудит конфигурации: - Вариант использования: оцените конфигурации системы и сети для обеспечения безопасности настроек (например, отключен SMBv1, включен MFA). - Реализация: внедрить инструменты автоматического сканирования конфигурации, такие как SCAP (протокол автоматизации контента безопасности), для выявления несоответствующих систем. Аудит сети: - Вариант использования: проверка сетевого трафика, правил брандмауэра и связи конечных точек для выявления несанкционированных или небезопасных подключений. - Реализация: используйте такие инструменты, как Wireshark или Zeek, для мониторинга и регистрации подозрительного поведения сети.",
+      "Управление учетными записями пользователей включает в себя внедрение и обеспечение соблюдения политик на протяжении всего жизненного цикла учетных записей пользователей, включая создание, изменение и деактивацию. Правильное управление учетными записями уменьшает поверхность атаки за счет ограничения несанкционированного доступа, управления привилегиями учетных записей и обеспечения использования учетных записей в соответствии с политиками организации. Это смягчение может быть реализовано с помощью следующих мер: Обеспечение соблюдения принципа наименьших привилегий – реализация: назначайте пользователям только минимальные разрешения, необходимые для выполнения их рабочих функций. Регулярно проверяйте учетные записи, чтобы убедиться, что не предоставлены лишние разрешения. - Вариант использования: снижает риск повышения привилегий, гарантируя, что учетные записи не смогут выполнять несанкционированные действия. Реализация политики надежных паролей. Реализация: обеспечить соблюдение требований к сложности пароля (например, к длине, типам символов). Требовать истечения срока действия пароля каждые 90 дней и запрещать повторное использование пароля. - Вариант использования: предотвращает получение злоумышленниками несанкционированного доступа посредством подбора пароля или атак методом перебора. Управление неактивными и потерянными учетными записями. Реализация: внедрить автоматизированные рабочие процессы для отключения учетных записей после установленного периода бездействия (например, 30 дней). Удаляйте потерянные учетные записи (например, учетные записи без назначенного владельца) во время регулярных проверок учетных записей. - Вариант использования: устраняет неактивные учетные записи, которые могут быть использованы злоумышленниками. Политики блокировки учетных записей — реализация: настройка пороговых значений блокировки учетных записей (например, блокировка учетных записей после пяти неудачных попыток входа в систему). Установите продолжительность блокировки минимум на 15 минут. - Вариант использования: смягчает методы автоматических атак, основанные на повторных попытках входа в систему. Многофакторная аутентификация (MFA) для учетных записей с высоким уровнем риска. Реализация: требовать MFA для всех административных учетных записей и пользователей с высоким уровнем риска. Используйте механизмы MFA, такие как аппаратные токены, приложения для проверки подлинности или биометрические данные. - Вариант использования: предотвращает несанкционированный доступ, даже если учетные данные украдены. Ограничение интерактивного входа в систему — реализация: Ограничьте интерактивный вход в систему для привилегированных учетных записей определенными безопасными системами или консолями управления. Используйте групповые политики для обеспечения соблюдения ограничений входа в систему. - Вариант использования: защищает конфиденциальные учетные записи от неправильного использования или эксплуатации. *Инструменты для реализации* Встроенные инструменты: - Microsoft Active Directory (AD): централизованное управление учетными записями и применение RBAC. - Объект групповой политики (GPO): обеспечивает соблюдение политик паролей, ограничений входа в систему и политик блокировки учетных записей. Инструменты управления идентификацией и доступом (IAM): - Okta: централизованная подготовка пользователей, интеграция MFA и SSO. - Microsoft Azure Active Directory: обеспечивает расширенное управление жизненным циклом учетной записи, доступ на основе ролей и политики условного доступа. Управление привилегированными учетными записями (PAM): - CyberArk, BeyondTrust, Thycotic: управление и мониторинг использования привилегированных учетных записей, обеспечение записи сеансов и JIT-доступа.",
+      "Ограничение разрешений реестра включает настройку параметров контроля доступа для конфиденциальных разделов и кустов реестра, чтобы гарантировать, что только авторизованные пользователи или процессы могут вносить изменения. Ограничивая доступ, организации могут предотвратить несанкционированные изменения, которые злоумышленники могут использовать для сохранения, повышения привилегий или обхода защиты. Это смягчение может быть реализовано с помощью следующих мер: Просмотр и настройка разрешений для критических ключей. Регулярно проверяйте разрешения для таких ключей, как «Run», «RunOnce» и «Services», чтобы гарантировать, что только авторизованные пользователи имеют доступ на запись. - Используйте такие инструменты, как icacls или PowerShell, для автоматизации настройки разрешений. Включить аудит реестра. Включите аудит конфиденциальных ключей для регистрации попыток доступа. - Используйте Event Viewer или решения SIEM для анализа журналов и обнаружения подозрительной активности. - Пример политики аудита: `auditpol /set /subcategory:\"Registry\" /success:enable /failure:enable` Защита кустов, связанных с учетными данными. Ограничьте доступ к ульям, таким как `SAM`,`SECURITY` и `SYSTEM`, чтобы предотвратить сброс учетных данных или другой несанкционированный доступ. - Используйте LSA Protection, чтобы добавить дополнительный уровень безопасности для хранения учетных данных. Ограничить использование редактора реестра. Используйте групповую политику, чтобы ограничить доступ к regedit.exe для пользователей, не являющихся администраторами. - Блокировать выполнение инструментов редактирования реестра на конечных точках, где они не нужны. Развертывание инструментов базовой настройки. Используйте такие инструменты, как Microsoft Security Compliance Toolkit или CIS Benchmarks, для применения и поддержания безопасных конфигураций реестра. *Инструменты для реализации* Инструменты разрешения реестра: - Редактор реестра (regedit): встроенный инструмент для управления разрешениями реестра. - PowerShell: автоматизация разрешений и управление ключами. `Set-ItemProperty -Path \"HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" -Name \"KeyName\" -Value \"Value\"` - icacls: инструмент командной строки для изменения списков ACL. Инструменты мониторинга: - Sysmon: отслеживает и регистрирует события реестра. - Просмотр событий: просмотр журналов доступа к реестру. Инструменты управления политиками: - Консоль управления групповыми политиками (GPMC): принудительное применение разрешений реестра через объекты групповой политики. - Microsoft Endpoint Manager: развертывание базовых показателей конфигурации для разрешений реестра.",
+      "Ограничение прав доступа к файлам и каталогам включает настройку контроля доступа на уровне файловой системы, чтобы ограничить круг пользователей, групп или процессов, которые могут читать, записывать или выполнять файлы. Настраивая разрешения соответствующим образом, организации могут уменьшить поверхность атаки для злоумышленников, пытающихся получить доступ к конфиденциальным данным, внедрить вредоносный код или подделать системные файлы. Примените разрешения с наименьшими привилегиями: — Удалите ненужные разрешения на запись для конфиденциальных файлов и каталогов. - Используйте права собственности на файлы и группы для управления доступом для определенных ролей. Пример (Windows): щелкните правой кнопкой мыши общую папку → Свойства → вкладка «Безопасность» → Настройте разрешения для списков управления доступом NTFS. Усиление общих папок: — Отключите анонимный доступ к общим папкам. - Обеспечить разрешения NTFS для общих папок в Windows. Пример: установите разрешения, чтобы ограничить доступ на запись к критически важным файлам, таким как системные исполняемые файлы (например, `/bin` или `/sbin` в Linux). Используйте такие инструменты, как chown и chmod, чтобы назначить владельца файла и ограничить доступ. В Linux примените: `chmod 750 /etc/sensitivity.conf` `chown root:admin /etc/sensitivity.conf` Мониторинг целостности файлов (FIM): - Используйте такие инструменты, как Tripwire, Wazuh или OSSEC, для мониторинга изменений критических прав доступа к файлам. Аудит доступа к файловой системе: — Включите аудит для отслеживания изменений разрешений или попыток несанкционированного доступа. - Используйте Auditd (Linux) или Event Viewer (Windows) для регистрации действий. Ограничить каталоги запуска: — Настройте разрешения для предотвращения несанкционированной записи в такие каталоги, как «C:\\ProgramData\\Microsoft\\Windows\\Start Menu». Пример: Ограничьте доступ на запись к критически важным каталогам, таким как `/etc/`, `/usr/local/`, и каталогам Windows, таким как `C:\\Windows\\System32`. - В Windows используйте icacls для изменения разрешений: `icacls \"C:\\Windows\\System32\" /inheritance:r /grant:r SYSTEM:(OI)(CI)F` - В Linux отслеживайте разрешения с помощью таких инструментов, как `lsattr` или `auditd`."
+    ]
+  },
+  {
+    "id": "T1560",
+    "name": "Архивировать собранные данные",
+    "tactic": "Collection",
+    "description": "Злоумышленник может сжать и/или зашифровать данные, собранные перед кражей. Сжатие данных может помочь запутать собранные данные и минимизировать объем данных, передаваемых по сети. (Цитата: Обвинительный акт ГРУ Министерства юстиции США, июль 2018 г.) Шифрование может использоваться для сокрытия информации, которая украдена, от обнаружения или для того, чтобы сделать утечку менее заметной при проверке защитником. И сжатие, и шифрование выполняются перед эксфильтрацией и могут быть выполнены с помощью утилиты, сторонней библиотеки или специального метода.",
+    "platforms": [
+      "Linux",
+      "macOS",
+      "Windows"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [
+      "macos_os",
+      "windows_os",
+      "linux_os"
+    ],
+    "detection": "",
+    "mitigations": [
+      "Аудит — это процесс регистрации активности, а также систематического просмотра и анализа активности и конфигураций системы. Основная цель аудита — обнаружить аномалии и выявить потенциальные угрозы или слабые места в среде. Правильные конфигурации аудита также могут помочь обеспечить соответствие требованиям. Процесс аудита включает в себя регулярный анализ поведения пользователей и системных журналов в поддержку превентивных мер безопасности. Аудит применим ко всем системам, используемым в организации, от входной двери здания до доступа к файлу на файловом сервере. Это считается более критичным для регулируемых отраслей, таких как здравоохранение, финансы и правительство, где требования соответствия требуют строгого отслеживания активности пользователей и систем. Это смягчение может быть реализовано с помощью следующих мер: Аудит системы: - Вариант использования: Регулярно оценивайте конфигурации системы для обеспечения соответствия политикам безопасности организации. - Реализация: использовать инструменты для поиска отклонений от установленных контрольных показателей. Аудит разрешений: - Вариант использования: просмотрите права доступа к файлам и папкам, чтобы свести к минимуму риск несанкционированного доступа или повышения привилегий. - Реализация: запускайте проверки доступа для выявления пользователей или групп с чрезмерными разрешениями. Аудит программного обеспечения: - Вариант использования: выявление устаревшего, неподдерживаемого или небезопасного программного обеспечения, которое может служить вектором атаки. - Реализация: использовать инструменты инвентаризации и сканирования уязвимостей для обнаружения устаревших версий и рекомендации безопасных альтернатив. Аудит конфигурации: - Вариант использования: оцените конфигурации системы и сети для обеспечения безопасности настроек (например, отключен SMBv1, включен MFA). - Реализация: внедрить инструменты автоматического сканирования конфигурации, такие как SCAP (протокол автоматизации контента безопасности), для выявления несоответствующих систем. Аудит сети: - Вариант использования: проверка сетевого трафика, правил брандмауэра и связи конечных точек для выявления несанкционированных или небезопасных подключений. - Реализация: используйте такие инструменты, как Wireshark или Zeek, для мониторинга и регистрации подозрительного поведения сети."
+    ]
+  },
+  {
+    "id": "T1152",
+    "name": "Launchctl",
+    "tactic": "Defense Evasion",
+    "description": "Launchctl управляет процессом запуска macOS, который обрабатывает такие вещи, как агенты запуска и демоны запуска, но может сам выполнять другие команды или программы. Launchctl поддерживает выполнение подкоманд в командной строке, в интерактивном режиме или даже с перенаправлением со стандартного ввода. Загружая или перезагружая агенты запуска или запуская демоны, злоумышленники могут установить постоянство или выполнить внесенные ими изменения (Цитата: Троян Sofacy Komplex). Запустить команду из launchctl так же просто, как launchctl submit -l -- /Path/to/thing/to/execute \"arg\" \"arg\" \"arg\" . Загрузка, выгрузка или перезагрузка агентов запуска или демонов запуска могут потребовать повышенных привилегий. Злоумышленники могут злоупотреблять этой функцией для выполнения кода или даже для обхода белого списка, если launchctl является разрешенным процессом.",
+    "platforms": [
+      "macOS"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [
+      "macos_os"
+    ],
+    "detection": "",
+    "mitigations": []
+  },
+  {
+    "id": "T1553.003",
+    "name": "Взлом SIP и Trust-провайдера",
+    "tactic": "Defense Evasion",
+    "description": "Злоумышленники могут вмешиваться в компоненты SIP и доверия поставщика, чтобы ввести в заблуждение операционную систему и инструменты управления приложениями при проведении проверок подписи. В пользовательском режиме цифровые подписи Windows Authenticode (Цитата: Microsoft Authenticode) используются для проверки происхождения и целостности файла, переменные, которые могут использоваться для установления доверия к подписанному коду (например: драйвер с действительной подписью Microsoft может рассматриваться как безопасный). Процесс проверки подписи осуществляется с помощью функции интерфейса прикладного программирования (API) WinVerifyTrust (Цитата: Microsoft WinVerifyTrust), которая принимает запрос и координирует свои действия с соответствующим поставщиком доверия, который отвечает за проверку параметров подписи. (Цитата: SpectorOps Subverting Trust, сентябрь 2017 г.) Из-за различных типов исполняемых файлов и соответствующих форматов сигнатур Microsoft создала программные компоненты, называемые пакетами субъектного интерфейса (SIP) (Цитата: SIP EduardosBlog, июль 2008 г.), чтобы обеспечить уровень абстракции между функциями API и файлами. SIP отвечают за предоставление функциям API возможности создавать, извлекать, вычислять и проверять подписи. Уникальные SIP существуют для большинства форматов файлов (исполняемых файлов, PowerShell, установщика и т. д.), при этом подписывание каталога обеспечивает всеобъемлющий характер (Цитата: Файлы и подписи каталога Microsoft, апрель 2017 г.)) и идентифицируются глобальными уникальными идентификаторами (GUID). (Цитата: SpectorOps Subverting Trust, сентябрь 2017 г.) Подобно [подписи кода](https://attack.mitre.org/techniques/T1553/002), злоумышленники могут злоупотреблять этой архитектурой, чтобы подорвать контроль доверия и обойти политики безопасности, которые позволяют выполнять в системе только законно подписанный код. Злоумышленники могут перехватить SIP и компоненты поставщика доверия, чтобы ввести в заблуждение инструменты управления операционной системой и приложениями, чтобы классифицировать вредоносный (или любой другой) код, подписанный: (Цитата: SpectorOps Subverting Trust, сентябрь 2017 г.) * Изменение значений реестра Dll и FuncName в HKLM\\SOFTWARE[\\WOW6432Node\\]Microsoft\\Cryptography\\OID\\EncodingType 0\\CryptSIPDllGetSignedDataMsg\\{SIP_GUID}, которые указывают на библиотеку динамической компоновки (DLL), предоставляющую функцию SIP CryptSIPDllGetSignedDataMsg, которая извлекает закодированный цифровой сертификат из подписанного файла. Указывая на созданную со злым умыслом DLL с экспортированной функцией, которая всегда возвращает заведомо исправное значение подписи (например, подпись Microsoft для переносимых исполняемых файлов), а не реальную подпись файла, злоумышленник может применить приемлемое значение подписи ко всем файлам, использующим этот SIP (Цитата: GitHub SIP POC, сентябрь 2017 г.) (хотя, скорее всего, произойдет несоответствие хеша, что сделает подпись недействительной, поскольку хэш, возвращаемый функцией, не будет соответствовать вычисленному значению из файла). * Изменение значений реестра Dll и FuncName в HKLM\\SOFTWARE\\[WOW6432Node\\]Microsoft\\Cryptography\\OID\\EncodingType 0\\CryptSIPDllVerifyIndirectData\\{SIP_GUID}, которые указывают на DLL, предоставляющую функцию SIP CryptSIPDllVerifyIndirectData, которая проверяет вычисленный хэш файла на соответствие подписанному хешу. ценность. Указывая на вредоносную DLL с экспортированной функцией, которая всегда возвращает TRUE (указывая, что проверка прошла успешно), злоумышленник может успешно проверить любой файл (с легитимной подписью) с помощью этого SIP (Цитата: GitHub SIP POC, сентябрь 2017 г.) (с перехватом ранее упомянутой функции CryptSIPDllGetSignedDataMsg или без него). Это значение реестра также можно перенаправить на подходящую экспортированную функцию из уже существующей DLL, избегая необходимости удалять и выполнять новый файл на диске. * Изменение значений DLL и реестра функций в HKLM\\SOFTWARE\\[WOW6432Node\\]Microsoft\\Cryptography\\Providers\\Trust\\FinalPolicy\\{GUID поставщика доверия}, которые указывают на DLL, предоставляющую функцию FinalPolicy поставщика доверия, в которой проверяется декодированная и анализируемая подпись и принимается большинство решений о доверии. Подобно перехвату функции CryptSIPDllVerifyIndirectData SIP, это значение может быть перенаправлено в подходящую экспортированную функцию из уже существующей DLL или вредоносной DLL (хотя реализация поставщика доверия сложна). * **Примечание:** Вышеупомянутые перехваты также возможны без изменения реестра с помощью перехвата порядка поиска [DLL](https://attack.mitre.org/techniques/T1574/001). Взлом компонентов SIP или поставщика доверия также может обеспечить постоянное выполнение кода, поскольку эти вредоносные компоненты могут быть вызваны любым приложением, выполняющим подписывание кода или проверку подписи. (Цитата: SpectorOps Subverting Trust, сентябрь 2017 г.)",
+    "platforms": [
+      "Windows"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [
+      "powershell",
+      "api_service",
+      "windows_os"
+    ],
+    "detection": "",
+    "mitigations": [
+      "Предотвратите выполнение несанкционированного или вредоносного кода в системах, внедрив контроль приложений, блокировку сценариев и другие механизмы предотвращения выполнения. Это гарантирует выполнение только надежного и авторизованного кода, что снижает риск вредоносного ПО и несанкционированных действий. Это смягчение может быть реализовано с помощью следующих мер: Контроль приложений: - Вариант использования: используйте такие инструменты, как AppLocker или Контроль приложений Защитника Windows (WDAC), для создания белых списков авторизованных приложений и блокировки неавторизованных. В Linux используйте такие инструменты, как SELinux или AppArmor, чтобы определить политики обязательного контроля доступа для выполнения приложений. - Реализация: разрешить выполнение на серверах и конечных точках только приложений с цифровой подписью или предварительно одобренных приложений. (например, `New-AppLockerPolicy -PolicyType Enforced -FilePath \"C:\\Policies\\AppLocker.xml\"`) Блокировка сценариев: - Вариант использования: используйте механизмы управления сценариями для блокировки несанкционированного выполнения сценариев, таких как PowerShell или JavaScript. Веб-браузеры: используйте расширения или настройки браузера, чтобы заблокировать выполнение JavaScript из ненадежных источников. - Реализация: настройте PowerShell для обеспечения соблюдения режима ограниченного языка для пользователей, не являющихся администраторами. (например, `Set-ExecutionPolicy AllSigned`) Блокировка исполняемых файлов: - Вариант использования: запретить выполнение двоичных файлов из подозрительных мест, таких как каталоги `%TEMP%` или `%APPDATA%`. - Реализация: блокировать выполнение файлов .exe, .bat или .ps1 из каталогов, доступных для записи пользователем. Предотвращение динамического анализа: - Вариант использования: используйте инструменты предотвращения выполнения на основе поведения для выявления и блокировки вредоносной активности в режиме реального времени. - Реализация: используйте решения EDR, которые анализируют поведение во время выполнения и блокируют выполнение подозрительного кода.",
+      "Ограничение разрешений реестра включает настройку параметров контроля доступа для конфиденциальных разделов и кустов реестра, чтобы гарантировать, что только авторизованные пользователи или процессы могут вносить изменения. Ограничивая доступ, организации могут предотвратить несанкционированные изменения, которые злоумышленники могут использовать для сохранения, повышения привилегий или обхода защиты. Это смягчение может быть реализовано с помощью следующих мер: Просмотр и настройка разрешений для критических ключей. Регулярно проверяйте разрешения для таких ключей, как «Run», «RunOnce» и «Services», чтобы гарантировать, что только авторизованные пользователи имеют доступ на запись. - Используйте такие инструменты, как icacls или PowerShell, для автоматизации настройки разрешений. Включить аудит реестра. Включите аудит конфиденциальных ключей для регистрации попыток доступа. - Используйте Event Viewer или решения SIEM для анализа журналов и обнаружения подозрительной активности. - Пример политики аудита: `auditpol /set /subcategory:\"Registry\" /success:enable /failure:enable` Защита кустов, связанных с учетными данными. Ограничьте доступ к ульям, таким как `SAM`,`SECURITY` и `SYSTEM`, чтобы предотвратить сброс учетных данных или другой несанкционированный доступ. - Используйте LSA Protection, чтобы добавить дополнительный уровень безопасности для хранения учетных данных. Ограничить использование редактора реестра. Используйте групповую политику, чтобы ограничить доступ к regedit.exe для пользователей, не являющихся администраторами. - Блокировать выполнение инструментов редактирования реестра на конечных точках, где они не нужны. Развертывание инструментов базовой настройки. Используйте такие инструменты, как Microsoft Security Compliance Toolkit или CIS Benchmarks, для применения и поддержания безопасных конфигураций реестра. *Инструменты для реализации* Инструменты разрешения реестра: - Редактор реестра (regedit): встроенный инструмент для управления разрешениями реестра. - PowerShell: автоматизация разрешений и управление ключами. `Set-ItemProperty -Path \"HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\" -Name \"KeyName\" -Value \"Value\"` - icacls: инструмент командной строки для изменения списков ACL. Инструменты мониторинга: - Sysmon: отслеживает и регистрирует события реестра. - Просмотр событий: просмотр журналов доступа к реестру. Инструменты управления политиками: - Консоль управления групповыми политиками (GPMC): принудительное применение разрешений реестра через объекты групповой политики. - Microsoft Endpoint Manager: развертывание базовых показателей конфигурации для разрешений реестра.",
+      "Ограничение прав доступа к файлам и каталогам включает настройку контроля доступа на уровне файловой системы, чтобы ограничить круг пользователей, групп или процессов, которые могут читать, записывать или выполнять файлы. Настраивая разрешения соответствующим образом, организации могут уменьшить поверхность атаки для злоумышленников, пытающихся получить доступ к конфиденциальным данным, внедрить вредоносный код или подделать системные файлы. Примените разрешения с наименьшими привилегиями: — Удалите ненужные разрешения на запись для конфиденциальных файлов и каталогов. - Используйте права собственности на файлы и группы для управления доступом для определенных ролей. Пример (Windows): щелкните правой кнопкой мыши общую папку → Свойства → вкладка «Безопасность» → Настройте разрешения для списков управления доступом NTFS. Усиление общих папок: — Отключите анонимный доступ к общим папкам. - Обеспечить разрешения NTFS для общих папок в Windows. Пример: установите разрешения, чтобы ограничить доступ на запись к критически важным файлам, таким как системные исполняемые файлы (например, `/bin` или `/sbin` в Linux). Используйте такие инструменты, как chown и chmod, чтобы назначить владельца файла и ограничить доступ. В Linux примените: `chmod 750 /etc/sensitivity.conf` `chown root:admin /etc/sensitivity.conf` Мониторинг целостности файлов (FIM): - Используйте такие инструменты, как Tripwire, Wazuh или OSSEC, для мониторинга изменений критических прав доступа к файлам. Аудит доступа к файловой системе: — Включите аудит для отслеживания изменений разрешений или попыток несанкционированного доступа. - Используйте Auditd (Linux) или Event Viewer (Windows) для регистрации действий. Ограничить каталоги запуска: — Настройте разрешения для предотвращения несанкционированной записи в такие каталоги, как «C:\\ProgramData\\Microsoft\\Windows\\Start Menu». Пример: Ограничьте доступ на запись к критически важным каталогам, таким как `/etc/`, `/usr/local/`, и каталогам Windows, таким как `C:\\Windows\\System32`. - В Windows используйте icacls для изменения разрешений: `icacls \"C:\\Windows\\System32\" /inheritance:r /grant:r SYSTEM:(OI)(CI)F` - В Linux отслеживайте разрешения с помощью таких инструментов, как `lsattr` или `auditd`."
+    ]
+  },
+  {
+    "id": "T1483",
+    "name": "Алгоритмы генерации доменов",
+    "tactic": "Command And Control",
+    "description": "Злоумышленники могут использовать алгоритмы генерации доменов (DGA) для динамического определения пункта назначения для трафика управления и контроля, а не полагаться на список статических IP-адресов или доменов. Преимущество этого заключается в том, что защитникам намного сложнее блокировать, отслеживать или захватывать канал управления и контроля, поскольку потенциально могут существовать тысячи доменов, которые вредоносное ПО может проверять на наличие инструкций. istgmxdejdnxuyla.ru), когда они создают доменные имена, генерируя каждую букву. Альтернативно, некоторые DGA используют целые слова в качестве единицы, объединяя слова вместе вместо букв (например: cityjulydish.net). Многие DGA основаны на времени и генерируют разные домены для каждого периода времени (час, день, месяц и т. д.). Другие также включают начальное значение, чтобы усложнить прогнозирование будущих доменов для защитников. Каналы] (https://attack.mitre.org/techniques/T1008). При потере контакта с основным сервером управления и контроля вредоносное ПО может использовать DGA как средство восстановления управления и контроля.",
+    "platforms": [
+      "Linux",
+      "macOS",
+      "Windows"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [
+      "macos_os",
+      "windows_os",
+      "linux_os"
+    ],
+    "detection": "",
+    "mitigations": []
+  },
+  {
+    "id": "T1185",
+    "name": "Перехват сеанса браузера",
+    "tactic": "Collection",
+    "description": "Злоумышленники могут воспользоваться уязвимостями безопасности и встроенными функциями программного обеспечения браузера для изменения контента, поведения пользователей и перехвата информации в рамках различных методов захвата сеанса браузера. (Цитата: Человек из Википедии в браузере). Конкретным примером является ситуация, когда злоумышленник внедряет в браузер программное обеспечение, которое позволяет ему наследовать файлы cookie, HTTP-сессии и SSL-сертификаты клиента пользователя, а затем использовать браузер как способ перехода в аутентифицированную интрасеть. (Цитата: Cobalt Strike Browser Pivot) (Цитата: ICEBRG Chrome Extensions) Выполнение действий на основе браузера, таких как поворот, может потребовать определенных разрешений процесса, таких как SeDebugPrivilege и/или права высокой целостности/администратора. Другой пример включает в себя перенаправление трафика браузера из браузера злоумышленника через браузер пользователя путем настройки прокси-сервера, который будет перенаправлять веб-трафик. Это никоим образом не меняет трафик пользователя, а прокси-соединение может быть разорвано сразу после закрытия браузера. Злоумышленник принимает на себя контекст безопасности того процесса браузера, в который внедряется прокси. Браузеры обычно создают новый процесс для каждой открытой вкладки, а разрешения и сертификаты разделяются соответствующим образом. Имея эти разрешения, злоумышленник потенциально может перейти к любому ресурсу в интрасети, например [Sharepoint](https://attack.mitre.org/techniques/T1213/002) или веб-почте, доступному через браузер и на который у браузера есть достаточные разрешения. Поворот браузера также может обойти безопасность, обеспечиваемую двухфакторной аутентификацией. (Цитата: руководство по cobaltstrike)",
+    "platforms": [
+      "Windows"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [
+      "windows_os"
+    ],
+    "detection": "",
+    "mitigations": [
+      "Обучение пользователей включает в себя обучение сотрудников и подрядчиков распознаванию, сообщению и предотвращению киберугроз, которые зависят от человеческого взаимодействия, таких как фишинг, социальная инженерия и другие манипулятивные методы. Комплексные программы обучения создают человеческий брандмауэр, предоставляя пользователям возможность быть активным компонентом защиты кибербезопасности организации. Это смягчение может быть реализовано с помощью следующих мер: Создайте комплексные программы обучения: - Разработайте учебные модули, адаптированные к профилю рисков организации и охватывающие такие темы, как фишинг, управление паролями и отчеты об инцидентах. - Обеспечить специальное обучение для сотрудников из группы высокого риска, таких как сотрудники службы поддержки или руководители. Используйте моделируемые упражнения: - Проведите моделирование фишинга, чтобы измерить восприимчивость пользователей и обеспечить целевое последующее обучение. - Проведите учения по социальной инженерии, чтобы оценить реакцию сотрудников и укрепить протоколы. Используйте геймификацию и взаимодействие: - Внедряйте интерактивные методы обучения, такие как викторины, игровые задачи и вознаграждения за успешное обнаружение и сообщение об угрозах. Включите политику безопасности в процесс адаптации: - Включите обучение кибербезопасности в процесс адаптации новых сотрудников. - Предоставлять простые для понимания материалы, описывающие политику приемлемого использования и процедуры отчетности. Регулярные курсы повышения квалификации: - Обновление учебных материалов с учетом новых угроз и методов, используемых злоумышленниками. - Обеспечьте, чтобы все сотрудники проходили периодические курсы повышения квалификации, чтобы оставаться в курсе. Особое внимание уделите реальным сценариям: - Используйте тематические исследования недавних атак, чтобы продемонстрировать последствия успешного фишинга или социальной инженерии. - Обсудите, как конкретные действия сотрудников могут предотвратить или смягчить такие атаки.",
+      "Управление учетными записями пользователей включает в себя внедрение и обеспечение соблюдения политик на протяжении всего жизненного цикла учетных записей пользователей, включая создание, изменение и деактивацию. Правильное управление учетными записями уменьшает поверхность атаки за счет ограничения несанкционированного доступа, управления привилегиями учетных записей и обеспечения использования учетных записей в соответствии с политиками организации. Это смягчение может быть реализовано с помощью следующих мер: Обеспечение соблюдения принципа наименьших привилегий – реализация: назначайте пользователям только минимальные разрешения, необходимые для выполнения их рабочих функций. Регулярно проверяйте учетные записи, чтобы убедиться, что не предоставлены лишние разрешения. - Вариант использования: снижает риск повышения привилегий, гарантируя, что учетные записи не смогут выполнять несанкционированные действия. Реализация политики надежных паролей. Реализация: обеспечить соблюдение требований к сложности пароля (например, к длине, типам символов). Требовать истечения срока действия пароля каждые 90 дней и запрещать повторное использование пароля. - Вариант использования: предотвращает получение злоумышленниками несанкционированного доступа посредством подбора пароля или атак методом перебора. Управление неактивными и потерянными учетными записями. Реализация: внедрить автоматизированные рабочие процессы для отключения учетных записей после установленного периода бездействия (например, 30 дней). Удаляйте потерянные учетные записи (например, учетные записи без назначенного владельца) во время регулярных проверок учетных записей. - Вариант использования: устраняет неактивные учетные записи, которые могут быть использованы злоумышленниками. Политики блокировки учетных записей — реализация: настройка пороговых значений блокировки учетных записей (например, блокировка учетных записей после пяти неудачных попыток входа в систему). Установите продолжительность блокировки минимум на 15 минут. - Вариант использования: смягчает методы автоматических атак, основанные на повторных попытках входа в систему. Многофакторная аутентификация (MFA) для учетных записей с высоким уровнем риска. Реализация: требовать MFA для всех административных учетных записей и пользователей с высоким уровнем риска. Используйте механизмы MFA, такие как аппаратные токены, приложения для проверки подлинности или биометрические данные. - Вариант использования: предотвращает несанкционированный доступ, даже если учетные данные украдены. Ограничение интерактивного входа в систему — реализация: Ограничьте интерактивный вход в систему для привилегированных учетных записей определенными безопасными системами или консолями управления. Используйте групповые политики для обеспечения соблюдения ограничений входа в систему. - Вариант использования: защищает конфиденциальные учетные записи от неправильного использования или эксплуатации. *Инструменты для реализации* Встроенные инструменты: - Microsoft Active Directory (AD): централизованное управление учетными записями и применение RBAC. - Объект групповой политики (GPO): обеспечивает соблюдение политик паролей, ограничений входа в систему и политик блокировки учетных записей. Инструменты управления идентификацией и доступом (IAM): - Okta: централизованная подготовка пользователей, интеграция MFA и SSO. - Microsoft Azure Active Directory: обеспечивает расширенное управление жизненным циклом учетной записи, доступ на основе ролей и политики условного доступа. Управление привилегированными учетными записями (PAM): - CyberArk, BeyondTrust, Thycotic: управление и мониторинг использования привилегированных учетных записей, обеспечение записи сеансов и JIT-доступа."
+    ]
+  },
+  {
+    "id": "T1021",
+    "name": "Удаленные услуги",
+    "tactic": "Lateral Movement",
+    "description": "Злоумышленники могут использовать [Действительные учетные записи](https://attack.mitre.org/techniques/T1078) для входа в службу, которая принимает удаленные соединения, такие как telnet, SSH и VNC. Затем злоумышленник может выполнять действия от имени вошедшего в систему пользователя. В корпоративной среде серверы и рабочие станции могут быть организованы в домены. Домены обеспечивают централизованное управление идентификацией, позволяя пользователям входить в систему, используя один набор учетных данных во всей сети. Если злоумышленник может получить набор действительных учетных данных домена, он может войти на множество различных компьютеров, используя протоколы удаленного доступа, такие как безопасная оболочка (SSH) или протокол удаленного рабочего стола (RDP). Законные приложения (такие как [Инструменты развертывания программного обеспечения] (https://attack.mitre.org/techniques/T1072) и другие административные программы) могут использовать [Удаленные службы] (https://attack.mitre.org/techniques/T1021) для доступа к удаленным хостам. Например, Apple Remote Desktop (ARD) в macOS — это встроенное программное обеспечение, используемое для удаленного управления. ARD использует сочетание протоколов, включая [VNC] (https://attack.mitre.org/techniques/T1021/005) для отправки буферов экрана и управления и [SSH] (https://attack.mitre.org/techniques/T1021/004) для безопасной передачи файлов. (Цитата: Remote Management MDM macOS) (Цитата: Kickstart Apple Remote Desktop команды) (Цитата: Руководство администратора Apple Remote Desktop 3.3). Злоумышленники могут злоупотреблять такими приложениями, как ARD, для удаленного выполнения кода и выполнения бокового перемещения. В версиях macOS до 10.14 злоумышленник может перевести сеанс SSH в сеанс ARD, что позволяет злоумышленнику принимать запросы TCC (прозрачность, согласие и контроль) без взаимодействия с пользователем и получать доступ к данным. (Цитата: FireEye 2019 Apple Remote Desktop) (Цитата: Lockboxx ARD 2019) (Цитата: команды Kickstart Apple Remote Desktop)",
+    "platforms": [
+      "Linux",
+      "macOS",
+      "Windows",
+      "IaaS",
+      "ESXi"
+    ],
+    "related_cwe": [],
+    "related_capec": [],
+    "requires_service": [
+      "rdp",
+      "macos_os",
+      "windows_os",
+      "ssh",
+      "linux_os"
+    ],
+    "detection": "",
+    "mitigations": [
+      "Ограничьте доступ к сетевым ресурсам, таким как общие файловые ресурсы, удаленные системы и службы, только теми пользователями, учетными записями или системами, у которых есть законные бизнес-требования. Это может включать в себя использование таких технологий, как сетевые концентраторы, шлюзы RDP и модели доступа к сети с нулевым доверием (ZTNA), а также услуги и протоколы усиления защиты. Это смягчение может быть реализовано с помощью следующих мер: Аудит и ограничение доступа: - Регулярно проверяйте разрешения для общих файловых ресурсов, сетевых служб и инструментов удаленного доступа. - Устранить ненужный доступ и обеспечить соблюдение принципов минимальных привилегий для пользователей и служб. - Используйте инструменты Active Directory и IAM для ограничения доступа на основе ролей и атрибутов. Развертывание решений безопасного удаленного доступа: — Используйте шлюзы RDP, концентраторы VPN и решения ZTNA для агрегирования и защиты подключений удаленного доступа. - Настройте элементы управления доступом для ограничения подключений на основе времени, устройства и личности пользователя. - Принудительно использовать MFA для всех механизмов удаленного доступа. Отключите ненужные службы: - Определите работающие службы с помощью таких инструментов, как netstat (Windows/Linux) или Nmap. - Отключите неиспользуемые службы, такие как Telnet, FTP и устаревший SMB, чтобы уменьшить поверхность атаки. - Используйте правила брандмауэра, чтобы блокировать трафик по неиспользуемым портам и протоколам. Сегментация и изоляция сети: - Используйте VLAN, межсетевые экраны или микросегментацию, чтобы изолировать критически важные сетевые ресурсы от общего доступа. - Ограничить связь между подсетями, чтобы предотвратить горизонтальное перемещение. Мониторинг и журналирование доступа: - Отслеживайте попытки доступа к общим файлам, RDP и удаленным сетевым ресурсам с помощью инструментов SIEM. - Включите аудит и ведение журнала успешных и неудачных попыток доступа к ограниченным ресурсам. *Инструменты для реализации* Управление общими файлами: - Групповые политики Microsoft Active Directory - Samba (управление общими файлами Linux/Unix) - AccessEnum (инструмент аудита доступа Windows) Безопасный удаленный доступ: - Шлюз удаленного рабочего стола Microsoft - Apache Guacamole (шлюз RDP/VNC с открытым исходным кодом) - Решения с нулевым доверием: Tailscale, Cloudflare Zero Trust Service и усиление протокола: - Nmap или Nessus для обнаружения сетевых служб - Редактор групповой политики Windows для отключение SMBv1, Telnet и устаревших протоколов — iptables или firewalld (Linux) для блокировки ненужного трафика. Сегментация сети: — pfSense для изоляции сети с открытым исходным кодом.",
+      "Аудит — это процесс регистрации активности, а также систематического просмотра и анализа активности и конфигураций системы. Основная цель аудита — обнаружить аномалии и выявить потенциальные угрозы или слабые места в среде. Правильные конфигурации аудита также могут помочь обеспечить соответствие требованиям. Процесс аудита включает в себя регулярный анализ поведения пользователей и системных журналов в поддержку превентивных мер безопасности. Аудит применим ко всем системам, используемым в организации, от входной двери здания до доступа к файлу на файловом сервере. Это считается более критичным для регулируемых отраслей, таких как здравоохранение, финансы и правительство, где требования соответствия требуют строгого отслеживания активности пользователей и систем. Это смягчение может быть реализовано с помощью следующих мер: Аудит системы: - Вариант использования: Регулярно оценивайте конфигурации системы для обеспечения соответствия политикам безопасности организации. - Реализация: использовать инструменты для поиска отклонений от установленных контрольных показателей. Аудит разрешений: - Вариант использования: просмотрите права доступа к файлам и папкам, чтобы свести к минимуму риск несанкционированного доступа или повышения привилегий. - Реализация: запускайте проверки доступа для выявления пользователей или групп с чрезмерными разрешениями. Аудит программного обеспечения: - Вариант использования: выявление устаревшего, неподдерживаемого или небезопасного программного обеспечения, которое может служить вектором атаки. - Реализация: использовать инструменты инвентаризации и сканирования уязвимостей для обнаружения устаревших версий и рекомендации безопасных альтернатив. Аудит конфигурации: - Вариант использования: оцените конфигурации системы и сети для обеспечения безопасности настроек (например, отключен SMBv1, включен MFA). - Реализация: внедрить инструменты автоматического сканирования конфигурации, такие как SCAP (протокол автоматизации контента безопасности), для выявления несоответствующих систем. Аудит сети: - Вариант использования: проверка сетевого трафика, правил брандмауэра и связи конечных точек для выявления несанкционированных или небезопасных подключений. - Реализация: используйте такие инструменты, как Wireshark или Zeek, для мониторинга и регистрации подозрительного поведения сети.",
+      "Управление учетными записями пользователей включает в себя внедрение и обеспечение соблюдения политик на протяжении всего жизненного цикла учетных записей пользователей, включая создание, изменение и деактивацию. Правильное управление учетными записями уменьшает поверхность атаки за счет ограничения несанкционированного доступа, управления привилегиями учетных записей и обеспечения использования учетных записей в соответствии с политиками организации. Это смягчение может быть реализовано с помощью следующих мер: Обеспечение соблюдения принципа наименьших привилегий – реализация: назначайте пользователям только минимальные разрешения, необходимые для выполнения их рабочих функций. Регулярно проверяйте учетные записи, чтобы убедиться, что не предоставлены лишние разрешения. - Вариант использования: снижает риск повышения привилегий, гарантируя, что учетные записи не смогут выполнять несанкционированные действия. Реализация политики надежных паролей. Реализация: обеспечить соблюдение требований к сложности пароля (например, к длине, типам символов). Требовать истечения срока действия пароля каждые 90 дней и запрещать повторное использование пароля. - Вариант использования: предотвращает получение злоумышленниками несанкционированного доступа посредством подбора пароля или атак методом перебора. Управление неактивными и потерянными учетными записями. Реализация: внедрить автоматизированные рабочие процессы для отключения учетных записей после установленного периода бездействия (например, 30 дней). Удаляйте потерянные учетные записи (например, учетные записи без назначенного владельца) во время регулярных проверок учетных записей. - Вариант использования: устраняет неактивные учетные записи, которые могут быть использованы злоумышленниками. Политики блокировки учетных записей — реализация: настройка пороговых значений блокировки учетных записей (например, блокировка учетных записей после пяти неудачных попыток входа в систему). Установите продолжительность блокировки минимум на 15 минут. - Вариант использования: смягчает методы автоматических атак, основанные на повторных попытках входа в систему. Многофакторная аутентификация (MFA) для учетных записей с высоким уровнем риска. Реализация: требовать MFA для всех административных учетных записей и пользователей с высоким уровнем риска. Используйте механизмы MFA, такие как аппаратные токены, приложения для проверки подлинности или биометрические данные. - Вариант использования: предотвращает несанкционированный доступ, даже если учетные данные украдены. Ограничение интерактивного входа в систему — реализация: Ограничьте интерактивный вход в систему для привилегированных учетных записей определенными безопасными системами или консолями управления. Используйте групповые политики для обеспечения соблюдения ограничений входа в систему. - Вариант использования: защищает конфиденциальные учетные записи от неправильного использования или эксплуатации. *Инструменты для реализации* Встроенные инструменты: - Microsoft Active Directory (AD): централизованное управление учетными записями и применение RBAC. - Объект групповой политики (GPO): обеспечивает соблюдение политик паролей, ограничений входа в систему и политик блокировки учетных записей. Инструменты управления идентификацией и доступом (IAM): - Okta: централизованная подготовка пользователей, интеграция MFA и SSO. - Microsoft Azure Active Directory: обеспечивает расширенное управление жизненным циклом учетной записи, доступ на основе ролей и политики условного доступа. Управление привилегированными учетными записями (PAM): - CyberArk, BeyondTrust, Thycotic: управление и мониторинг использования привилегированных учетных записей, обеспечение записи сеансов и JIT-доступа.",
+      "Отключите или удалите ненужное и потенциально уязвимое программное обеспечение, функции или службы, чтобы уменьшить поверхность атаки и предотвратить злоупотребления со стороны злоумышленников. Это включает в себя выявление программного обеспечения или функций, которые больше не нужны или которые могут быть использованы, и обеспечение их удаления или правильного отключения. Это смягчение может быть реализовано с помощью следующих мер: Удаление устаревшего программного обеспечения: - Вариант использования: отключение или удаление старых версий программного обеспечения, которые больше не получают обновления или исправления безопасности (например, устаревшая Java, Adobe Flash). - Реализация: компания удаляет Flash Player из всех систем сотрудников после того, как истек срок его эксплуатации. Отключите неиспользуемые функции: - Вариант использования: отключите ненужные функции операционной системы, такие как SMBv1, Telnet или RDP, если они не требуются. - Реализация: отключите SMBv1 в среде Windows, чтобы устранить такие уязвимости, как EternalBlue. Контролируйте приложения, установленные пользователями: - Вариант использования: запретите пользователям устанавливать несанкционированное программное обеспечение с помощью групповых политик или других инструментов управления. - Реализация: блокировать установку пользователем несанкционированных приложений для обмена файлами (например, клиентов BitTorrent) в корпоративной среде. Удалите ненужные службы: - Вариант использования: определите и отключите ненужные службы по умолчанию, работающие на конечных точках, серверах или сетевых устройствах. - Реализация: отключите неиспользуемые общие административные ресурсы (например, C$, ADMIN$) на рабочих станциях. Ограничьте надстройки и плагины: - Вариант использования: удалите или отключите плагины и надстройки браузера, которые не нужны для деловых целей. - Реализация: отключите плагины Java и ActiveX в веб-браузерах, чтобы предотвратить атаки типа Drive-by.",
+      "Многофакторная аутентификация (MFA) повышает безопасность, требуя от пользователей предоставить как минимум две формы проверки для подтверждения своей личности перед предоставлением доступа. Эти факторы обычно включают в себя: - *Что-то, что вы знаете*: пароли, PIN-коды. - *Что-то, что у вас есть*: физические токены, приложения для проверки подлинности на смартфоне. - *Что-то, чем вы являетесь*: биометрические данные, такие как отпечатки пальцев, распознавание лиц или сканирование сетчатки. Внедрение MFA во всех критически важных системах и службах обеспечивает надежную защиту от захвата учетных записей и несанкционированного доступа. Это смягчение можно реализовать с помощью следующих мер: Управление идентификацией и доступом (IAM): — используйте решения IAM, такие как Azure Active Directory, Okta или AWS IAM, для применения политик MFA для всех входов пользователей, особенно для привилегированных ролей. – Включите политики условного доступа, чтобы обеспечить применение MFA для рискованных входов в систему (например, с незнакомых устройств, геолокации). — Включите политики условного доступа, чтобы разрешить вход в систему только с доверенных устройств, например тех, которые зарегистрированы в Intune или подключены через Hybrid/Entra. Инструменты и методы аутентификации: - Используйте приложения для аутентификации, такие как Google Authenticator, Microsoft Authenticator или Authy, для одноразовых паролей на основе времени (TOTP). - Разверните аппаратные токены, такие как YubiKey, RSA SecurID или смарт-карты, для дополнительной безопасности. - Обеспечить биометрическую аутентификацию для совместимых устройств и приложений. Безопасные устаревшие системы: - Интегрируйте решения MFA со старыми системами с помощью сторонних инструментов, таких как Duo Security или Thales SafeNet. - Включите серверы RADIUS/NPS, чтобы облегчить MFA для VPN, RDP и других сетевых входов. Мониторинг и оповещение: — Используйте инструменты SIEM для отслеживания неудачных попыток MFA, аномалий входа в систему или попыток грубого подбора систем MFA. - Внедряйте оповещения о подозрительных действиях MFA, таких как повторяющиеся неудачные коды или регистрации новых устройств. Обучение и обеспечение соблюдения политик: - Расскажите сотрудникам о важности MFA и безопасном использовании средств аутентификации. - Применяйте политики, требующие MFA, на всех критически важных системах, особенно для удаленного доступа, привилегированных учетных записей и облачных приложений.",
+      "Устанавливайте и применяйте политики безопасности паролей для учетных записей, чтобы снизить вероятность несанкционированного доступа. Политика надежных паролей включает в себя обеспечение сложности паролей, требование регулярной смены паролей и предотвращение повторного использования паролей. Это смягчение может быть реализовано с помощью следующих мер: Системы Windows: - Используйте консоль управления групповыми политиками (GPMC) для настройки: - Минимальной длины пароля (например, 12+ символов). - Требования к сложности пароля. - История паролей (например, запретить последние 24 пароля). - Продолжительность и пороговые значения блокировки учетной записи. Системы Linux: - Настройте подключаемые модули аутентификации (PAM): - Используйте `pam_pwquality` для обеспечения соблюдения требований к сложности и длине. - Внедрите pam_tally2 или pam_faillock для блокировки учетных записей. - Используйте pwunconv, чтобы отключить повторное использование пароля. Менеджеры паролей: — Обеспечьте использование корпоративных менеджеров паролей (например, Bitwarden, 1Password, LastPass) для создания и хранения надежных паролей. Черный список паролей: — Используйте такие инструменты, как проверка паролей «Я был взломан» или решения для черных списков на основе NIST, чтобы запретить пользователям устанавливать скомпрометированные пароли. Регулярный аудит: - Периодически проверяйте политику паролей и конфигурации учетных записей, чтобы обеспечить соответствие требованиям, используя такие инструменты, как LAPS (Local Admin Password Solution) и сканеры уязвимостей. *Инструменты для реализации* Windows: - Консоль управления групповыми политиками (GPMC): принудительное применение политик паролей. - Решение для паролей локального администратора Microsoft (LAPS): применяйте случайные уникальные пароли администратора. Linux/macOS: — Модули PAM (pam_pwquality, pam_tally2, pam_faillock): обеспечивают соблюдение правил паролей. - Lynis: аудит политик паролей и конфигураций системы. Кроссплатформенность: - Менеджеры паролей (Bitwarden, 1Password, KeePass): управляйте надежными паролями и применяйте их принудительно. - API-интерфейс «Я был взломан»: предотвращение использования взломанных паролей. - Инструменты, соответствующие требованиям NIST SP 800-63B: соблюдение правил использования паролей и внесение в черный список."
     ]
   }
 ]
