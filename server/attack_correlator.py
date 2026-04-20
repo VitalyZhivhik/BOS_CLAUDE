@@ -16,7 +16,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from common.models import (
     SystemInfo, ScanResult, VulnerabilityMatch,
-    AttackFeasibility, Severity, AttackVector
+    AttackFeasibility, Severity, AttackVector,
+    normalize_feasibility, normalize_severity,
 )
 from server.vulnerability_db import VulnerabilityDatabase
 from server.vector_cve_resolver import resolve_cves_for_attack_vector
@@ -87,10 +88,17 @@ class AttackCorrelator:
                     attack_vector_id=av.id,
                     attack_name=av.name,
                     description=f"Вектор атаки '{av.name}' не имеет известных CVE уязвимостей",
-                    severity="INFO",
-                    feasibility=AttackFeasibility.NOT_FEASIBLE.value,
+                    severity=normalize_severity("INFO"),
+                    feasibility=normalize_feasibility(AttackFeasibility.NOT_FEASIBLE.value),
                     reason="Не найдено соответствующих CVE уязвимостей в базе данных",
                     recommendation="Требуется ручной анализ вектора атаки",
+                    target_port=av.target_port,
+                    found_by="Сервер (вектор атакующего)",
+                    feasibility_trace={
+                        "version": 1,
+                        "note": "Для вектора не найдено CVE в локальной базе",
+                        "attack_vector_id": av.id,
+                    },
                 )
                 matches = [match]
             
@@ -116,6 +124,13 @@ class AttackCorrelator:
         self.results.extend(sw_based)
         sw_elapsed = time.time() - sw_start
         logger.info(f"[3/3] Завершено: +{len(sw_based)} результатов за {sw_elapsed:.2f}s")
+
+        # 3b. Дедупликация на входе: один и тот же CVE из разных источников (вектор / порт / ПО)
+        logger.info("Дедупликация по CVE между источниками...")
+        self._report_progress(88, "Дедупликация по CVE между источниками...")
+        before_merge = len(self.results)
+        self.results = self._deduplicate_same_cve_across_sources(self.results)
+        logger.info(f"После объединения по CVE: {before_merge} -> {len(self.results)}")
 
         # Убираем дубликаты (Умная агрегация)
         logger.info("Дедупликация результатов...")
@@ -180,6 +195,12 @@ class AttackCorrelator:
         
         logger.info(f"Присвоено ПО: {sum(1 for m in self.results if m.target_software)}/{len(self.results)} результатов")
 
+        for match in self.results:
+            match.feasibility = normalize_feasibility(match.feasibility)
+            match.severity = normalize_severity(match.severity)
+            if not isinstance(getattr(match, "feasibility_trace", None), dict):
+                match.feasibility_trace = {}
+
         total_elapsed = time.time() - start_time
         self._report_progress(100, f"Корреляция завершена. Найдено {len(self.results)} уникальных результатов")
         logger.info("=" * 70)
@@ -200,7 +221,7 @@ class AttackCorrelator:
         unique_cves = resolve_cves_for_attack_vector(av, self.vuln_db)
 
         for cve in unique_cves:
-            feasibility, reason = self._evaluate_feasibility(cve, av)
+            feasibility, reason, trace = self._evaluate_feasibility(cve, av)
             chain = self.vuln_db.get_full_chain(cve)
             mitigations = self.vuln_db.get_all_mitigations(cve)
 
@@ -222,10 +243,13 @@ class AttackCorrelator:
                 attack_vector_id=av.id,
                 attack_name=av.name,
                 description=desc,
-                severity=cve.get("severity", Severity.MEDIUM.value),
-                feasibility=feasibility.value,
+                severity=normalize_severity(cve.get("severity", Severity.MEDIUM.value)),
+                feasibility=normalize_feasibility(feasibility.value),
                 reason=reason,
                 recommendation=recommendation,
+                target_port=av.target_port,
+                found_by="Сервер (вектор атакующего)",
+                feasibility_trace=trace if isinstance(trace, dict) else {},
             )
             matches.append(match)
 
@@ -432,8 +456,42 @@ class AttackCorrelator:
             reason_text += ". Защита: " + "; ".join(protection_notes)
         if trivy_confirmed:
             reason_text += ". " + trivy_details
-        
-        return score, max_score, feasibility, reason_text
+
+        open_ports_sorted = sorted(int(x) for x in open_port_nums if isinstance(x, int) or (isinstance(x, str) and str(x).isdigit()))
+        trace = {
+            "version": 1,
+            "cve_id": cve_id,
+            "attack_vector_id": getattr(av, "id", "") or "",
+            "score": int(score),
+            "max_score": int(max_score),
+            "feasibility": feasibility.value,
+            "rule_summary": {
+                "has_hard_evidence": bool(has_hard_evidence),
+                "blockers": list(blockers),
+                "uncertainty_flags": list(uncertainty_flags),
+            },
+            "factors": {
+                "score_detail_lines": list(score_details),
+                "protection": list(protection_notes),
+            },
+            "trivy": {
+                "confirmed": bool(trivy_confirmed),
+                "reported_severity": trivy_severity,
+                "details": trivy_details if trivy_confirmed else None,
+            },
+            "host_context": {
+                "open_ports": open_ports_sorted,
+                "cve_required_ports": list(required_ports) if required_ports else [],
+                "attack_type": cve.get("attack_type", ""),
+                "vulnerable_affected_catalog_match": bool(vulnerable_sw_found),
+                "vector_target_service": getattr(av, "target_service", "") or "",
+                "firewall_active": bool(self.system_info.firewall_active),
+                "antivirus_active": bool(self.system_info.antivirus_active),
+                "updates_installed": bool(self.system_info.updates_installed),
+            },
+        }
+
+        return score, max_score, feasibility, reason_text, trace
 
     def _evaluate_feasibility(self, cve: dict, av: AttackVector) -> tuple:
         """
@@ -563,14 +621,16 @@ class AttackCorrelator:
             protection_notes.append("Антивирус активен (может обнаружить эксплоит)")
 
         # === МНОГОФАКТОРНАЯ ОЦЕНКА (улучшенная логика) ===
-        score, max_score, feasibility, detailed_reason = self._calculate_feasibility_score(
+        score, max_score, feasibility, detailed_reason, trace = self._calculate_feasibility_score(
             cve, av, reasons, protection_notes
         )
 
         # Добавляем числовую оценку в reason
         final_reason = f"Оценка реализуемости: {score}/{max_score}. {detailed_reason}"
+        if isinstance(trace, dict):
+            trace["prerequisite_checks"] = list(reasons)
 
-        return (feasibility, final_reason)
+        return (feasibility, final_reason, trace)
 
     def _analyze_port_based_vulnerabilities(self, scan_result: ScanResult) -> list[VulnerabilityMatch]:
         """Анализ уязвимостей на основе обнаруженных открытых портов."""
@@ -591,7 +651,7 @@ class AttackCorrelator:
                     description=f"Вектор атаки через открытый порт {port}",
                     target_port=port,
                 )
-                feasibility, reason = self._evaluate_feasibility(cve, dummy_av)
+                feasibility, reason, trace = self._evaluate_feasibility(cve, dummy_av)
                 mitigations = self.vuln_db.get_all_mitigations(cve)
                 recommendation = self._generate_recommendation(cve, feasibility, mitigations)
 
@@ -603,10 +663,13 @@ class AttackCorrelator:
                     attack_vector_id=dummy_av.id,
                     attack_name=dummy_av.name,
                     description=cve["description"],
-                    severity=cve.get("severity", "MEDIUM"),
-                    feasibility=feasibility.value,
+                    severity=normalize_severity(cve.get("severity", "MEDIUM")),
+                    feasibility=normalize_feasibility(feasibility.value),
                     reason=reason,
                     recommendation=recommendation,
+                    target_port=port,
+                    found_by="Сервер (открытый порт)",
+                    feasibility_trace=trace if isinstance(trace, dict) else {},
                 )
                 matches.append(match)
 
@@ -631,7 +694,7 @@ class AttackCorrelator:
                     description=f"Эксплуатация уязвимости в {sw_name}",
                     target_service=sw_name,
                 )
-                feasibility, reason = self._evaluate_feasibility(cve, dummy_av)
+                feasibility, reason, trace = self._evaluate_feasibility(cve, dummy_av)
                 mitigations = self.vuln_db.get_all_mitigations(cve)
                 recommendation = self._generate_recommendation(cve, feasibility, mitigations)
 
@@ -643,10 +706,13 @@ class AttackCorrelator:
                     attack_vector_id=dummy_av.id,
                     attack_name=dummy_av.name,
                     description=cve["description"],
-                    severity=cve.get("severity", "MEDIUM"),
-                    feasibility=feasibility.value,
+                    severity=normalize_severity(cve.get("severity", "MEDIUM")),
+                    feasibility=normalize_feasibility(feasibility.value),
                     reason=reason,
                     recommendation=recommendation,
+                    target_port=None,
+                    found_by="Сервер (установленное ПО)",
+                    feasibility_trace=trace if isinstance(trace, dict) else {},
                 )
                 matches.append(match)
 
@@ -746,6 +812,62 @@ class AttackCorrelator:
     # НОВЫЙ БЛОК: УМНАЯ АГРЕГАЦИЯ ДУБЛИКАТОВ
     # =========================================================================
 
+    def _cve_signature_key(self, m: VulnerabilityMatch) -> Optional[str]:
+        """Ключ для объединения записей с одинаковым набором CVE (без N/A)."""
+        raw = (m.cve_id or "").strip()
+        if not raw or raw.upper() == "N/A":
+            return None
+        parts = []
+        for chunk in raw.split(","):
+            x = chunk.strip().upper()
+            if not x or x == "N/A":
+                continue
+            if "..." in x or "+ ЕЩЁ" in x.upper():
+                # усечённый список CVE — не используем как ключ дедупликации
+                return None
+            parts.append(x)
+        if not parts:
+            return None
+        return ",".join(sorted(set(parts)))
+
+    def _append_trace_merge(self, keeper: VulnerabilityMatch, dropped: VulnerabilityMatch, tag: str):
+        if not isinstance(keeper.feasibility_trace, dict):
+            keeper.feasibility_trace = {}
+        ms = keeper.feasibility_trace.setdefault("merged_sources", [])
+        ms.append({
+            "tag": tag,
+            "attack_vector_id": dropped.attack_vector_id,
+            "attack_name": dropped.attack_name,
+            "found_by": getattr(dropped, "found_by", ""),
+            "feasibility_trace": dropped.feasibility_trace or {},
+        })
+
+    def _merge_two_matches_same_cve(self, a: VulnerabilityMatch, b: VulnerabilityMatch) -> VulnerabilityMatch:
+        """Объединяет две строки с одинаковым CVE (разные источники/векторы)."""
+        a.severity = normalize_severity(self._get_max_severity(a.severity, b.severity))
+        a.feasibility = normalize_feasibility(self._get_worst_feasibility(a.feasibility, b.feasibility))
+        if b.attack_name and (b.attack_name not in (a.attack_name or "")):
+            a.attack_name = f"{a.attack_name} | {b.attack_name}" if a.attack_name else b.attack_name
+        if getattr(b, "found_by", "") and getattr(b, "found_by", "") not in (a.found_by or ""):
+            a.found_by = f"{a.found_by} & {b.found_by}" if a.found_by else b.found_by
+        self._append_trace_merge(a, b, "same_cve_across_sources")
+        return a
+
+    def _deduplicate_same_cve_across_sources(self, results: list[VulnerabilityMatch]) -> list[VulnerabilityMatch]:
+        """Схлопывает одинаковый CVE, пришедший из разных веток анализа или разных векторов."""
+        buckets: dict[str, VulnerabilityMatch] = {}
+        no_key: list[VulnerabilityMatch] = []
+        for r in results:
+            key = self._cve_signature_key(r)
+            if key is None:
+                no_key.append(r)
+                continue
+            if key not in buckets:
+                buckets[key] = r
+            else:
+                buckets[key] = self._merge_two_matches_same_cve(buckets[key], r)
+        return list(buckets.values()) + no_key
+
     def _get_max_severity(self, sev1: str, sev2: str) -> str:
         """Сравнение критичности (возвращает наивысшую)."""
         weights = {'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1, 'INFO': 0}
@@ -790,8 +912,12 @@ class AttackCorrelator:
                 
                 existing_match = groups[key]['match']
                 # Берем наивысшую критичность и реализуемость из всех дубликатов
-                existing_match.severity = self._get_max_severity(existing_match.severity, r.severity)
-                existing_match.feasibility = self._get_worst_feasibility(existing_match.feasibility, r.feasibility)
+                existing_match.severity = normalize_severity(
+                    self._get_max_severity(existing_match.severity, r.severity)
+                )
+                existing_match.feasibility = normalize_feasibility(
+                    self._get_worst_feasibility(existing_match.feasibility, r.feasibility)
+                )
                 
                 # Если у нового дубликата критичность выше, забираем его описание, так как оно важнее
                 w_existing = {'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1, 'INFO': 0}.get(str(existing_match.severity).upper(), 0)
@@ -800,8 +926,10 @@ class AttackCorrelator:
                     existing_match.description = r.description
                     existing_match.reason = r.reason
                     existing_match.recommendation = r.recommendation
+                self._append_trace_merge(existing_match, r, "attack_name_capec_dedupe")
+            em = groups[key]['match']
             if hasattr(r, 'target_software') and r.target_software:
-                existing_match.target_software = r.target_software
+                em.target_software = r.target_software
 
         unique = []
         for g in groups.values():

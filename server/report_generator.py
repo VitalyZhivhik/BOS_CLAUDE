@@ -2,6 +2,8 @@ import json
 import os
 import re
 
+from common.models import normalize_feasibility, normalize_severity, report_status_meta
+
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -78,6 +80,29 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .real { background: rgba(218, 54, 51, 0.15); color: #ff7b72; border: 1px solid #da3633; }
         .part-real { background: rgba(210, 153, 34, 0.15); color: #e3b341; border: 1px solid #d29922; }
         .noreal { background: rgba(35, 134, 54, 0.15); color: #3fb950; border: 1px solid #238636; }
+        .feas-unk { background: rgba(139, 148, 158, 0.15); color: #8b949e; border: 1px solid #8b949e; }
+        .stats-explain { font-size: 12px; color: #8b949e; margin: -6px 0 18px 0; line-height: 1.55; padding: 10px 12px; background: #0d1117; border: 1px solid var(--border); border-radius: 6px; }
+        .trace-pre { max-height: 340px; overflow: auto; font-size: 11px; }
+        .trace-human { font-size: 13px; color: #c9d1d9; line-height: 1.55; }
+        .trace-human .trace-lead { font-size: 14px; color: #e6edf3; margin-bottom: 10px; }
+        .trace-human .trace-meta { font-size: 12px; color: #8b949e; margin-bottom: 12px; }
+        .trace-sec-title { font-size: 11px; font-weight: 700; color: #8b949e; letter-spacing: 0.04em; text-transform: uppercase; margin: 16px 0 8px 0; border-bottom: 1px solid #21262d; padding-bottom: 6px; }
+        .trace-callout { border-left: 3px solid #30363d; padding: 10px 14px; margin: 8px 0; background: #0d1117; border-radius: 0 6px 6px 0; }
+        .trace-callout.blockers { border-color: #da3633; background: rgba(218,54,51,0.06); }
+        .trace-callout.warn { border-color: #d29922; background: rgba(210,153,34,0.06); }
+        .trace-callout.ok { border-color: #238636; background: rgba(35,134,54,0.06); }
+        .trace-callout.neutral { border-color: #58a6ff; background: rgba(88,166,255,0.06); }
+        .trace-list { margin: 6px 0 0 0; padding-left: 18px; color: #c9d1d9; }
+        .trace-list li { margin-bottom: 6px; }
+        .trace-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .trace-chip { font-size: 11px; padding: 4px 10px; border-radius: 999px; background: #21262d; border: 1px solid #30363d; color: #8b949e; }
+        .trace-chip.yes { border-color: #238636; color: #3fb950; }
+        .trace-chip.no { border-color: #484f58; color: #6e7681; }
+        .trace-score-bar { height: 8px; border-radius: 4px; background: #21262d; overflow: hidden; margin: 8px 0 4px 0; max-width: 360px; }
+        .trace-score-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #238636, #d29922, #da3633); }
+        .trace-details { margin-top: 10px; font-size: 12px; color: #8b949e; }
+        .trace-details summary { cursor: pointer; color: #58a6ff; user-select: none; }
+        .trace-merge { font-size: 12px; color: #8b949e; margin-top: 8px; padding: 8px; background: #161b22; border-radius: 6px; border: 1px dashed #30363d; }
         
         /* Модальное окно */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(3px); overflow-y: auto;}
@@ -131,6 +156,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .group-members-row:nth-child(even) { background: #0f141b; }
         .group-members-row .mono { font-family: "Consolas", monospace; color: #58a6ff; }
 
+        .modal-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 0 14px 0; border-bottom: 1px solid #21262d; margin-bottom: 12px; }
+        .modal-body-accordion { padding-top: 0; }
+        .modal-details { margin-bottom: 10px; border: 1px solid #30363d; border-radius: 8px; background: #0d1117; overflow: hidden; }
+        .modal-details > summary { list-style: none; cursor: pointer; padding: 12px 14px; font-weight: 600; font-size: 13px; color: #c9d1d9; background: #161b22; user-select: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .modal-details > summary::-webkit-details-marker { display: none; }
+        .modal-details > summary::after { content: "▼"; font-size: 10px; color: #8b949e; flex-shrink: 0; transition: transform 0.15s; }
+        .modal-details[open] > summary::after { transform: rotate(-180deg); }
+        .modal-details .modal-details-body { padding: 14px 16px 16px; border-top: 1px solid #21262d; }
+        .polygon-tools { font-size: 13px; line-height: 1.55; color: #c9d1d9; margin: 0; }
+        ol.polygon-steps { margin: 8px 0 0 0; padding-left: 22px; color: #c9d1d9; line-height: 1.6; }
+        ol.polygon-steps li { margin-bottom: 8px; }
+
         @media (max-width: 1200px) {
             .filters-bar { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
         }
@@ -150,7 +187,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div class="stat-box" style="border-top: 3px solid #da3633;"><div class="title">Реализуемые (КРИТИЧНО)</div><div class="num" id="st-real" style="color: #ff7b72;">0</div></div>
             <div class="stat-box" style="border-top: 3px solid #d29922;"><div class="title">Частично реализуемые (ПРОВЕРИТЬ)</div><div class="num" id="st-part" style="color: #e3b341;">0</div></div>
             <div class="stat-box" style="border-top: 3px solid #238636;"><div class="title">Не реализуемые (ЗАБЛОКИРОВАНО)</div><div class="num" id="st-noreal" style="color: #3fb950;">0</div></div>
+            <div class="stat-box" style="border-top: 3px solid #8b949e;"><div class="title">Требуют анализа</div><div class="num" id="st-req" style="color: #8b949e;">0</div></div>
         </div>
+        <p id="stats-explain" class="stats-explain"></p>
 
         <!-- ПЕРЕЧНИ CVE / CWE / CAPEC / ПО -->
         <div class="card">
@@ -176,6 +215,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
             
             <div id="raw-cve-container" class="raw-table-container">
+                <div style="padding:10px 12px; background:#0d1117; border-bottom:1px solid var(--border); display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <span style="font-size:12px;color:#8b949e;">Фильтр реестра (CVE через пробел / запятую):</span>
+                    <input type="text" id="raw-cve-filter" placeholder="например CVE-2023-2986 CVE-2023-3162" oninput="applyRawCveFilter()"
+                        style="flex:1;min-width:220px;padding:8px;background:#161b22;border:1px solid #30363d;color:#c9d1d9;border-radius:4px;font-size:12px;" />
+                    <button type="button" class="agg-btn" onclick="clearRawCveFilter()">Сбросить</button>
+                </div>
                 <table id="raw-cve-table">
                     <thead>
                         <tr>
@@ -306,13 +351,245 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         var sysData = __SYS_DATA__;
         var summaryData = __SUMMARY_DATA__;
         var atkDefData = __ATK_DEF_DATA__;
+        var statusMeta = __STATUS_META__;
         var network = null;
         var detailsMap = {};
+
+        function escapeHtml(s) {
+            if (s === undefined || s === null) return "";
+            return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+        function esc(x) {
+            return escapeHtml(x);
+        }
+        function formatStepsToOl(steps) {
+            if (steps === undefined || steps === null || steps === "") {
+                return '<p class="trace-meta" style="margin:0;">Шаги не заданы.</p>';
+            }
+            var s = String(steps);
+            var NL = String.fromCharCode(10);
+            s = s.split(String.fromCharCode(13) + NL).join(NL).split(String.fromCharCode(13)).join(NL);
+            var BS = "\\\\";
+            var fakeNl = BS + "n";
+            if (s.indexOf(fakeNl) !== -1 && s.split(NL).length <= 1) s = s.split(fakeNl).join(NL);
+            var lines = s.split(NL).map(function(l) { return l.trim(); }).filter(Boolean);
+            if (lines.length === 0) {
+                return '<p class="trace-meta" style="margin:0;">' + esc(s) + '</p>';
+            }
+            var items = [];
+            lines.forEach(function(line) {
+                var m = line.match(/^(?:\\d+[\\.\\)])\\s*(.+)$/);
+                if (m) items.push(m[1].trim());
+                else items.push(line);
+            });
+            var h = '<ol class="polygon-steps">';
+            items.forEach(function(it) { h += "<li>" + esc(it) + "</li>"; });
+            h += "</ol>";
+            return h;
+        }
+        function isGenericTrainingPlaceholder(r) {
+            var tools = (r.tools || "").replace(/\\s+/g, " ").trim();
+            var st = String(r.steps || "");
+            var NL = String.fromCharCode(10);
+            st = st.split(String.fromCharCode(13) + NL).join(NL).split(String.fromCharCode(13)).join(NL);
+            var BS = "\\\\";
+            var fakeNl = BS + "n";
+            if (st.indexOf(fakeNl) !== -1 && st.split(NL).length <= 1) st = st.split(fakeNl).join(NL);
+            var toolsMatch = tools === "Burp Suite, SQLMap, Nmap" || tools === "Nmap, Metasploit";
+            var stepsMatch = /Анализ порта|Идентификация службы|Подбор эксплоита|Сканирование сети|Выбор эксплоита|Запуск/i.test(st);
+            return toolsMatch && stepsMatch;
+        }
+        function formatTrainingPolygon(r) {
+            var gen = isGenericTrainingPlaceholder(r);
+            var html = "";
+            if (gen) {
+                html += '<div class="trace-callout warn" style="margin-bottom:12px;"><strong>Шаблон из базы.</strong> Инструменты и шаги ниже — запасной учебный сценарий (CWE/общий), он может <em>не совпадать</em> с реальной технологией из CVE (например, плагин WordPress vs сетевой скан). Ориентируйтесь на «Описание уязвимости» и блок «Атаки и защита» на странице отчёта.</div>';
+            }
+            html += '<p style="margin:0 0 6px 0;"><strong style="color:#d29922">Инструменты</strong> <span class="trace-meta">(из записи отчёта / локальной БД)</span></p>';
+            html += '<p class="polygon-tools">' + esc(r.tools || "—") + '</p>';
+            html += '<p style="margin:14px 0 6px 0;"><strong style="color:#d29922">Шаги эксплуатации</strong></p>';
+            html += formatStepsToOl(r.steps);
+            html += '<p class="trace-meta" style="margin-top:12px;">В лабораторных целях используйте только стенды и явное разрешение. Не повторяйте действия на продакшене без согласования.</p>';
+            return html;
+        }
+        function traceUl(lines, emptyMsg) {
+            if (!lines || !lines.length) {
+                return '<p class="trace-meta" style="margin:0;">' + escapeHtml(emptyMsg || "—") + '</p>';
+            }
+            var h = '<ul class="trace-list">';
+            for (var i = 0; i < lines.length; i++) {
+                h += '<li>' + escapeHtml(String(lines[i])) + '</li>';
+            }
+            h += '</ul>';
+            return h;
+        }
+        function tracePortsBlock(ports, title) {
+            if (!ports || !ports.length) {
+                return '<p class="trace-meta" style="margin:0;">' + escapeHtml(title) + ': не указаны.</p>';
+            }
+            var n = ports.length;
+            var preview = ports.slice(0, 14).join(", ");
+            var more = n > 14 ? " … и ещё " + (n - 14) + " порт(ов)" : "";
+            return '<p class="trace-meta" style="margin:0 0 6px 0;"><strong style="color:#c9d1d9;">' + escapeHtml(title) + '</strong> — всего ' + n + '.</p>' +
+                '<details class="trace-details"><summary>Показать список портов</summary><p style="margin:8px 0 0 0;font-family:Consolas,monospace;font-size:11px;color:#8b949e;word-break:break-all;">' +
+                escapeHtml(preview + more) + '</p></details>';
+        }
+        function formatTraceBlock(trace) {
+            if (!trace || typeof trace !== "object" || Object.keys(trace).length === 0) {
+                return '<p style="color:#484f58;font-size:12px;">Трассировка вердикта недоступна для этой записи.</p>';
+            }
+            /* Trivy+атакующий — отдельная компактная форма */
+            if (trace.source === "trivy_attacker_correlation" && trace.trivy) {
+                var tv = trace.trivy;
+                var h = '<div class="trace-human">';
+                h += '<p class="trace-lead">Подтверждение по <strong>Trivy</strong> совмещено с вектором атакующего.</p>';
+                h += '<div class="trace-chips">';
+                h += '<span class="trace-chip yes">CVE: ' + escapeHtml(String(tv.vuln_id || trace.cve_id || "—")) + '</span>';
+                if (tv.pkg_name) h += '<span class="trace-chip">' + escapeHtml(tv.pkg_name) + (tv.installed_version ? " " + escapeHtml(tv.installed_version) : "") + '</span>';
+                if (tv.severity) h += '<span class="trace-chip">' + escapeHtml(tv.severity) + '</span>';
+                h += '</div>';
+                if (trace.attack_vector_id || (trace.open_port_on_vector != null && trace.open_port_on_vector !== "")) {
+                    h += '<p class="trace-meta" style="margin-top:10px;">';
+                    if (trace.attack_vector_id) h += 'Вектор: <code style="color:#58a6ff;">' + escapeHtml(trace.attack_vector_id) + '</code>';
+                    if (trace.open_port_on_vector != null && trace.open_port_on_vector !== "")
+                        h += (trace.attack_vector_id ? " · " : "") + "порт вектора: <strong>" + escapeHtml(String(trace.open_port_on_vector)) + "</strong>";
+                    h += "</p>";
+                }
+                h += '<details class="trace-details"><summary>Технические данные (JSON)</summary><pre class="cmd-block trace-pre">' + escapeHtml(JSON.stringify(trace, null, 2)) + '</pre></details>';
+                h += '</div>';
+                return h;
+            }
+            /* Основная форма коррелятора (version 1) */
+            if (trace.version === 1 && trace.rule_summary && trace.factors) {
+                var rs = trace.rule_summary || {};
+                var fac = trace.factors || {};
+                var tr = trace.trivy || {};
+                var hc = trace.host_context || {};
+                var score = trace.score != null ? Number(trace.score) : null;
+                var maxSc = trace.max_score != null ? Number(trace.max_score) : 100;
+                var pct = score != null && maxSc > 0 ? Math.min(100, Math.round((score / maxSc) * 100)) : 0;
+                var feas = trace.feasibility || "—";
+                var h = '<div class="trace-human">';
+                h += '<p class="trace-lead">Оценка модели: <strong>' + (score != null ? score + " / " + maxSc : "—") + '</strong> баллов → вердикт: <strong>' + escapeHtml(feas) + '</strong></p>';
+                h += '<p class="trace-meta">Число отражает сумму факторов риска (сеть, Trivy, ПО, патчи, защита). Вердикт выводится по порогам и наличию блокеров; при слабых доказательствах возможен статус «требует анализа».</p>';
+                if (score != null) {
+                    h += '<div class="trace-score-bar" title="Заполнение шкалы относительно максимума"><div class="trace-score-fill" style="width:' + pct + '%;"></div></div>';
+                }
+                if (trace.cve_id || trace.attack_vector_id) {
+                    h += '<p class="trace-meta" style="margin-top:4px;">';
+                    if (trace.cve_id) h += 'CVE: <code style="color:#58a6ff;">' + escapeHtml(trace.cve_id) + '</code> ';
+                    if (trace.attack_vector_id) h += '· вектор: <code style="color:#58a6ff;">' + escapeHtml(trace.attack_vector_id) + '</code>';
+                    h += '</p>';
+                }
+                /* Trivy */
+                h += '<div class="trace-sec-title">Подтверждение Trivy</div>';
+                if (tr.confirmed) {
+                    h += '<div class="trace-callout ok"><strong>Trivy подтвердил</strong> уязвимость в установленном ПО.';
+                    if (tr.reported_severity && tr.reported_severity !== "UNKNOWN") h += ' Степень в отчёте: <strong>' + escapeHtml(tr.reported_severity) + '</strong>.';
+                    h += '</div>';
+                    if (tr.details) h += '<p class="trace-meta" style="margin-top:6px;">' + escapeHtml(tr.details) + '</p>';
+                } else {
+                    h += '<div class="trace-callout warn"><strong>Trivy не подтвердил</strong> эту CVE по установленным пакетам. Оценка реализуемости опирается на эвристики (порты, ПО из инвентаря, вектор атакующего) — результат менее надёжен, чем при подтверждении сканером.</div>';
+                    if (tr.reported_severity) h += '<p class="trace-meta">Поле severity в данных Trivy: <code>' + escapeHtml(String(tr.reported_severity)) + '</code></p>';
+                }
+                /* Блокеры */
+                h += '<div class="trace-sec-title">Блокирующие факторы</div>';
+                if (rs.blockers && rs.blockers.length) {
+                    h += '<div class="trace-callout blockers"><strong>Есть блокеры</strong> — условия, при которых атака в текущей модели считается невозможной или сильно ограниченной.</div>';
+                    h += traceUl(rs.blockers, "");
+                } else {
+                    h += '<div class="trace-callout neutral">Блокеров нет: явных «стоп-факторов» модель не нашла.</div>';
+                }
+                /* Неопределённость */
+                h += '<div class="trace-sec-title">Неопределённость и оговорки</div>';
+                if (rs.uncertainty_flags && rs.uncertainty_flags.length) {
+                    h += '<p class="trace-meta" style="margin:0 0 6px 0;">Эти пункты снижают уверенность — имеет смысл проверить вручную или досканировать хост.</p>';
+                    h += traceUl(rs.uncertainty_flags, "");
+                } else {
+                    h += '<p class="trace-meta" style="margin:0;">Дополнительных флагов неопределённости нет.</p>';
+                }
+                /* Факторы в баллы */
+                h += '<div class="trace-sec-title">Что вошло в балльную оценку</div>';
+                h += traceUl(fac.score_detail_lines, "Нет строк детализации.");
+                /* Защита хоста */
+                h += '<div class="trace-sec-title">Средства защиты (учтены в тексте причины)</div>';
+                h += traceUl(fac.protection, "Заметок о защите нет.");
+                /* Контекст */
+                h += '<div class="trace-sec-title">Среда: хост и вектор</div>';
+                h += '<div class="trace-chips">';
+                h += '<span class="trace-chip ' + (hc.firewall_active ? "yes" : "no") + '">Брандмауэр: ' + (hc.firewall_active ? "вкл." : "выкл.") + '</span>';
+                h += '<span class="trace-chip ' + (hc.antivirus_active ? "yes" : "no") + '">Антивирус: ' + (hc.antivirus_active ? "вкл." : "выкл.") + '</span>';
+                h += '<span class="trace-chip ' + (hc.updates_installed ? "yes" : "no") + '">Обновления: ' + (hc.updates_installed ? "установлены" : "не все") + '</span>';
+                h += '<span class="trace-chip">' + (rs.has_hard_evidence ? "Есть жёсткие доказательства" : "Жёстких доказательств мало") + '</span>';
+                h += '</div>';
+                if (hc.vector_target_service || hc.attack_type) {
+                    h += '<p class="trace-meta" style="margin-top:10px;">';
+                    if (hc.vector_target_service) h += "Сервис по вектору: <strong>" + escapeHtml(hc.vector_target_service) + "</strong>";
+                    if (hc.attack_type) h += (hc.vector_target_service ? " · " : "") + "тип атаки в каталоге CVE: <code>" + escapeHtml(String(hc.attack_type)) + "</code>";
+                    h += "</p>";
+                }
+                h += tracePortsBlock(hc.open_ports, "Открытые порты на хосте");
+                if (hc.cve_required_ports && hc.cve_required_ports.length) {
+                    h += '<p class="trace-meta" style="margin-top:10px;">Порты, указанные для CVE: <strong>' + escapeHtml(hc.cve_required_ports.join(", ")) + '</strong></p>';
+                }
+                /* Проверки предпосылок */
+                h += '<div class="trace-sec-title">Проверки по предпосылкам CVE и вектору</div>';
+                h += traceUl(trace.prerequisite_checks, "Список проверок не передан.");
+                /* Объединение источников */
+                if (trace.merged_sources && trace.merged_sources.length) {
+                    h += '<div class="trace-merge">Запись объединена из <strong>' + trace.merged_sources.length + '</strong> источников (одна CVE, разные пути обнаружения). Детали по каждому источнику — в JSON ниже.</div>';
+                }
+                h += '<details class="trace-details"><summary>Технические данные (JSON)</summary><pre class="cmd-block trace-pre">' + escapeHtml(JSON.stringify(trace, null, 2)) + '</pre></details>';
+                h += '</div>';
+                return h;
+            }
+            /* Прочие объекты — краткие пары ключ→значение + JSON */
+            var keys = Object.keys(trace);
+            if (keys.length <= 6) {
+                var simple = '<div class="trace-human"><div class="trace-sec-title">Краткая трассировка</div><ul class="trace-list">';
+                keys.forEach(function(k) {
+                    var v = trace[k];
+                    var s = typeof v === "object" ? JSON.stringify(v) : String(v);
+                    if (s.length > 200) s = s.slice(0, 200) + "…";
+                    simple += '<li><strong>' + escapeHtml(k) + ':</strong> ' + escapeHtml(s) + '</li>';
+                });
+                simple += '</ul><details class="trace-details"><summary>Полный JSON</summary><pre class="cmd-block trace-pre">' + escapeHtml(JSON.stringify(trace, null, 2)) + '</pre></details></div>';
+                return simple;
+            }
+            return '<div class="trace-human"><p class="trace-meta">Структура трассировки нестандартная. Ниже — полные данные.</p><pre class="cmd-block trace-pre">' + escapeHtml(JSON.stringify(trace, null, 2)) + '</pre></div>';
+        }
+        function openRawRegistryForCves(cveList) {
+            let cont = document.getElementById("raw-cve-container");
+            let inp = document.getElementById("raw-cve-filter");
+            let arr = Array.isArray(cveList) ? cveList : [];
+            if (inp) inp.value = arr.join(" ");
+            if (cont) {
+                cont.style.display = "block";
+                cont.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }
+            applyRawCveFilter();
+        }
+        function applyRawCveFilter() {
+            let inp = document.getElementById("raw-cve-filter");
+            let q = (inp && inp.value) ? inp.value.toUpperCase() : "";
+            let tokens = q.split(/[\s,;]+/).map(s => s.trim()).filter(Boolean);
+            document.querySelectorAll("#raw-cve-body tr").forEach(tr => {
+                let cell = (tr.getAttribute("data-cve") || "").toUpperCase();
+                let ok = tokens.length === 0 || tokens.some(t => cell.includes(t));
+                tr.style.display = ok ? "" : "none";
+            });
+        }
+        function clearRawCveFilter() {
+            let inp = document.getElementById("raw-cve-filter");
+            if (inp) inp.value = "";
+            applyRawCveFilter();
+        }
 
         function init() {
             rebuildAggregatedData();
             applyFilters();
             renderRawCveTable();
+            applyRawCveFilter();
             renderSummaryPanels();
             renderAtkDefSection();
         }
@@ -452,7 +729,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             tbody.innerHTML = "";
             rawCveData.forEach(c => {
                 let portStr = (c.port !== 'None' && c.port !== '') ? c.port : 'Н/Д';
-                let tr = `<tr>
+                let cveAttr = escapeHtml((c.cve || "").toUpperCase());
+                let tr = `<tr data-cve="${cveAttr}">
                     <td style="font-family: monospace; color: #58a6ff; font-weight: bold;">${c.cve}</td>
                     <td><span class="badge ${getSevClass(c.sev)}">${c.sev}</span></td>
                     <td style="font-weight: 500;">
@@ -598,6 +876,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     sw_purpose: b.sw_purpose || "",
                     sw_impact: b.sw_impact || "",
                     sw_scope: b.sw_scope || "",
+                    feasibility_trace: (b.feasibility_trace && typeof b.feasibility_trace === "object") ? b.feasibility_trace : {},
                     members: Object.keys(g.member_map).map(sig => {
                         let mm = g.member_map[sig];
                         return Object.assign({}, mm.item, { occurrences: mm.occurrences });
@@ -690,11 +969,41 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             renderGraph(filtered);
         }
 
+        function updateStatsExplain(filteredData) {
+            let el = document.getElementById("stats-explain");
+            if (!el) return;
+            let keys = getSelectedAggregationKeys();
+            let feas = document.getElementById("f-feas").value;
+            let capec = document.getElementById("f-capec").value;
+            let cwe = document.getElementById("f-cwe").value;
+            let sw = document.getElementById("f-sw").value;
+            let parts = [];
+            parts.push("Числа в блоке выше считают по <strong>текущей выборке</strong> (после фильтров ПО / CAPEC / CWE / реализуемости): строк на карте и в таблице = <strong>" + filteredData.length + "</strong>.");
+            if (!keys || keys.length === 0) {
+                parts.push("Агрегация: <strong>выключена</strong> — каждая сырьевая находка отображается отдельной строкой.");
+            } else {
+                parts.push("Агрегация: по полям <strong>" + keys.join(", ") + "</strong> — одна строка на группу схлопнутых находок.");
+            }
+            let fs = [];
+            if (feas !== "all") fs.push("реализуемость");
+            if (capec !== "all") fs.push("CAPEC");
+            if (cwe !== "all") fs.push("CWE");
+            if (sw !== "all") fs.push("ПО");
+            if (fs.length) parts.push("Дополнительно учитываются фильтры: <strong>" + fs.join(", ") + "</strong>.");
+            if (statusMeta && statusMeta.feasibility_values) {
+                parts.push("Допустимые значения реализуемости (единый словарь с сервера): " + statusMeta.feasibility_values.join(", ") + ".");
+            }
+            el.innerHTML = parts.join(" ");
+        }
+
         function updateStats(data) {
             document.getElementById('st-total').innerText = data.length;
             document.getElementById('st-real').innerText = data.filter(x => x.feas === 'РЕАЛИЗУЕМА').length;
             document.getElementById('st-part').innerText = data.filter(x => x.feas.includes('ЧАСТИЧНО')).length;
             document.getElementById('st-noreal').innerText = data.filter(x => x.feas === 'НЕ РЕАЛИЗУЕМА').length;
+            let reqEl = document.getElementById('st-req');
+            if (reqEl) reqEl.innerText = data.filter(x => (x.feas || '').includes('ТРЕБУЕТ')).length;
+            updateStatsExplain(data);
         }
 
         function getSevClass(sev) {
@@ -708,16 +1017,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if(s === "MEDIUM") return "#d29922"; if(s === "LOW") return "#238636"; return "#1f77b4";
         }
         function getFeasClass(feas) {
-            let f = feas.toUpperCase();
+            let f = (feas || "").toUpperCase();
             if(f === "РЕАЛИЗУЕМА") return "real";
             if(f.includes("ЧАСТИЧНО")) return "part-real";
+            if(f.includes("ТРЕБУЕТ")) return "feas-unk";
             return "noreal";
         }
         function getFeasColor(feas) {
-            let f = feas.toUpperCase();
+            let f = (feas || "").toUpperCase();
             if(f === "РЕАЛИЗУЕМА") return "#da3633"; 
             if(f.includes("ЧАСТИЧНО")) return "#d29922"; 
-            if(f === "НЕ РЕАЛИЗУЕМА") return "#238636"; 
+            if(f === "НЕ РЕАЛИЗУЕМА") return "#238636";
+            if(f.includes("ТРЕБУЕТ")) return "#8b949e";
             return "#8b949e";
         }
 
@@ -916,29 +1227,42 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             // 1. Если кликнули на отдельный элемент внутри агрегированной группы
             if (nodeInfo.type === 'member') {
                 let reasonColor = r.feas === 'РЕАЛИЗУЕМА' ? '#da3633' : (r.feas.includes('ЧАСТИЧНО') ? '#d29922' : (r.feas === 'НЕ РЕАЛИЗУЕМА' ? '#238636' : '#8b949e'));
-                let backBtn = nodeInfo.parentId ? `<button class="agg-btn" onclick="openModal('${nodeInfo.parentId}')" style="margin-right:8px;">← Назад к агрегированной группе</button>` : "";
+                let backBtn = nodeInfo.parentId ? `<button type="button" class="agg-btn" onclick="openModal('${nodeInfo.parentId}')">← Назад к группе</button>` : "";
+                let rawCves = JSON.stringify((r.cve || "").split(",").map(s => s.trim()).filter(Boolean));
                 contentDiv.innerHTML = `
                     <div class="modal-header">
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-                            <h2 style="margin: 0; font-size: 18px; color: #fff;">Элемент группы: ${r.capec}</h2>
-                            <div>${backBtn}</div>
+                            <h2 style="margin: 0; font-size: 18px; color: #fff;">Элемент группы: ${esc(r.capec)}</h2>
                         </div>
                     </div>
                     <div class="grid-info">
-                        <div class="grid-item"><span>ПО:</span><strong>${r.sw}</strong></div>
-                        <div class="grid-item"><span>Порт:</span><strong>${r.port}</strong></div>
-                        <div class="grid-item"><span>CWE:</span><strong>${r.cwe}</strong></div>
-                        <div class="grid-item"><span>CAPEC:</span><strong>${r.capec}</strong></div>
-                        <div class="grid-item"><span>Критичность:</span><strong style="color: ${getSevColor(r.sev)}">${r.sev}</strong></div>
-                        <div class="grid-item"><span>Статус:</span><strong style="color: ${getFeasColor(r.feas)}">${r.feas}</strong></div>
+                        <div class="grid-item"><span>ПО:</span><strong>${esc(r.sw)}</strong></div>
+                        <div class="grid-item"><span>Порт:</span><strong>${esc(r.port)}</strong></div>
+                        <div class="grid-item"><span>CWE:</span><strong>${esc(r.cwe)}</strong></div>
+                        <div class="grid-item"><span>CAPEC:</span><strong>${esc(r.capec)}</strong></div>
+                        <div class="grid-item"><span>Критичность:</span><strong style="color: ${getSevColor(r.sev)}">${esc(r.sev)}</strong></div>
+                        <div class="grid-item"><span>Статус:</span><strong style="color: ${getFeasColor(r.feas)}">${esc(r.feas)}</strong></div>
                     </div>
-                    <div class="modal-body">
-                        <h4>📝 CVE</h4>
-                        <p style="color:#58a6ff; font-family:monospace; font-size: 13px;">${r.cve}</p>
-                        <h4 style="color: ${reasonColor};">⚖️ Обоснование</h4>
-                        <p style="background: ${reasonColor}15; padding: 15px; border-radius: 6px; border-left: 4px solid ${reasonColor}; font-size: 13px; line-height: 1.6;">${r.reason || 'Подробные пояснения недоступны.'}</p>
-                        <h4>📝 Описание уязвимости</h4>
-                        <p>${r.desc || 'Описание отсутствует.'}</p>
+                    <div class="modal-toolbar">${backBtn}
+                        <button type="button" class="agg-btn" onclick='openRawRegistryForCves(${rawCves})'>📂 Сырой реестр CVE</button>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details">
+                            <summary>📝 CVE</summary>
+                            <div class="modal-details-body"><p style="color:#58a6ff; font-family:monospace; font-size: 13px; margin:0;">${esc(r.cve)}</p></div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🔬 Трассировка вердикта</summary>
+                            <div class="modal-details-body">${formatTraceBlock(r.feasibility_trace)}</div>
+                        </details>
+                        <details class="modal-details">
+                            <summary style="color:${reasonColor};">⚖️ Обоснование реализуемости</summary>
+                            <div class="modal-details-body"><p style="background: ${reasonColor}15; padding: 15px; border-radius: 6px; border-left: 4px solid ${reasonColor}; font-size: 13px; line-height: 1.6; margin:0;">${esc(r.reason || 'Подробные пояснения недоступны.')}</p></div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>📝 Описание уязвимости</summary>
+                            <div class="modal-details-body"><p style="margin:0; line-height:1.55; white-space:pre-wrap;">${esc(r.desc || 'Описание отсутствует.')}</p></div>
+                        </details>
                     </div>
                 `;
             }
@@ -946,11 +1270,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             else if (nodeInfo.type === 'cwe') {
                 contentDiv.innerHTML = `
                     <div class="modal-header">
-                        <h2 style="margin: 0; font-size: 20px; color: #fff;">🐛 Класс уязвимости: ${r.cwe}</h2>
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">🐛 Класс уязвимости: ${esc(r.cwe)}</h2>
                     </div>
                     <div class="modal-body">
                         <h4 style="color:#58a6ff;">Подробное описание (Common Weakness Enumeration)</h4>
-                        <p style="background: #0d1117; padding: 15px; border-radius: 6px; border: 1px solid #30363d; font-size: 15px;">${r.cwe_desc}</p>
+                        <p style="background: #0d1117; padding: 15px; border-radius: 6px; border: 1px solid #30363d; font-size: 15px; white-space:pre-wrap;">${esc(r.cwe_desc)}</p>
                     </div>
                 `;
             } 
@@ -962,16 +1286,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
                     <div class="modal-body">
                         <div class="grid-info" style="grid-template-columns: 1fr;">
-                            <div class="grid-item"><span>Обнаруженное программное обеспечение:</span><strong style="font-size: 18px; color: #fff;">${r.sw}</strong></div>
-                            <div class="grid-item"><span>Открытый порт:</span><strong style="font-size: 16px; color: #58a6ff;">${r.port}</strong></div>
+                            <div class="grid-item"><span>Обнаруженное программное обеспечение:</span><strong style="font-size: 18px; color: #fff;">${esc(r.sw)}</strong></div>
+                            <div class="grid-item"><span>Открытый порт:</span><strong style="font-size: 16px; color: #58a6ff;">${esc(r.port)}</strong></div>
                         </div>
                         <div class="sw-context">
                             <h4>Что это за ПО и почему важно</h4>
                             <ul>
-                                <li><strong>Тип/категория:</strong> ${r.sw_category || 'Не определено'}</li>
-                                <li><strong>Назначение:</strong> ${r.sw_purpose || 'Нет описания'}</li>
-                                <li><strong>Последствия успешной атаки:</strong> ${r.sw_impact || 'Требуется ручная оценка'}</li>
-                                <li><strong>Контекст:</strong> ${r.sw_scope || 'Локальный компонент инфраструктуры'}</li>
+                                <li><strong>Тип/категория:</strong> ${esc(r.sw_category || 'Не определено')}</li>
+                                <li><strong>Назначение:</strong> ${esc(r.sw_purpose || 'Нет описания')}</li>
+                                <li><strong>Последствия успешной атаки:</strong> ${esc(r.sw_impact || 'Требуется ручная оценка')}</li>
+                                <li><strong>Контекст:</strong> ${esc(r.sw_scope || 'Локальный компонент инфраструктуры')}</li>
                             </ul>
                         </div>
                     </div>
@@ -982,64 +1306,83 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 // Определяем цвет для блока реализуемости
                 let reasonColor = r.feas === 'РЕАЛИЗУЕМА' ? '#da3633' : (r.feas.includes('ЧАСТИЧНО') ? '#d29922' : (r.feas === 'НЕ РЕАЛИЗУЕМА' ? '#238636' : '#8b949e'));
                 
+                let rawCvesGrp = JSON.stringify((r.cve || "").split(",").map(s => s.trim()).filter(Boolean));
+                let mu = r.members_unique != null ? r.members_unique : (r.members || []).length;
+                let mt = r.members_total != null ? r.members_total : (r.members || []).length;
                 contentDiv.innerHTML = `
                     <div class="modal-header">
-                        <h2 style="margin: 0; font-size: 18px; color: #fff;">Агрегированная группа: ${r.capec}</h2>
+                        <h2 style="margin: 0; font-size: 18px; color: #fff;">Агрегированная группа: ${esc(r.capec)}</h2>
                     </div>
                     <div class="grid-info">
-                        <div class="grid-item"><span>Критичность:</span><strong style="color: ${getSevColor(r.sev)}">${r.sev}</strong></div>
-                        <div class="grid-item"><span>Статус (Сводный):</span><strong style="color: ${getFeasColor(r.feas)}">${r.feas}</strong></div>
-                        <div class="grid-item"><span>Атакуемое ПО:</span><strong>${r.sw} (Порт: ${r.port})</strong></div>
-                        <div class="grid-item"><span>Вектор (CAPEC):</span><strong>${r.capec}</strong></div>
-                        <div class="grid-item"><span>Класс (CWE):</span><strong>${r.cwe}</strong></div>
-                        <div class="grid-item"><span>Кем обнаружено:</span><strong>${r.found_by}</strong></div>
+                        <div class="grid-item"><span>Критичность:</span><strong style="color: ${getSevColor(r.sev)}">${esc(r.sev)}</strong></div>
+                        <div class="grid-item"><span>Статус (сводный):</span><strong style="color: ${getFeasColor(r.feas)}">${esc(r.feas)}</strong></div>
+                        <div class="grid-item"><span>Атакуемое ПО:</span><strong>${esc(r.sw)} <span class="trace-meta">(порт: ${esc(r.port)})</span></strong></div>
+                        <div class="grid-item"><span>Вектор (CAPEC):</span><strong>${esc(r.capec)}</strong></div>
+                        <div class="grid-item"><span>Класс (CWE):</span><strong>${esc(r.cwe)}</strong></div>
+                        <div class="grid-item"><span>Кем обнаружено:</span><strong>${esc(r.found_by)}</strong></div>
                     </div>
-                    <div class="modal-body">
-                        <div class="sw-context">
-                            <h4>Состав агрегированной группы</h4>
-                            <ul>
-                                <li><strong>ПО (все значения):</strong> ${r.sw_all || r.sw}</li>
-                                <li><strong>Порты (все значения):</strong> ${r.port_all || r.port}</li>
-                                <li><strong>CWE (все значения):</strong> ${r.cwe_all || r.cwe}</li>
-                                <li><strong>CAPEC (все значения):</strong> ${r.capec_all || r.capec}</li>
-                            </ul>
-                        </div>
-
-                        <div class="sw-context">
-                            <h4>Контекст программного обеспечения</h4>
-                            <ul>
-                                <li><strong>Тип/категория:</strong> ${r.sw_category || 'Не определено'}</li>
-                                <li><strong>Назначение:</strong> ${r.sw_purpose || 'Нет описания'}</li>
-                                <li><strong>Последствия успешной атаки:</strong> ${r.sw_impact || 'Требуется ручная оценка'}</li>
-                                <li><strong>Затрагиваемая зона:</strong> ${r.sw_scope || 'Локальный компонент инфраструктуры'}</li>
-                            </ul>
-                        </div>
-
-                        <h4>📝 Включенные CVE (Агрегация из ${r.count} находок)</h4>
-                        <p style="color:#58a6ff; font-family:monospace; font-size: 13px;">${r.cve}</p>
-
-                        <h4 style="color: ${reasonColor};">⚖️ ОБОСНОВАНИЕ РЕАЛИЗУЕМОСТИ</h4>
-                        <p style="background: ${reasonColor}15; padding: 15px; border-radius: 6px; border-left: 4px solid ${reasonColor}; font-size: 13px; line-height: 1.6;">
-                            ${r.reason || 'Подробные пояснения недоступны.'}
-                        </p>
-
-                        <h4>📝 Описание уязвимости</h4>
-                        <p>${r.desc}</p>
-                        
-                        <h4 style="color: #e3b341;">🥷 Учебный полигон (Как атаковать)</h4>
-                        <p class="attack-box">
-                            <strong style="color:#d29922">Требуемое ПО:</strong> <span>${r.tools}</span><br><br>
-                            <strong style="color:#d29922">Шаги эксплуатации:</strong><br>
-                            <span>${r.steps.replace(/\\n/g, "<br>")}</span>
-                        </p>
-
-                        <h4 style="color: #3fb950;">🛡️ Как защититься (Устранение)</h4>
-                        <p class="rec-box">${r.rec}</p>
-
-                        <div class="group-members">
-                            <div class="group-members-head">Отдельные элементы, вошедшие в группу (уникальных: ${r.members_unique || (r.members || []).length}, всего записей: ${r.members_total || (r.members || []).length})</div>
-                            <div id="group-members-container"></div>
-                        </div>
+                    <div class="modal-toolbar">
+                        <button type="button" class="agg-btn" onclick='openRawRegistryForCves(${rawCvesGrp})'>📂 Сырой реестр CVE по группе</button>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details">
+                            <summary>🔬 Трассировка вердикта (представитель группы)</summary>
+                            <div class="modal-details-body">${formatTraceBlock(r.feasibility_trace)}</div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>Состав группы и контекст ПО</summary>
+                            <div class="modal-details-body">
+                                <div class="sw-context" style="margin-top:0;">
+                                    <h4 style="margin-top:0;">Состав</h4>
+                                    <ul>
+                                        <li><strong>ПО (все значения):</strong> ${esc(r.sw_all || r.sw)}</li>
+                                        <li><strong>Порты (все значения):</strong> ${esc(r.port_all || r.port)}</li>
+                                        <li><strong>CWE (все значения):</strong> ${esc(r.cwe_all || r.cwe)}</li>
+                                        <li><strong>CAPEC (все значения):</strong> ${esc(r.capec_all || r.capec)}</li>
+                                    </ul>
+                                </div>
+                                <div class="sw-context">
+                                    <h4>Контекст программного обеспечения</h4>
+                                    <ul>
+                                        <li><strong>Тип/категория:</strong> ${esc(r.sw_category || 'Не определено')}</li>
+                                        <li><strong>Назначение:</strong> ${esc(r.sw_purpose || 'Нет описания')}</li>
+                                        <li><strong>Последствия успешной атаки:</strong> ${esc(r.sw_impact || 'Требуется ручная оценка')}</li>
+                                        <li><strong>Затрагиваемая зона:</strong> ${esc(r.sw_scope || 'Локальный компонент инфраструктуры')}</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>📝 Включённые CVE (агрегация из ${r.count} находок)</summary>
+                            <div class="modal-details-body"><p style="color:#58a6ff; font-family:monospace; font-size: 13px; margin:0;">${esc(r.cve)}</p></div>
+                        </details>
+                        <details class="modal-details">
+                            <summary style="color: ${reasonColor};">⚖️ Обоснование реализуемости</summary>
+                            <div class="modal-details-body"><p style="background: ${reasonColor}15; padding: 15px; border-radius: 6px; border-left: 4px solid ${reasonColor}; font-size: 13px; line-height: 1.6; margin:0;">${esc(r.reason || 'Подробные пояснения недоступны.')}</p></div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>📝 Описание уязвимости</summary>
+                            <div class="modal-details-body"><p style="margin:0; line-height:1.55; white-space:pre-wrap;">${esc(r.desc)}</p></div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🥷 Учебный полигон (как атаковать)</summary>
+                            <div class="modal-details-body">${formatTrainingPolygon(r)}</div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🛡️ Устранение и защита</summary>
+                            <div class="modal-details-body">
+                                <p class="trace-meta" style="margin:0 0 10px 0;">Текст ниже из базы рекомендаций (CVE/CWE); отдельные фрагменты могут быть нерелевантны вашему стеку — ориентируйтесь на описание CVE и официальные бюллетени.</p>
+                                <p class="rec-box" style="margin:0;">${esc(r.rec)}</p>
+                            </div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>👥 Участники группы <span class="trace-meta">(уникальных: ${mu}, записей: ${mt})</span></summary>
+                            <div class="modal-details-body">
+                                <div class="group-members" style="border:none;">
+                                    <div id="group-members-container"></div>
+                                </div>
+                            </div>
+                        </details>
                     </div>
                 `;
                 renderGroupMembers(r);
@@ -1954,6 +2297,9 @@ class ReportGenerator:
             cwe_id_raw = getattr(r, 'cwe_id', '') or 'CWE-Неизвестно'
             cwe_desc_raw = self._get_cwe_description(cwe_id_raw)
             found_by_raw = getattr(r, 'found_by', 'Сервер') if hasattr(r, 'found_by') else 'Сервер'
+            _trace = getattr(r, "feasibility_trace", None) or {}
+            if not isinstance(_trace, dict):
+                _trace = {}
             raw_findings_data.append({
                 "raw_id": idx,
                 "cve": cve_str if cve_str else "N/A",
@@ -1963,8 +2309,8 @@ class ReportGenerator:
                 "name": getattr(r, 'attack_name', None) or 'Атака',
                 "sw": real_sw,
                 "port": port,
-                "feas": self._get_worst_feas([getattr(r, 'feasibility', 'UNKNOWN')]),
-                "sev": getattr(r, 'severity', 'INFO'),
+                "feas": normalize_feasibility(self._get_worst_feas([getattr(r, 'feasibility', 'UNKNOWN')])),
+                "sev": normalize_severity(getattr(r, 'severity', 'INFO')),
                 "desc": getattr(r, 'description', None) or 'Описание отсутствует.',
                 "rec": getattr(r, 'recommendation', None) or 'Специфичных рекомендаций нет.',
                 "reason": getattr(r, 'reason', None) or 'Подробные пояснения недоступны.',
@@ -1976,6 +2322,7 @@ class ReportGenerator:
                 "sw_purpose": sw_ctx_raw["purpose"],
                 "sw_impact": sw_ctx_raw["impact"],
                 "sw_scope": sw_ctx_raw["scope"],
+                "feasibility_trace": _trace,
             })
 
             for single_cve in cve_list:
@@ -2014,6 +2361,7 @@ class ReportGenerator:
             html = html.replace('__SYS_DATA__', json.dumps(sys_data, ensure_ascii=False))
             html = html.replace('__SUMMARY_DATA__', json.dumps(summary_data, ensure_ascii=False))
             html = html.replace('__ATK_DEF_DATA__', json.dumps(atk_def_data, ensure_ascii=False))
+            html = html.replace('__STATUS_META__', json.dumps(report_status_meta(), ensure_ascii=False))
             f.write(html)
 
         return filepath

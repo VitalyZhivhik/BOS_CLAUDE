@@ -236,3 +236,49 @@ class AttackToolkit:
         for tool in self.tools_db:
             ids.update(tool.get("applicable_cve", []))
         return sorted(ids)
+
+
+def validate_tools_database_at_startup(base_dir: str, toolkit: AttackToolkit | None = None) -> bool:
+    """
+    Проверка databases/tools_database.json при старте сервера/GUI.
+    Пишет в лог явный результат (успех / предупреждения / ошибка).
+    Если передан уже загруженный AttackToolkit, повторная загрузка не выполняется.
+    """
+    bd = base_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(bd, TOOLS_DB_PATH)
+    if toolkit is not None:
+        tk = toolkit
+    else:
+        tk = AttackToolkit(bd)
+        tk.load()
+    n = len(tk.tools_db)
+    if n == 0:
+        logger.error(
+            "[TOOLKIT-VALIDATE] База инструментов пуста или не загрузилась. "
+            f"Проверьте файл: {path}"
+        )
+        return False
+    bad = 0
+    for i, row in enumerate(tk.tools_db):
+        if not isinstance(row, dict):
+            bad += 1
+            if bad <= 3:
+                logger.warning(f"[TOOLKIT-VALIDATE] Запись #{i} не является объектом JSON")
+            continue
+        if not row.get("name") and not row.get("tool_name"):
+            bad += 1
+            if bad <= 3:
+                logger.warning(f"[TOOLKIT-VALIDATE] Запись #{i} без поля name")
+        cves = row.get("applicable_cve")
+        if cves is not None and not isinstance(cves, list):
+            bad += 1
+            if bad <= 3:
+                logger.warning(f"[TOOLKIT-VALIDATE] Запись #{i}: applicable_cve должен быть списком")
+    if bad:
+        logger.warning(
+            f"[TOOLKIT-VALIDATE] Загружено записей: {n}, замечаний по структуре: {bad}. "
+            "Проверьте поля name / applicable_cve в tools_database.json."
+        )
+    else:
+        logger.info(f"[TOOLKIT-VALIDATE] OK: {n} записей в tools_database.json, структура корректна.")
+    return True

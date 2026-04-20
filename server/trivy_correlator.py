@@ -16,7 +16,8 @@ from dataclasses import dataclass, field
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from common.models import (
-    VulnerabilityMatch, AttackFeasibility, Severity, AttackVector, OpenPort
+    VulnerabilityMatch, AttackFeasibility, Severity, AttackVector, OpenPort,
+    normalize_feasibility, normalize_severity,
 )
 from common.logger import get_server_logger
 from server.trivy_scanner import TrivyScanResult, TrivyVulnerability
@@ -301,11 +302,25 @@ class TrivyCorrelator:
                     f"{trivy_vuln.title}\n\n"
                     f"Trivy подтвердил: {trivy_vuln.description[:300]}"
                 ),
-                severity=trivy_vuln.severity,
-                feasibility=feasibility.value,
+                severity=normalize_severity(trivy_vuln.severity),
+                feasibility=normalize_feasibility(feasibility.value),
                 reason=reason,
                 recommendation=self._generate_trivy_recommendation(trivy_vuln, feasibility),
                 target_software=f"{trivy_vuln.pkg_name} v.{trivy_vuln.installed_version}" if trivy_vuln.installed_version else trivy_vuln.pkg_name,
+                target_port=av.target_port,
+                found_by="Trivy+атакующий",
+                feasibility_trace={
+                    "version": 1,
+                    "source": "trivy_attacker_correlation",
+                    "trivy": {
+                        "vuln_id": vuln_id,
+                        "pkg_name": trivy_vuln.pkg_name,
+                        "installed_version": trivy_vuln.installed_version,
+                        "severity": trivy_vuln.severity,
+                    },
+                    "attack_vector_id": av.id,
+                    "open_port_on_vector": av.target_port,
+                },
             )
             
             self.results.append(enhanced_match)

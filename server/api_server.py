@@ -332,9 +332,10 @@ def start_server(base_dir: str = "", port: int = None):
 
     # 3. Загрузка базы инструментов (опционально)
     try:
-        from server.attack_toolkit import AttackToolkit
+        from server.attack_toolkit import AttackToolkit, validate_tools_database_at_startup
         state.toolkit = AttackToolkit(state.base_dir)
         state.toolkit.load()
+        validate_tools_database_at_startup(state.base_dir, state.toolkit)
         logger.info("[SRV] База инструментов загружена")
     except Exception as e:
         logger.warning(f"[SRV] База инструментов недоступна: {e}")

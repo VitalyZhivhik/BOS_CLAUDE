@@ -23,6 +23,26 @@ class AttackFeasibility(str, Enum):
     REQUIRES_ANALYSIS = "ТРЕБУЕТ АНАЛИЗА"
 
 
+def normalize_severity(value: object) -> str:
+    """Приводит критичность к значению из Severity (верхний регистр)."""
+    if value is None:
+        return Severity.INFO.value
+    try:
+        if isinstance(value, Severity):
+            return value.value
+    except Exception:
+        pass
+    s = str(value).strip().upper()
+    if not s:
+        return Severity.INFO.value
+    for sev in Severity:
+        if sev.value == s:
+            return sev.value
+    if s in ("UNKNOWN", "NONE"):
+        return Severity.INFO.value
+    return Severity.INFO.value
+
+
 def normalize_feasibility(value: object) -> str:
     """
     Приводит разные представления статуса реализуемости к единому формату.
@@ -192,6 +212,20 @@ class VulnerabilityMatch:
     reason: str = ""
     recommendation: str = ""
     target_software: str = ""
+    # Порт, с которым связана находка (если применимо); для отчётов/трассировки
+    target_port: Optional[int] = None
+    # Источник строки (сервер, атакующий, Trivy+атака и т.д.)
+    found_by: str = "Сервер"
+    # Структурированная трассировка вердикта (баллы, Trivy, порты, блокеры)
+    feasibility_trace: dict = field(default_factory=dict)
+
+
+def report_status_meta() -> dict:
+    """Единый словарь статусов для UI и HTML-отчёта (сериализуется в JSON)."""
+    return {
+        "feasibility_values": [f.value for f in AttackFeasibility],
+        "severity_values": [s.value for s in Severity],
+    }
 
 
 def to_json(obj):

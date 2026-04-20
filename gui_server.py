@@ -33,7 +33,7 @@ from server.system_analyzer import SystemAnalyzer
 from server.vulnerability_db import VulnerabilityDatabase
 from server.attack_correlator import AttackCorrelator
 from server.report_generator import ReportGenerator
-from server.attack_toolkit import AttackToolkit
+from server.attack_toolkit import AttackToolkit, validate_tools_database_at_startup
 from server.report_history import ReportHistory, ReportRecord
 from server.scan_history import ScanHistory, ScanRecord
 from server.local_vuln_scanner import LocalVulnScanner, ScanReport
@@ -231,10 +231,11 @@ class ServerGUI(QMainWindow):
         self.setStyleSheet(STYLE)
         self.update_results_signal.connect(self._update_results_table_slot)
         self.correlation_progress_signal.connect(self._on_correlation_progress_update)
+        self.log_signal.connect(self._append_log)
         gh = GUILogHandler(self._on_log_message)
         gh.setLevel(10)
         logger.addHandler(gh)
-        self.log_signal.connect(self._append_log)
+        validate_tools_database_at_startup(PROJECT_DIR)
         self.client_connected_signal.connect(self._on_client_connected)
         self.analysis_done_signal.connect(self._on_server_analysis_done)
         # Синхронизируем историю с диском при старте
