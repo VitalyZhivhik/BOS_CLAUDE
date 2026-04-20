@@ -45,7 +45,9 @@ class ServerState:
         self.vuln_db = None
         self.toolkit = None           # AttackToolkit — для схем 3,4,5
         self.local_scan_report = None # ScanReport   — для схемы 3
-        self.trivy_result = None      # TrivyScanResult — для корреляции уязвимостей
+        # Заполняется после «3б. Сканирование Trivy» в gui_server. Пока None — этап [4/4] в
+        # AttackCorrelator пропускается (нет подтверждения CVE по установленным пакетам).
+        self.trivy_result = None      # TrivyScanResult | dict | None
         self.base_dir = ""
         self.ready = False
         self.connected_clients = []
@@ -209,10 +211,12 @@ class RequestHandler(BaseHTTPRequestHandler):
                 if state.on_correlation_progress:
                     state.on_correlation_progress(0, "Начало корреляции...")
 
+                # trivy_result: если выполнен скан Trivy на сервере — усиливает корреляцию и
+                # подтверждение CVE; иначе correlator работает без слоя Trivy (см. attack_correlator).
                 correlator = AttackCorrelator(
-                    state.system_info, 
+                    state.system_info,
                     state.vuln_db,
-                    trivy_result=state.trivy_result  # Передаём результаты Trivy
+                    trivy_result=state.trivy_result,
                 )
                 
                 # Устанавливаем callback для прогресса

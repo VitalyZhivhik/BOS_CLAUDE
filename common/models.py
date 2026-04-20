@@ -67,6 +67,41 @@ def normalize_feasibility(value: object) -> str:
     return AttackFeasibility.REQUIRES_ANALYSIS.value
 
 
+def feasibility_counters(items, value_getter=None) -> dict:
+    """
+    Единый подсчёт статистики реализуемости для UI/отчётов.
+    Возвращает словарь с ключами:
+      feasible, partially_feasible, not_feasible, requires_analysis, total
+    """
+    if value_getter is None:
+        def value_getter(x):
+            if isinstance(x, dict):
+                return x.get("feasibility")
+            return getattr(x, "feasibility", None)
+
+    counters = {
+        "feasible": 0,
+        "partially_feasible": 0,
+        "not_feasible": 0,
+        "requires_analysis": 0,
+        "total": 0,
+    }
+
+    for item in items or []:
+        status = normalize_feasibility(value_getter(item))
+        counters["total"] += 1
+        if status == AttackFeasibility.FEASIBLE.value:
+            counters["feasible"] += 1
+        elif status == AttackFeasibility.PARTIALLY_FEASIBLE.value:
+            counters["partially_feasible"] += 1
+        elif status == AttackFeasibility.NOT_FEASIBLE.value:
+            counters["not_feasible"] += 1
+        else:
+            counters["requires_analysis"] += 1
+
+    return counters
+
+
 @dataclass
 class OpenPort:
     port: int
@@ -126,6 +161,8 @@ class AttackVector:
     tools_used: str = ""
     # Явные CVE для корреляции (если заданы генератором или клиентом API)
     representative_cve_ids: list = field(default_factory=list)
+    # Эвристика с атакующей стороны: предполагаемое ПО по баннеру/порту (для target_software на сервере)
+    inferred_product: str = ""
 
 
 @dataclass

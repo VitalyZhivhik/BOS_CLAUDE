@@ -106,6 +106,16 @@ QLineEdit {
 }
 QSplitter::handle { background: #333; width: 1px; }
 """
+
+_HINT_NEUTRAL = (
+    "background:#1a1a1a;border:1px solid #333;border-radius:3px;"
+    "padding:6px;color:#888;font-size:10px;"
+)
+_HINT_ACCENT = (
+    "background:#1e2a2a;border:1px solid #2a4a4a;border-radius:3px;"
+    "padding:6px;color:#7a9a9a;font-size:10px;"
+)
+
 def is_port_available(port):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -249,7 +259,6 @@ class ServerGUI(QMainWindow):
         self._build_trivy_history_tab()  # НОВАЯ ВКЛАДКА ИСТОРИИ TRIVY
         self._build_vuln_tab()
         self._build_correlation_tab()
-        self._build_attack_selector_tab()
         self._build_history_tab()
         self._build_log_tab()
         ml.addWidget(self.tabs, 1)
@@ -344,6 +353,10 @@ class ServerGUI(QMainWindow):
         self.btn_load_db = QPushButton("2. Загрузить базы CVE/CWE/CAPEC/MITRE")
         self.btn_load_db.setStyleSheet(btn_style)
         self.btn_load_db.setEnabled(False)
+        self.btn_load_db.setToolTip(
+            "Читает JSON из папки databases/: cve_database, cwe_database, capec_database, "
+            "mitre_attack. Используются при поиске CVE по портам/ПО и при корреляции."
+        )
         self.btn_load_db.clicked.connect(self._load_databases)
         cl.addWidget(self.btn_load_db)
 
@@ -356,6 +369,10 @@ class ServerGUI(QMainWindow):
         self.btn_vuln_scan = QPushButton("3. Локальное сканирование уязвимостей")
         self.btn_vuln_scan.setStyleSheet(btn_style)
         self.btn_vuln_scan.setEnabled(False)
+        self.btn_vuln_scan.setToolTip(
+            "Встроенные проверки Windows (PowerShell/WMI): обновления, политики, файрвол, RDP, SMB и др. "
+            "Результат — вкладка «Локальный скан»."
+        )
         self.btn_vuln_scan.clicked.connect(self._start_vuln_scan)
         cl.addWidget(self.btn_vuln_scan)
 
@@ -368,6 +385,10 @@ class ServerGUI(QMainWindow):
         self.btn_trivy_scan = QPushButton("3б. Сканирование Trivy (CVE/CWE/CAPEC)")
         self.btn_trivy_scan.setStyleSheet(btn_style)
         self.btn_trivy_scan.setEnabled(False)
+        self.btn_trivy_scan.setToolTip(
+            "Запускает Trivy по установленному ПО. CVE — из баз уязвимостей Trivy; CWE — из карточки уязвимости; "
+            "CAPEC дополняется из локальной базы при отображении."
+        )
         self.btn_trivy_scan.clicked.connect(self._start_trivy_scan)
         cl.addWidget(self.btn_trivy_scan)
 
@@ -383,6 +404,29 @@ class ServerGUI(QMainWindow):
         cl.addWidget(self.btn_server)
 
         ll.addWidget(cg)
+
+        sg = QGroupBox("Справка: данные и пайплайн")
+        sg.setStyleSheet("QGroupBox { font-size: 11px; padding-top: 18px; }")
+        sgl = QVBoxLayout(sg)
+        sgl.setSpacing(4)
+        sgl.setContentsMargins(6, 10, 6, 8)
+        db_hint = QLabel(
+            "Базы: CVE — записи об уязвимостях (идентификатор, описание, привязка к портам, "
+            "службам и ПО); CWE — классы ошибок в ПО; CAPEC — шаблоны атак; MITRE ATT&CK — техники "
+            "противника; база инструментов — средства и тексты для разделов отчёта.\n\n"
+            "Типичный порядок: анализ системы → загрузка справочников → локальный скан Windows → "
+            "(опционально) Trivy → запуск API → приём данных от атакующего → корреляция → HTML/JSON отчёт.\n\n"
+            "Локальный скан формирует находки с полями ID проверки, категорией (политика, сеть, службы…), "
+            "статусом (уязвимо/защищено/неизвестно), серьёзностью и описанием.\n\n"
+            "Trivy сопоставляет установленные пакеты с CVE из своих баз; CWE и CAPEC берутся из метаданных "
+            "уязвимости и локальных JSON-справочников при отображении.\n\n"
+            "Корреляция сопоставляет векторы атакующего с конфигурацией сервера, портами, ПО и данными Trivy; "
+            "на выходе — оценка реализуемости атак, сводка и рекомендации в отчёте."
+        )
+        db_hint.setStyleSheet(_HINT_NEUTRAL)
+        db_hint.setWordWrap(True)
+        sgl.addWidget(db_hint)
+        ll.addWidget(sg)
 
         # Параметры - уменьшены
         pg = QGroupBox("Параметры")
@@ -458,6 +502,13 @@ class ServerGUI(QMainWindow):
     def _build_system_tab(self):
         st = QWidget()
         stl = QVBoxLayout(st)
+        sy = QLabel(
+            "Сводка с хоста после шага «Анализ системы»: ОС, сеть, установленное ПО и открытые порты "
+            "по данным SystemAnalyzer. Эти сведения участвуют в корреляции с векторами атакующего."
+        )
+        sy.setStyleSheet(_HINT_NEUTRAL)
+        sy.setWordWrap(True)
+        stl.addWidget(sy)
         self.sys_table = QTableWidget(0, 2)
         self.sys_table.setHorizontalHeaderLabels(["Параметр", "Значение"])
         self.sys_table.horizontalHeader().setStretchLastSection(True)
@@ -471,7 +522,13 @@ class ServerGUI(QMainWindow):
         """Новая вкладка для реального ПО от сканера"""
         st = QWidget()
         stl = QVBoxLayout(st)
-        label = QLabel("Реестр программного обеспечения и открытых портов, найденных сканером на сервере:")
+        label = QLabel(
+            "Реестр ПО и сетевых служб, которые сервер «видит» у себя локально (установленные программы "
+            "и прослушиваемые порты). Используется для сопоставления с CVE и с результатами Trivy при "
+            "оценке реализуемости атак."
+        )
+        label.setStyleSheet(_HINT_NEUTRAL)
+        label.setWordWrap(True)
         stl.addWidget(label)
 
         self.software_table = QTableWidget(0, 3)
@@ -491,7 +548,16 @@ class ServerGUI(QMainWindow):
         title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         title.setStyleSheet("color:#888;padding:6px 0;")
         stl.addWidget(title)
-        
+        tri_expl = QLabel(
+            "Trivy сравнивает установленные пакеты и их версии с известными уязвимостями. "
+            "CVE-ID приходит из отчёта Trivy (базы NVD и др.). CWE — из метаданных уязвимости. "
+            "Колонка CWE/CAPEC объединяет идентификаторы слабости и шаблона атаки (CAPEC подгружается "
+            "из локальной базы, если есть связь). «Исправлено» — версия пакета, в которой проблема закрыта."
+        )
+        tri_expl.setStyleSheet(_HINT_ACCENT)
+        tri_expl.setWordWrap(True)
+        stl.addWidget(tri_expl)
+
         # Панель управления Trivy
         ctrl_layout = QHBoxLayout()
         self.btn_load_trivy = QPushButton("📂 Загрузить отчёт из файла (История)")
@@ -884,8 +950,6 @@ class ServerGUI(QMainWindow):
         self.btn_load_toolkit.setText("2б. Инструменты (загружены)")
         self.btn_load_toolkit.setEnabled(True)
         self.btn_generate_manual.setEnabled(True)
-        # Заполняем вкладку выбора вектора атаки
-        self._populate_attack_selector()
         logger.info(f"[TOOLKIT] Загружено {len(tk.tools_db)} инструментов атаки, {len(tk.defense_db)} мер защиты")
     def _on_toolkit_error(self, e):
         self.btn_load_toolkit.setText("2б. Загрузить базу инструментов")
@@ -1578,9 +1642,8 @@ class ServerGUI(QMainWindow):
                     seen.add(key)
                     unique_results.append(r)
             logger.debug(f"[UI] Обновление таблицы. Уникальных строк: {len(unique_results)} из {len(results)}")
-            feasible_cnt = 0
-            not_feasible_cnt = 0
-            partial_cnt = 0
+            from common.models import feasibility_counters
+            counters = feasibility_counters(unique_results)
             for r in unique_results:
                 row = self.results_table.rowCount()
                 self.results_table.insertRow(row)
@@ -1598,13 +1661,10 @@ class ServerGUI(QMainWindow):
                 # ВАЖНО: проверяем ЧАСТИЧНО раньше РЕАЛИЗУЕМА (иначе частичные попадают как реализуемые)
                 if "ЧАСТИЧНО" in feas:
                     fi.setForeground(QColor("#d29922"))
-                    partial_cnt += 1
                 elif feas == "НЕ РЕАЛИЗУЕМА":
                     fi.setForeground(QColor("#696"))
-                    not_feasible_cnt += 1
                 elif feas == "РЕАЛИЗУЕМА":
                     fi.setForeground(QColor("#b55"))
-                    feasible_cnt += 1
                 else:
                     fi.setForeground(QColor("#888"))
                 self.results_table.setItem(row, 2, fi)
@@ -1612,8 +1672,10 @@ class ServerGUI(QMainWindow):
                 self.results_table.setItem(row, 4, QTableWidgetItem(desc))
             self.correlation_summary.setText(
                 f"Всего (уникальных): {len(unique_results)}  |  "
-                f"🔴 Реализуемых: {feasible_cnt}  |  🟡 Частичных: {partial_cnt}  |  "
-                f"🟢 Нереализуемых: {not_feasible_cnt}"
+                f"🔴 Реализуемых: {counters['feasible']}  |  "
+                f"🟡 Частичных: {counters['partially_feasible']}  |  "
+                f"🟢 Нереализуемых: {counters['not_feasible']}  |  "
+                f"⚪ Требуют анализа: {counters['requires_analysis']}"
             )
         except Exception as e:
             logger.error(f"[UI] Сбой при заполнении таблицы: {e}", exc_info=True)

@@ -122,6 +122,47 @@ BANNER_CVE_MAP = {
 }
 
 
+def infer_product_from_observation(
+    banner: str = "",
+    service: str = "",
+    port: int | None = None,
+) -> str:
+    """
+    Эвристика: какое ПО, вероятно, отвечает на порту (по баннеру и/или имени службы).
+    Передаётся на сервер в inferred_product для заполнения target_software при корреляции.
+    """
+    b = (banner or "").strip()
+    bl = b.lower()
+    if re.search(r"Apache[/\s]", b, re.I):
+        m = re.search(r"Apache[/\s]+([\d.]+)", b, re.I)
+        return f"Apache {m.group(1)}" if m else "Apache"
+    if "nginx" in bl:
+        m = re.search(r"nginx/([\d.]+)", b, re.I)
+        return f"nginx {m.group(1)}" if m else "nginx"
+    if "openssh" in bl:
+        m = re.search(r"OpenSSH[_\s]+([^\s,]+)", b, re.I)
+        return f"OpenSSH {m.group(1)}" if m else "OpenSSH"
+    if "microsoft-iis" in bl or "iis/" in bl:
+        return "Microsoft-IIS"
+    if "mysql" in bl and "mariadb" not in bl:
+        return "MySQL"
+    if "mariadb" in bl:
+        return "MariaDB"
+    if "postgresql" in bl:
+        return "PostgreSQL"
+    if "redis" in bl:
+        return "Redis"
+    if "exim" in bl:
+        return "Exim"
+    if "proftpd" in bl or "vsftpd" in bl:
+        return "ProFTPD" if "proftpd" in bl else "vsftpd"
+    if service and service not in ("Unknown", "unknown", "banner_detected"):
+        return service
+    if port and port in KNOWN_PORTS:
+        return KNOWN_PORTS[port]
+    return ""
+
+
 class PortScanner:
     """Сканер портов с расширенным фингерпринтингом."""
 
@@ -844,16 +885,21 @@ class AttackVectorGenerator:
             if key in banner_seen:
                 continue
             banner_seen.add(key)
+            port_obj = next((p for p in open_ports if p.port == finding["port"]), None)
+            ts = port_obj.service if port_obj else "banner_detected"
+            ban = (port_obj.banner if port_obj else "") or ""
             av = AttackVector(
                 id=f"AV-BANNER-{finding['cve_id']}",
                 name=f"{finding['cve_id']} (по баннеру)",
                 description=finding['description'],
                 target_port=finding['port'],
-                target_service=open_ports[0].service if open_ports else "banner_detected",
+                target_service=ts,
                 attack_type="known_vulnerability",
                 severity=finding['severity'],
                 tools_used="BannerAnalyzer",
                 representative_cve_ids=[finding["cve_id"]],
+                inferred_product=infer_product_from_observation(
+                    banner=ban, service=ts, port=finding["port"]),
             )
             vectors.append(av)
 
@@ -939,6 +985,11 @@ class AttackVectorGenerator:
                         attack_type="known_vulnerability",
                         severity=cve['severity'],
                         tools_used="CVE-specific exploit",
+                        inferred_product=infer_product_from_observation(
+                            banner=port_info.banner or "",
+                            service=service,
+                            port=port_info.port,
+                        ),
                     )
                     vectors.append(av)
 
@@ -1085,6 +1136,11 @@ def run_attacker(target_ip: str = None, server_port: int = None,
             attack_type="known_vulnerability",
             severity=vuln['severity'],
             tools_used=vuln['source'],
+            inferred_product=infer_product_from_observation(
+                banner=vuln.get("banner") or "",
+                service=vuln.get("service", "unknown"),
+                port=vuln.get("port"),
+            ),
         )
         attack_vectors.append(av)
 

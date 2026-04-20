@@ -126,7 +126,8 @@ class AttackCorrelator:
         dedup_elapsed = time.time() - dedup_start
         logger.info(f"Дедупликация: {before_count} -> {len(self.results)} за {dedup_elapsed:.2f}s")
 
-        # 4. КОРРЕЛЯЦИЯ С TRIVY (если есть данные)
+        # 4. Trivy: требуется непустой self.trivy_result (результат сканирования в gui_server).
+        # Без него подтверждение уязвимостей по установленному ПО и merge с TrivyCorrelator не выполняются.
         if self.trivy_result:
             logger.info("[4/4] Корреляция с данными Trivy...")
             self._report_progress(92, "Корреляция с Trivy...")
@@ -167,6 +168,12 @@ class AttackCorrelator:
                             match.target_software = sw
                             break
             
+            # Подсказка атакующего (баннер/порт) — до эвристики по порту
+            if not match.target_software and match.attack_vector_id:
+                ip = self._inferred_product_from_vector_id(match.attack_vector_id, scan_result)
+                if ip:
+                    match.target_software = ip
+
             # Фоллбэк: если всё ещё нет ПО, используем эвристику по порту
             if not match.target_software:
                 match.target_software = self._guess_software_from_port(match, scan_result)
@@ -280,6 +287,8 @@ class AttackCorrelator:
         score = 0
         max_score = 100
         score_details = []
+        blockers = []
+        uncertainty_flags = []
         
         # Фактор 1: Сетевая доступность (30 баллов)
         required_ports = cve.get("requires_port", [])
@@ -302,6 +311,7 @@ class AttackCorrelator:
                 # Если порты требуются но не открыты - снижаем баллы
                 score -= 10
                 score_details.append(f"Требуемые порты закрыты: {required_ports}")
+                blockers.append("Требуемые порты закрыты")
         else:
             # Если нет специфичных портов, но атака требует сетевого доступа
             attack_type = cve.get("attack_type", "")
@@ -313,11 +323,13 @@ class AttackCorrelator:
                     score_details.append("Веб-порты открыты")
                 else:
                     score += 10
-                    score_details.append("Веб-порты частично открыты")
+                    score_details.append("Веб-порты не обнаружены")
+                    uncertainty_flags.append("Неочевидная сетевая доступность веб-вектора")
             else:
                 # Для других атак считаем что сеть доступна
                 score += 15
                 score_details.append("Сетевой доступ предполагается")
+                uncertainty_flags.append("Сетевой доступ оценён эвристически")
         
         # Фактор 2: Подтверждение Trivy (35 баллов)
         cve_id = cve.get("id", "")
@@ -334,9 +346,9 @@ class AttackCorrelator:
                 score += 15
                 score_details.append("Trivy подтвердил (низко)")
         else:
-            # Если Trivy не подтвердил, но есть другие признаки
-            score += 5
-            score_details.append("Trivy не подтвердил, но есть другие признаки")
+            # Trivy не подтвердил: без штрафа/бонуса, это зона неопределённости
+            score_details.append("Trivy не подтвердил уязвимость")
+            uncertainty_flags.append("Нет подтверждения Trivy")
         
         # Фактор 3: Уязвимое ПО обнаружено (20 баллов)
         sw_names_lower = set()
@@ -365,6 +377,10 @@ class AttackCorrelator:
                 if any(av_svc_lower in installed for installed in sw_names_lower):
                     score += 10
                     score_details.append("ПО по вектору атаки обнаружено")
+                else:
+                    blockers.append("ПО из вектора атаки не обнаружено")
+            else:
+                blockers.append("Целевое уязвимое ПО не обнаружено")
         
         # Фактор 4: Отсутствие патчей/обновлений (10 баллов)
         if not self.system_info.updates_installed:
@@ -384,16 +400,34 @@ class AttackCorrelator:
             score_details.append("Антивирус отключён")
         
         # Определяем реализуемость на основе score (ПОВЫШЕННЫЕ ПОРОГИ)
-        if score >= 60:
+        has_hard_evidence = trivy_confirmed or vulnerable_sw_found
+
+        if score >= 70 and not blockers:
             feasibility = AttackFeasibility.FEASIBLE
-        elif score >= 30:
-            feasibility = AttackFeasibility.PARTIALLY_FEASIBLE
-        elif score >= 10:
+        elif blockers:
+            # Если есть блокеры, обычно считаем атаку нереализуемой.
+            # Частичную оценку оставляем только для конфликтного случая:
+            # есть подтверждающие признаки, но часть условий не выполнена.
+            if has_hard_evidence and score >= 50:
+                feasibility = AttackFeasibility.PARTIALLY_FEASIBLE
+            else:
+                feasibility = AttackFeasibility.NOT_FEASIBLE
+        elif score >= 55:
+            feasibility = AttackFeasibility.FEASIBLE
+        elif score <= 30:
+            feasibility = AttackFeasibility.NOT_FEASIBLE
+        elif uncertainty_flags and not has_hard_evidence:
+            # REQUIRES_ANALYSIS оставляем для действительно "серой зоны":
+            # данных недостаточно, явных подтверждений нет.
             feasibility = AttackFeasibility.REQUIRES_ANALYSIS
         else:
-            feasibility = AttackFeasibility.NOT_FEASIBLE
+            feasibility = AttackFeasibility.PARTIALLY_FEASIBLE
         
         reason_text = ". ".join(score_details)
+        if blockers:
+            reason_text += ". Блокирующие факторы: " + "; ".join(blockers)
+        if uncertainty_flags:
+            reason_text += ". Неопределённость: " + "; ".join(uncertainty_flags)
         if protection_notes:
             reason_text += ". Защита: " + "; ".join(protection_notes)
         if trivy_confirmed:
@@ -937,6 +971,20 @@ class AttackCorrelator:
         
         logger.info(f"[SOFTWARE_MAP] Всего записей в карте ПО: {len(software_map)}")
         return software_map
+
+    def _inferred_product_from_vector_id(self, vector_id: str, scan_result: ScanResult) -> str:
+        """Предполагаемое ПО с атакующего агента (поле inferred_product у AttackVector)."""
+        if not vector_id:
+            return ""
+        for av in scan_result.attack_vectors:
+            if isinstance(av, dict):
+                if av.get("id") != vector_id:
+                    continue
+                return (av.get("inferred_product") or "").strip()
+            if getattr(av, "id", None) != vector_id:
+                continue
+            return (getattr(av, "inferred_product", "") or "").strip()
+        return ""
 
     def _guess_software_from_port(self, match: VulnerabilityMatch, scan_result: ScanResult) -> str:
         """

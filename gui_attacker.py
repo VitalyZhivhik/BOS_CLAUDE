@@ -33,12 +33,23 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget, QProgressBar,
     QFrame, QMessageBox, QStatusBar, QCheckBox, QFileDialog,
     QTreeWidget, QTreeWidgetItem, QAbstractItemView, QSplitter,
+    QComboBox, QListWidget, QListWidgetItem, QFormLayout,
     QScrollArea
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt6.QtGui import QFont, QColor, QTextCursor, QIcon
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+class NoWheelWhenUnfocusedSpinBox(QSpinBox):
+    """Не менять значение колесом мыши, пока поле не в фокусе (типичная причина смены порта API)."""
+
+    def wheelEvent(self, event):
+        if self.hasFocus():
+            super().wheelEvent(event)
+        else:
+            event.ignore()
 
 def get_app_dir() -> str:
     """Возвращает папку с .exe (frozen) или папку скрипта (Python)."""
@@ -55,7 +66,12 @@ from common.config import (TARGET_SERVER_HOST, TARGET_SERVER_PORT,
                            SCAN_PORT_START, SCAN_PORT_END, SCAN_TIMEOUT)
 from common.models import ScanResult, OpenPort, AttackVector
 from common.logger import get_attacker_logger, GUILogHandler
-from attacker.attacker_agent import AttackVectorGenerator, PortScanner
+from attacker.attacker_agent import (
+    AttackVectorGenerator,
+    PortScanner,
+    infer_product_from_observation,
+)
+from server.attack_toolkit import AttackToolkit
 
 
 
@@ -89,6 +105,22 @@ QSpinBox {
     background: #0e0e0e; color: #d0d0d0; border: 1px solid #333;
     border-radius: 3px; padding: 4px;
 }
+QComboBox {
+    background: #0e0e0e; color: #d0d0d0; border: 1px solid #333;
+    border-radius: 3px; padding: 4px 8px; font-size: 11px;
+}
+QComboBox::drop-down { border: none; }
+QComboBox QAbstractItemView {
+    background: #1a1a1a; color: #d0d0d0; border: 1px solid #333;
+    selection-background-color: #2a2a2a;
+    selection-color: #e0e0e0;
+}
+QListWidget {
+    background: #0e0e0e; color: #b0b0b0; border: 1px solid #2a2a2a;
+    border-radius: 3px; font-size: 11px;
+}
+QListWidget::item { padding: 3px 4px; }
+QListWidget::item:selected { background: #2a2a2a; color: #e0e0e0; }
 QTableWidget {
     background: #0e0e0e; color: #b0b0b0; border: 1px solid #2a2a2a;
     border-radius: 3px; gridline-color: #222; font-size: 11px;
@@ -132,6 +164,13 @@ QScrollBar::handle:vertical { background: #333; border-radius: 4px; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
 """
 
+# Стиль коротких пояснений в интерфейсе (прозрачность пайплайна для пользователя)
+_HINT_NEUTRAL = (
+    "background:#1a1a1a;border:1px solid #333;border-radius:3px;"
+    "padding:6px;color:#888;font-size:10px;"
+)
+
+
 # ─────────────────────────── ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ЛОГИРОВАНИЯ ───────────────────────────
 
 def _log_phase(phase_name: str, icon: str = "━") -> str:
@@ -169,14 +208,25 @@ class CheckConnectionWorker(QThread):
         except urllib.error.HTTPError as e:
             msg = f"HTTP {e.code}: Сервер отклонил запрос."
             if e.code == 503:
-                msg = (f"Порт {self.port} отвечает 503 (Не готов).\n\n"
-                       "Сервер найден, но вы не выполнили шаги 1 и 2 в серверной программе.")
+                msg = (f"Порт {self.port} отвечает 503 (не готов).\n\n"
+                       "HTTP-сервер запущен, но анализ системы и/или загрузка баз не выполнены, "
+                       "или сервер ещё не переведён в состояние ready. Выполните в gui_server шаги "
+                       "1–2 (анализ, базы), затем при необходимости остальные шаги и снова "
+                       "«Запустить сервер».")
             self.failed_signal.emit(msg)
         except Exception as e:
             msg = str(e)
-            if "10061" in msg or "refused" in msg.lower():
-                msg = (f"Подключение не удалось. Сервер выключен "
-                       f"или указан неверный порт ({self.port}).")
+            if "10061" in msg or "refused" in msg.lower() or "actively refused" in msg.lower():
+                msg = (
+                    f"Подключение не удалось: на {self.target}:{self.port} никто не принимает запросы "
+                    f"(сервер не слушает порт или указан неверный адрес/порт).\n\n"
+                    "Проверьте на стороне серверного агента (gui_server):\n"
+                    "• Запущена программа и выполнены шаги 1–3 по необходимости.\n"
+                    "• Нажата кнопка «4. Запустить сервер» — без неё HTTP API не поднимается.\n"
+                    "• В блоке «Параметры» указан тот же порт API, что и здесь "
+                    f"({self.port}).\n"
+                    "• Файрвол не блокирует входящие на этот порт (для удалённого хоста)."
+                )
             self.failed_signal.emit(msg)
 
 
@@ -444,12 +494,21 @@ class NucleiWorker(QThread):
                                 name = f"[NUCLEI] {info.get('name', item.get('template-id', 'Unknown'))}"
                                 sev = str(info.get("severity", "MEDIUM")).upper()
                                 pt = item.get("port", "")
+                                pt_int = int(pt) if str(pt).isdigit() else None
+                                tags = info.get("tags", [])
+                                tag_s = " ".join(tags) if isinstance(tags, list) else ""
+                                nuc_inf = infer_product_from_observation(
+                                    banner=f"{name} {tag_s}",
+                                    service="",
+                                    port=pt_int,
+                                )
                                 vectors.append(AttackVector(
                                     id=str(item.get("template-id", "nuclei-vuln"))[:50],
                                     name=name[:100],
                                     description=str(info.get("description", "Обнаружено Nuclei."))[:500],
                                     severity=sev if sev in ["CRITICAL","HIGH","MEDIUM","LOW","INFO"] else "MEDIUM",
-                                    target_port=int(pt) if str(pt).isdigit() else None
+                                    target_port=pt_int,
+                                    inferred_product=nuc_inf,
                                 ))
                         except Exception:
                             pass
@@ -599,12 +658,19 @@ class NmapWorker(QThread):
                                     sev = "CRITICAL"
                                 desc = (f"Nmap скрипт '{script_id}' выявил уязвимость:\n"
                                         f"{output[:400]}...")
+                                pid = int(port_id) if port_id.isdigit() else None
+                                nm_inf = infer_product_from_observation(
+                                    banner=output[:800],
+                                    service=service_name,
+                                    port=pid,
+                                )
                                 vectors.append(AttackVector(
                                     id=cve,
                                     name=name,
                                     description=desc,
                                     severity=sev,
-                                    target_port=int(port_id) if port_id.isdigit() else None
+                                    target_port=pid,
+                                    inferred_product=nm_inf,
                                 ))
                                 self.log_msg.emit(f"  🔴 Уязвимость: {cve}  порт {port_id}  [{sev}]")
                                 logger.info(f"  🔴 Nmap: {cve}  порт {port_id}  [{sev}]")
@@ -642,7 +708,10 @@ class AttackerGUI(QMainWindow):
         self.attack_vectors = []   # Накопительный список векторов (мёрж всех сканирований)
         self.scan_worker = None
         self.connected_to_server = False
+        self._verified_api_port = None  # порт, на котором последний раз успешно прошла /ping
         self._scan_elapsed = 0.0
+        self.attack_toolkit = None
+        self._attack_vectors_data = []
 
         # Счётчики по источникам
         self._vectors_from_portscan = 0
@@ -743,6 +812,15 @@ class AttackerGUI(QMainWindow):
         tl.setSpacing(6)
         tl.setContentsMargins(8, 12, 8, 10)
 
+        ht = QLabel(
+            "Укажите адрес и порт HTTP API сервера и диапазон TCP-портов для обхода. "
+            "«Глубокий фингерпринтинг» расширяет сбор баннеров и признаков служб — это сырьё "
+            "для эвристик CVE по версиям в ответах сервисов."
+        )
+        ht.setStyleSheet(_HINT_NEUTRAL)
+        ht.setWordWrap(True)
+        tl.addWidget(ht)
+
         tl.addWidget(QLabel("IP-адрес сервера:"))
         self.target_input = QLineEdit(TARGET_SERVER_HOST)
         self.target_input.setFont(QFont("Consolas", 12))
@@ -750,10 +828,14 @@ class AttackerGUI(QMainWindow):
         tl.addWidget(self.target_input)
 
         tl.addWidget(QLabel("Порт API сервера:"))
-        self.port_spin = QSpinBox()
+        self.port_spin = NoWheelWhenUnfocusedSpinBox()
         self.port_spin.setRange(1024, 65535)
         self.port_spin.setValue(TARGET_SERVER_PORT)
         self.port_spin.setFixedHeight(28)
+        self.port_spin.setToolTip(
+            "Порт HTTP API серверного агента (должен совпадать с «Параметры» в gui_server). "
+            "Значение колесом мыши не меняется без фокуса на поле — чтобы не сбить порт случайно."
+        )
         tl.addWidget(self.port_spin)
 
         r = QHBoxLayout()
@@ -775,6 +857,10 @@ class AttackerGUI(QMainWindow):
         self.chk_deep = QCheckBox("Глубокий фингерпринтинг")
         self.chk_deep.setChecked(True)
         tl.addWidget(self.chk_deep)
+        self.target_input.textChanged.connect(
+            lambda _t: self._invalidate_connection_on_target_or_port_change())
+        self.port_spin.valueChanged.connect(
+            lambda _v: self._invalidate_connection_on_target_or_port_change())
         ll.addWidget(tg)
 
         # Действия - расширены
@@ -783,6 +869,15 @@ class AttackerGUI(QMainWindow):
         al = QVBoxLayout(ag)
         al.setSpacing(8)
         al.setContentsMargins(8, 12, 8, 10)
+
+        ha = QLabel(
+            "Цепочка: связь → скан портов → Nuclei (веб) и/или Nmap (сеть) → отправка на сервер. "
+            "Сервер сопоставит векторы с конфигурацией машины и справочниками CVE/CWE/CAPEC "
+            "(см. справку в серверном агенте) и вернёт реализуемость атак и рекомендации."
+        )
+        ha.setStyleSheet(_HINT_NEUTRAL)
+        ha.setWordWrap(True)
+        al.addWidget(ha)
 
         # Кнопки действий - динамический размер
         action_btn_style = """
@@ -796,6 +891,11 @@ class AttackerGUI(QMainWindow):
 
         self.btn_check = QPushButton("1. Проверить связь с сервером")
         self.btn_check.setStyleSheet(action_btn_style)
+        self.btn_check.setToolTip(
+            "Отправляет GET /ping на указанный хост и порт.\n\n"
+            "На сервере сначала: gui_server → шаги 1–3 при необходимости → "
+            "«4. Запустить сервер». Порт в «Параметры» сервера должен совпадать с полем «Порт API» здесь."
+        )
         self.btn_check.clicked.connect(self._check_connection)
         al.addWidget(self.btn_check)
 
@@ -880,6 +980,13 @@ class AttackerGUI(QMainWindow):
         # Вкладка 0: Порты
         pt = QWidget()
         ptl = QVBoxLayout(pt)
+        ph = QLabel(
+            "Открытые порты с протоколом, определённым сервисом и баннером (если удалось снять). "
+            "Баннеры участвуют в присвоении CVE: известные уязвимые версии сопоставляются по шаблонам."
+        )
+        ph.setStyleSheet(_HINT_NEUTRAL)
+        ph.setWordWrap(True)
+        ptl.addWidget(ph)
         self.ports_table = QTableWidget(0, 4)
         self.ports_table.setHorizontalHeaderLabels(["Порт", "Протокол", "Сервис", "Баннер"])
         self.ports_table.horizontalHeader().setStretchLastSection(True)
@@ -897,8 +1004,13 @@ class AttackerGUI(QMainWindow):
 
         # Подсказка
         hint = QLabel(
-            "💡 Таблица накапливает уникальные векторы из всех сканирований. "
-            "Кнопка «➕ Nuclei» и «➕ Nmap» добавляют результаты без дубликатов."
+            "Вектор атаки — это конкретная гипотеза эксплуатации (порт, служба, шаблон Nuclei, "
+            "скрипт Nmap и т.д.). Таблица накапливает уникальные векторы из всех запусков. "
+            "Колонка «ID/CVE»: идентификатор находки или CVE, если он известен из шаблона/баннера. "
+            "CVE к баннерам привязываются эвристически (совпадение версии в тексте ответа службы с "
+            "известными уязвимыми релизами). На сервере векторы дополнительно сопоставляются с "
+            "локальной базой CVE и конфигурацией — окончательная реализуемость смотрите во вкладке "
+            "«Ответ сервера» после отправки."
         )
         hint.setStyleSheet(
             "background:#1e2a1e;border:1px solid #2a4a2a;border-radius:3px;"
@@ -929,6 +1041,14 @@ class AttackerGUI(QMainWindow):
         # Вкладка 2: Ответ сервера
         rpt = QWidget()
         rtl = QVBoxLayout(rpt)
+        rh = QLabel(
+            "Ответ API после шага 5: для каждой уязвимости — CVE, степень риска, вывод коррелятора "
+            "о том, реалистична ли атака на этой машине, краткое описание вектора и рекомендация. "
+            "Данные формируются на сервере из вашего скана и локальных проверок/баз."
+        )
+        rh.setStyleSheet(_HINT_NEUTRAL)
+        rh.setWordWrap(True)
+        rtl.addWidget(rh)
         self.response_table = QTableWidget(0, 5)
         self.response_table.setHorizontalHeaderLabels(
             ["CVE", "Серьёзность", "Реализуемость", "Атака", "Рекомендация"])
@@ -950,8 +1070,9 @@ class AttackerGUI(QMainWindow):
         htl = QVBoxLayout(ht)
 
         hist_hint = QLabel(
-            "📂 История разделена по: Серверу → Дате → Времени → Типу сканирования.\n"
-            "Выберите любой узел и нажмите кнопку загрузки."
+            "📂 История разделена по: серверу → дате → времени → типу сканирования. "
+            "Можно заменить таблицу векторов или добавить к текущей. Двойной клик по записи "
+            "тоже подгружает сохранённый сеанс."
         )
         hist_hint.setStyleSheet(
             "background:#1a1e2a;border:1px solid #2a3a4a;border-radius:3px;"
@@ -1016,6 +1137,14 @@ class AttackerGUI(QMainWindow):
         log_title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
         log_title.setStyleSheet("color:#888;padding:4px 0;")
         ntl.addWidget(log_title)
+        scan_hint = QLabel(
+            "Сырой вывод внешних сканеров: слева — Nmap (сервисы, скрипты), справа — Nuclei "
+            "(шаблоны веб-уязвимостей). Итоговые векторы собираются в отдельной вкладке; здесь "
+            "удобно проверить, что именно было запущено и что вернулось в консоль."
+        )
+        scan_hint.setStyleSheet(_HINT_NEUTRAL)
+        scan_hint.setWordWrap(True)
+        ntl.addWidget(scan_hint)
         
         # Разделённый layout
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -1062,14 +1191,104 @@ class AttackerGUI(QMainWindow):
         # Вкладка 5: Системный Лог
         lt = QWidget()
         ltl = QVBoxLayout(lt)
+        log_hint = QLabel(
+            "Структурированный журнал агента: этапы сканирования, ошибки, сводки. "
+            "Используйте при разборе сбоев и для понимания порядка операций."
+        )
+        log_hint.setStyleSheet(_HINT_NEUTRAL)
+        log_hint.setWordWrap(True)
+        ltl.addWidget(log_hint)
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
         ltl.addWidget(self.log_output)
         self.tabs.addTab(lt, "📜 Системный Лог")
+        self._build_attack_playbook_tab()
 
         ml.addWidget(self.tabs, 1)
         self.setStatusBar(QStatusBar())
         self.statusBar().showMessage("Готов к работе")
+
+    def _build_attack_playbook_tab(self):
+        """Вкладка пошаговой реализации выбранной атаки (для атакующего агента)."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        title = QLabel("🧭 Пошаговая реализация атаки")
+        title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        title.setStyleSheet("color:#888;padding:4px 0;")
+        layout.addWidget(title)
+
+        hint = QLabel(
+            "Выберите CVE/вектор, чтобы получить последовательность действий и команды. "
+            "Это учебный playbook для атакующего агента."
+        )
+        hint.setStyleSheet(_HINT_NEUTRAL)
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        controls = QHBoxLayout()
+        self.btn_load_toolkit_attacker = QPushButton("Загрузить базу сценариев")
+        self.btn_load_toolkit_attacker.clicked.connect(self._load_attack_toolkit)
+        controls.addWidget(self.btn_load_toolkit_attacker)
+        controls.addStretch()
+        layout.addLayout(controls)
+
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        left = QWidget()
+        left_l = QVBoxLayout(left)
+        left_l.setContentsMargins(0, 0, 0, 0)
+
+        filter_box = QGroupBox("Фильтры")
+        filter_l = QVBoxLayout(filter_box)
+        filter_l.addWidget(QLabel("Тип атаки:"))
+        self.attack_type_combo = QComboBox()
+        self.attack_type_combo.addItem("Все типы")
+        self.attack_type_combo.currentTextChanged.connect(self._filter_attack_playbooks)
+        filter_l.addWidget(self.attack_type_combo)
+        filter_l.addWidget(QLabel("Поиск (CVE / инструмент):"))
+        self.attack_search = QLineEdit()
+        self.attack_search.setPlaceholderText("Например: CVE-2021 или metasploit")
+        self.attack_search.textChanged.connect(self._filter_attack_playbooks)
+        filter_l.addWidget(self.attack_search)
+        left_l.addWidget(filter_box)
+
+        target_box = QGroupBox("Параметры")
+        target_form = QFormLayout(target_box)
+        self.playbook_target_ip = QLineEdit()
+        self.playbook_target_ip.setPlaceholderText("IP цели")
+        self.playbook_target_ip.setText(self.target_input.text().strip() or "<TARGET_IP>")
+        target_form.addRow("Цель:", self.playbook_target_ip)
+        left_l.addWidget(target_box)
+
+        vectors_box = QGroupBox("Доступные сценарии")
+        vectors_l = QVBoxLayout(vectors_box)
+        self.attack_vectors_list = QListWidget()
+        self.attack_vectors_list.currentItemChanged.connect(self._on_playbook_selected)
+        vectors_l.addWidget(self.attack_vectors_list)
+        left_l.addWidget(vectors_box)
+
+        self.btn_show_attack = QPushButton("Показать шаги")
+        self.btn_show_attack.setEnabled(False)
+        self.btn_show_attack.clicked.connect(self._show_attack_playbook)
+        left_l.addWidget(self.btn_show_attack)
+
+        splitter.addWidget(left)
+
+        right = QWidget()
+        right_l = QVBoxLayout(right)
+        right_l.setContentsMargins(0, 0, 0, 0)
+        details_box = QGroupBox("Пошаговый сценарий")
+        details_l = QVBoxLayout(details_box)
+        self.attack_details_text = QTextEdit()
+        self.attack_details_text.setReadOnly(True)
+        self.attack_details_text.setFont(QFont("Consolas", 10))
+        details_l.addWidget(self.attack_details_text)
+        right_l.addWidget(details_box)
+        splitter.addWidget(right)
+        splitter.setSizes([360, 640])
+
+        layout.addWidget(splitter, 1)
+        self.tabs.addTab(tab, "🧭 Пошаговая атака")
 
     # ──────────── ЛОГИРОВАНИЕ ────────────
 
@@ -1152,6 +1371,21 @@ class AttackerGUI(QMainWindow):
 
     # ──────────── ПРОВЕРКА СВЯЗИ ────────────
 
+    def _invalidate_connection_on_target_or_port_change(self):
+        """Смена IP или порта API после успешной /ping делает проверку недействительной."""
+        if not self.connected_to_server:
+            return
+        self.connected_to_server = False
+        self._verified_api_port = None
+        self.conn_icon.setText("● Нет связи")
+        self.conn_icon.setStyleSheet("color:#866;")
+        self.conn_detail.setText(
+            "Адрес или порт API изменены после проверки связи. Нажмите «1. Проверить связь» снова."
+        )
+        self.conn_frame.setStyleSheet(
+            "background:#1a1a1a;border:1px solid #5a3a3a;border-radius:4px;padding:8px;")
+        self.btn_check.setText("1. Проверить связь с сервером")
+
     def _check_connection(self):
         logger.info(_log_phase("ПРОВЕРКА СВЯЗИ С СЕРВЕРОМ", "─"))
         logger.info(_log_result_line("Адрес:", self.target_input.text()))
@@ -1161,6 +1395,9 @@ class AttackerGUI(QMainWindow):
         self.btn_check.setText("Проверка...")
         self.conn_icon.setText("● Проверка связи...")
         self.conn_icon.setStyleSheet("color:#888;")
+        self.conn_detail.setText("Проверка доступности HTTP API...")
+        self.conn_frame.setStyleSheet(
+            "background:#1a1a1a;border:1px solid #444;border-radius:4px;padding:8px;")
 
         self.check_worker = CheckConnectionWorker(
             self.target_input.text(), self.port_spin.value())
@@ -1170,6 +1407,7 @@ class AttackerGUI(QMainWindow):
 
     def _on_connected(self, hostname, ready, server_port):
         self.connected_to_server = True
+        self._verified_api_port = server_port
         self.conn_icon.setText("● Связь установлена")
         self.conn_icon.setStyleSheet("color:#8a8;")
         self.conn_detail.setText(
@@ -1181,18 +1419,22 @@ class AttackerGUI(QMainWindow):
             "background:#1a1a1a;border:1px solid #3a5a3a;border-radius:4px;padding:8px;")
         self.btn_check.setText("1. Связь установлена ✔")
         self.btn_check.setEnabled(True)
+        self.btn_send.setEnabled(bool(self.open_ports or self.attack_vectors))
         logger.info(f"  ✔  Связь установлена: {hostname}  (порт {server_port})")
+        logger.info("  ✔  Статус соединения обновлён: СВЯЗЬ ЕСТЬ")
         self.statusBar().showMessage(f"Подключено: {hostname}:{server_port}")
 
     def _on_connection_failed(self, error):
         self.connected_to_server = False
+        self._verified_api_port = None
         self.conn_icon.setText("● Нет связи")
         self.conn_icon.setStyleSheet("color:#866;")
-        self.conn_detail.setText(error[:300])
+        self.conn_detail.setText(error[:2000] if len(error) > 2000 else error)
         self.conn_frame.setStyleSheet(
             "background:#1a1a1a;border:1px solid #5a3a3a;border-radius:4px;padding:8px;")
         self.btn_check.setText("1. Повторить проверку")
         self.btn_check.setEnabled(True)
+        logger.warning("  ⚠  Статус соединения обновлён: СВЯЗИ НЕТ")
         logger.error(f"  ❌  Сбой подключения: {error}")
 
     # ──────────── СКАНИРОВАНИЕ ПОРТОВ ────────────
@@ -1624,6 +1866,134 @@ class AttackerGUI(QMainWindow):
             f"  LOW:       {lo}"
         )
 
+    # ──────────── PLAYBOOK АТАК ────────────
+
+    def _load_attack_toolkit(self):
+        logger.info(_log_phase("ЗАГРУЗКА БАЗЫ СЦЕНАРИЕВ АТАК", "─"))
+        try:
+            tk = AttackToolkit(APP_DIR)
+            tk.load()
+            self.attack_toolkit = tk
+            vectors_count = len(tk.get_available_attack_vectors())
+            if vectors_count == 0:
+                self.btn_load_toolkit_attacker.setText("База загружена (нет сценариев)")
+                self.attack_details_text.setPlainText(
+                    "База сценариев загружена, но доступных сценариев не найдено.\n"
+                    "Проверьте файл databases/tools_database.json."
+                )
+                logger.warning("  ⚠  База сценариев загружена, но список сценариев пуст.")
+            else:
+                self.btn_load_toolkit_attacker.setText("База сценариев загружена")
+            self._populate_attack_playbooks()
+            logger.info(
+                f"  ✔  Playbook база загружена: инструментов={len(tk.tools_db)}, "
+                f"защит={len(tk.defense_db)}, сценариев={vectors_count}"
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Playbook", f"Не удалось загрузить базу сценариев:\n{e}")
+            logger.error(f"❌ Ошибка загрузки базы сценариев: {e}")
+
+    def _populate_attack_playbooks(self):
+        if not self.attack_toolkit:
+            return
+        self.attack_type_combo.blockSignals(True)
+        self.attack_type_combo.clear()
+        self.attack_type_combo.addItem("Все типы")
+        for attack_type in self.attack_toolkit.get_all_attack_types():
+            self.attack_type_combo.addItem(attack_type)
+        self.attack_type_combo.blockSignals(False)
+
+        self._attack_vectors_data = self.attack_toolkit.get_available_attack_vectors()
+        self._update_attack_playbook_list(self._attack_vectors_data)
+        logger.info(
+            _log_result_line("Доступных сценариев:", len(self._attack_vectors_data))
+        )
+
+    def _update_attack_playbook_list(self, vectors):
+        self.attack_vectors_list.clear()
+        for vec in vectors:
+            cve = vec.get("cve_id", "")
+            tool = vec.get("tool_name", "")
+            skill = vec.get("skill_level", "Unknown")
+            item = QListWidgetItem(f"{cve}  —  {tool}  [{skill}]")
+            item.setData(Qt.ItemDataRole.UserRole, vec)
+            self.attack_vectors_list.addItem(item)
+        if not vectors:
+            self.attack_details_text.setPlainText(
+                "Сценарии не найдены для текущего фильтра или база пуста."
+            )
+
+    def _filter_attack_playbooks(self):
+        if not self._attack_vectors_data:
+            return
+        attack_type = self.attack_type_combo.currentText()
+        query = self.attack_search.text().strip().lower()
+        filtered = []
+        for vec in self._attack_vectors_data:
+            if attack_type != "Все типы" and attack_type not in vec.get("attack_types", []):
+                continue
+            if query and query not in vec.get("cve_id", "").lower() and query not in vec.get("tool_name", "").lower():
+                continue
+            filtered.append(vec)
+        self._update_attack_playbook_list(filtered)
+
+    def _on_playbook_selected(self, current, previous):
+        self.btn_show_attack.setEnabled(current is not None)
+
+    def _show_attack_playbook(self):
+        item = self.attack_vectors_list.currentItem()
+        if not item:
+            return
+        if not self.attack_toolkit:
+            QMessageBox.information(self, "Playbook", "Сначала загрузите базу сценариев.")
+            return
+
+        vec = item.data(Qt.ItemDataRole.UserRole) or {}
+        cve_id = vec.get("cve_id", "")
+        target_ip = self.playbook_target_ip.text().strip() or self.target_input.text().strip() or "<TARGET_IP>"
+        tool_name = vec.get("tool_name", "")
+        phases = ", ".join(vec.get("phases", []))
+
+        text = []
+        text.append("═══════════════════════════════════════")
+        text.append(f"  АТАКА: {cve_id}")
+        text.append(f"  Инструмент: {tool_name}")
+        text.append(f"  Цель: {target_ip}")
+        text.append(f"  Фазы: {phases if phases else '—'}")
+        text.append("═══════════════════════════════════════\n")
+
+        commands = self.attack_toolkit.get_attack_commands(cve_id, target_ip)
+        if not commands:
+            text.append("Команды для выбранного CVE не найдены в базе.")
+        else:
+            step_idx = 1
+            for cmd_block in commands:
+                text.append(f"[{step_idx}] {cmd_block.get('tool_name', 'Инструмент')}")
+                text.append(f"Тип: {cmd_block.get('tool_type', '—')}")
+                text.append(f"Описание: {cmd_block.get('description', '—')}")
+                url = cmd_block.get("url", "")
+                if url:
+                    text.append(f"URL: {url}")
+                text.append("Команды:")
+                for command in cmd_block.get("commands", []):
+                    text.append(f"  {command}")
+                text.append("")
+                step_idx += 1
+
+        defense = self.attack_toolkit.get_defense_tools(cve_id)
+        if defense:
+            text.append("🛡️ Рекомендуемые меры защиты:")
+            for d in defense:
+                text.append(
+                    f"- {d.get('defense_name', '')}: {d.get('tool_name', '')} "
+                    f"(приоритет: {d.get('priority', '—')})"
+                )
+
+        self.attack_details_text.setPlainText("\n".join(text))
+        logger.info(
+            f"  ▸ Playbook открыт: {cve_id}  (командных блоков: {len(commands)})"
+        )
+
     # ──────────── ИСТОРИЯ (ДЕРЕВО) ────────────
 
     def _save_history_file(self, scan_type: str):
@@ -1906,7 +2276,9 @@ class AttackerGUI(QMainWindow):
     def _send_results(self):
         if not self.open_ports and not self.attack_vectors:
             return
-        t = self.target_input.text()
+        if not self.connected_to_server:
+            logger.warning("⚠ Отправка выполняется без подтверждённой связи (/ping не пройден).")
+        t = self.target_input.text().strip()
         p = self.port_spin.value()
         sr = ScanResult(
             scanner_ip="127.0.0.1",
@@ -1928,6 +2300,18 @@ class AttackerGUI(QMainWindow):
         self.btn_send.setText("5. Отправить на сервер для анализа")
         self.btn_send.setEnabled(True)
         if result.get("status") == "success":
+            # Сервер ответил успешно — считаем соединение активным даже после прежних ошибок.
+            if not self.connected_to_server:
+                self.connected_to_server = True
+                self.conn_icon.setText("● Связь установлена")
+                self.conn_icon.setStyleSheet("color:#8a8;")
+                self.conn_detail.setText(
+                    f"Сервер ответил на /analyze\n✔ Связь активна\nПорт: {self.port_spin.value()}"
+                )
+                self.conn_frame.setStyleSheet(
+                    "background:#1a1a1a;border:1px solid #3a5a3a;border-radius:4px;padding:8px;")
+                self.btn_check.setText("1. Связь установлена ✔")
+                logger.info("  ✔  Статус соединения восстановлен по успешному /analyze")
             sm      = result.get("summary", {})
             details = result.get("details", [])
             self.response_table.setRowCount(0)
@@ -1952,16 +2336,20 @@ class AttackerGUI(QMainWindow):
                 self.response_table.setItem(r, 3, QTableWidgetItem(str(it.get("attack_name", ""))))
                 self.response_table.setItem(r, 4, QTableWidgetItem(str(it.get("recommendation", ""))[:150]))
 
-            from common.models import normalize_feasibility
-            feasible = sum(1 for d in details if normalize_feasibility(d.get("feasibility")) == "РЕАЛИЗУЕМА")
+            from common.models import feasibility_counters
+            counters = feasibility_counters(details, value_getter=lambda d: d.get("feasibility"))
             self.response_summary.setText(
-                f"Всего: {len(details)}  |  🔴 Реализуемых: {feasible}  |  "
-                f"🟢 Нереализуемых: {len(details) - feasible}"
+                f"Всего: {counters['total']}  |  🔴 Реализуемых: {counters['feasible']}  |  "
+                f"🟡 Частичных: {counters['partially_feasible']}  |  "
+                f"🟢 Нереализуемых: {counters['not_feasible']}  |  "
+                f"⚪ Требуют анализа: {counters['requires_analysis']}"
             )
             logger.info(_log_phase("ОТВЕТ СЕРВЕРА ПОЛУЧЕН", "─"))
-            logger.info(_log_result_line("Всего уязвимостей:", len(details)))
-            logger.info(_log_result_line("Реализуемых:", feasible))
-            logger.info(_log_result_line("Нереализуемых:", len(details) - feasible))
+            logger.info(_log_result_line("Всего уязвимостей:", counters["total"]))
+            logger.info(_log_result_line("Реализуемых:", counters["feasible"]))
+            logger.info(_log_result_line("Частичных:", counters["partially_feasible"]))
+            logger.info(_log_result_line("Нереализуемых:", counters["not_feasible"]))
+            logger.info(_log_result_line("Требуют анализа:", counters["requires_analysis"]))
             self.tabs.setCurrentIndex(2)
         else:
             QMessageBox.warning(self, "Ответ сервера", f"Ошибка: {result.get('error', '?')}")
@@ -1969,10 +2357,26 @@ class AttackerGUI(QMainWindow):
     def _on_send_error(self, error):
         self.btn_send.setText("5. Отправить на сервер для анализа")
         self.btn_send.setEnabled(True)
+        self.connected_to_server = False
+        self._verified_api_port = None
+        self.conn_icon.setText("● Нет связи")
+        self.conn_icon.setStyleSheet("color:#866;")
+        self.conn_frame.setStyleSheet(
+            "background:#1a1a1a;border:1px solid #5a3a3a;border-radius:4px;padding:8px;")
+        self.btn_check.setText("1. Проверить связь с сервером")
         if "503" in error:
             QMessageBox.warning(self, "Сервер не готов", error)
         else:
-            QMessageBox.critical(self, "Ошибка отправки", error)
+            msg = error
+            if "10061" in error or "отверг запрос" in error.lower() or "refused" in error.lower():
+                msg = (
+                    f"{error}\n\n"
+                    f"Сейчас отправка идёт на http://{self.target_input.text().strip()}:{self.port_spin.value()}/analyze.\n"
+                    "Убедитесь, что в gui_server запущен API на этом порту (частая ошибка — другой порт "
+                    "в поле «Порт API» после прокрутки колеса мыши; поле теперь не меняется без фокуса). "
+                    "Повторите «1. Проверить связь» и отправку снова."
+                )
+            QMessageBox.critical(self, "Ошибка отправки", msg)
         logger.error(f"❌ Ошибка отправки: {error}")
 
     # ──────────── ЭКСПОРТ ────────────

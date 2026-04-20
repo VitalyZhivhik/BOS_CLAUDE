@@ -32,7 +32,19 @@ class AttackToolkit:
     def _load_json(self, path: str, name: str) -> list:
         try:
             with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
+                raw = f.read()
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError as e:
+                # Устойчивый режим: берём первый валидный JSON-объект, если в файле есть лишний хвост.
+                decoder = json.JSONDecoder()
+                data, end_pos = decoder.raw_decode(raw.lstrip())
+                tail = raw.lstrip()[end_pos:].strip()
+                if tail:
+                    logger.warning(
+                        f"[TOOLKIT] {name}: файл содержит лишние данные после JSON "
+                        f"(позиция {end_pos}). Использована валидная часть."
+                    )
             logger.info(f"[TOOLKIT] {name}: загружено {len(data)} записей")
             return data
         except FileNotFoundError:
