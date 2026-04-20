@@ -125,6 +125,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .sw-context h4 { margin: 0 0 8px 0; color: #58a6ff; border: none; padding: 0; }
         .sw-context ul { margin: 0; padding-left: 18px; color: #c9d1d9; }
         .sw-context li { margin-bottom: 6px; }
+        .group-members { margin-top: 12px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+        .group-members-head { background: #161b22; padding: 10px 12px; font-size: 12px; color: #8b949e; }
+        .group-members-row { display: grid; grid-template-columns: 1.2fr 0.7fr 0.7fr 1fr auto; gap: 8px; align-items: center; padding: 10px 12px; border-top: 1px solid #21262d; font-size: 12px; }
+        .group-members-row:nth-child(even) { background: #0f141b; }
+        .group-members-row .mono { font-family: "Consolas", monospace; color: #58a6ff; }
 
         @media (max-width: 1200px) {
             .filters-bar { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
@@ -504,6 +509,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         cve_set: new Set(),
                         name_set: new Set(),
                         found_by_set: new Set(),
+                        sw_set: new Set(),
+                        port_set: new Set(),
+                        cwe_set: new Set(),
+                        capec_set: new Set(),
+                        feas_set: new Set(),
+                        sev_set: new Set(),
+                        members: [],
+                        member_map: {},
                         count: 0,
                         max_sev_rank: -1,
                         max_feas_rank: -1,
@@ -525,6 +538,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     let ss = src.trim();
                     if (ss) g.found_by_set.add(ss);
                 });
+                if (item.sw) g.sw_set.add(item.sw);
+                if (item.port) g.port_set.add(item.port);
+                if (item.cwe) g.cwe_set.add(item.cwe);
+                if (item.capec) g.capec_set.add(item.capec);
+                if (item.feas) g.feas_set.add(item.feas);
+                if (item.sev) g.sev_set.add(item.sev);
+                g.members.push(item);
+                let memberSig = [
+                    item.sw || "",
+                    item.port || "",
+                    item.cwe || "",
+                    item.capec || "",
+                    item.cve || "",
+                    item.feas || "",
+                    item.sev || "",
+                    item.found_by || "",
+                ].join("|");
+                if (!g.member_map[memberSig]) {
+                    g.member_map[memberSig] = { item: item, occurrences: 0 };
+                }
+                g.member_map[memberSig].occurrences += 1;
 
                 let sevRank = getSeverityRank(item.sev);
                 if (sevRank > g.max_sev_rank) {
@@ -563,7 +597,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     sw_category: b.sw_category || "",
                     sw_purpose: b.sw_purpose || "",
                     sw_impact: b.sw_impact || "",
-                    sw_scope: b.sw_scope || ""
+                    sw_scope: b.sw_scope || "",
+                    members: Object.keys(g.member_map).map(sig => {
+                        let mm = g.member_map[sig];
+                        return Object.assign({}, mm.item, { occurrences: mm.occurrences });
+                    }),
+                    members_total: g.members.length,
+                    members_unique: Object.keys(g.member_map).length,
+                    sw_all: Array.from(g.sw_set).sort().join(", "),
+                    port_all: Array.from(g.port_set).sort().join(", "),
+                    cwe_all: Array.from(g.cwe_set).sort().join(", "),
+                    capec_all: Array.from(g.capec_set).sort().join(", "),
+                    feas_all: Array.from(g.feas_set).sort().join(", "),
+                    sev_all: Array.from(g.sev_set).sort().join(", "),
+                    sw_count: g.sw_set.size,
+                    port_count: g.port_set.size,
+                    cwe_count: g.cwe_set.size,
+                    capec_count: g.capec_set.size
                 };
             });
         }
@@ -677,6 +727,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             data.forEach(r => {
                 let nameShort = r.name.substring(0, 50) + (r.name.length > 50 ? "..." : "");
                 let dupes = r.count > 1 ? `<br><small style="color:#58a6ff;">(Сгруппировано из ${r.count} CVE)</small>` : "";
+                let variants = r.count > 1
+                    ? `<br><small style="color:#8b949e;">В группе: ПО ${r.sw_count || 1}, портов ${r.port_count || 1}, CWE ${r.cwe_count || 1}, CAPEC ${r.capec_count || 1}</small>`
+                    : "";
                 
                 let tr = `<tr class="clickable-row" onclick="openModal('aggr_${r.id}')">
                     <td><strong style="color: #8b949e;">(Группа)</strong></td>
@@ -686,7 +739,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <small style="color:#8b949e;">${r.sw_category || 'Тип не определен'}</small><br>
                         <small style="color:#8b949e;">${r.sw_purpose || ''}</small>
                     </td>
-                    <td>${nameShort}${dupes}</td>
+                    <td>${nameShort}${dupes}${variants}</td>
                     <td><span class="badge ${getSevClass(r.sev)}">${r.sev}</span></td>
                     <td><span class="badge ${getFeasClass(r.feas)}">${r.feas}</span></td>
                     <td class="details-btn">Подробнее ➔</td>
@@ -860,8 +913,37 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             let r = nodeInfo.data;
             let contentDiv = document.getElementById("dynamic-modal-content");
             
-            // 1. Если кликнули на слабость CWE
-            if (nodeInfo.type === 'cwe') {
+            // 1. Если кликнули на отдельный элемент внутри агрегированной группы
+            if (nodeInfo.type === 'member') {
+                let reasonColor = r.feas === 'РЕАЛИЗУЕМА' ? '#da3633' : (r.feas.includes('ЧАСТИЧНО') ? '#d29922' : (r.feas === 'НЕ РЕАЛИЗУЕМА' ? '#238636' : '#8b949e'));
+                let backBtn = nodeInfo.parentId ? `<button class="agg-btn" onclick="openModal('${nodeInfo.parentId}')" style="margin-right:8px;">← Назад к агрегированной группе</button>` : "";
+                contentDiv.innerHTML = `
+                    <div class="modal-header">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+                            <h2 style="margin: 0; font-size: 18px; color: #fff;">Элемент группы: ${r.capec}</h2>
+                            <div>${backBtn}</div>
+                        </div>
+                    </div>
+                    <div class="grid-info">
+                        <div class="grid-item"><span>ПО:</span><strong>${r.sw}</strong></div>
+                        <div class="grid-item"><span>Порт:</span><strong>${r.port}</strong></div>
+                        <div class="grid-item"><span>CWE:</span><strong>${r.cwe}</strong></div>
+                        <div class="grid-item"><span>CAPEC:</span><strong>${r.capec}</strong></div>
+                        <div class="grid-item"><span>Критичность:</span><strong style="color: ${getSevColor(r.sev)}">${r.sev}</strong></div>
+                        <div class="grid-item"><span>Статус:</span><strong style="color: ${getFeasColor(r.feas)}">${r.feas}</strong></div>
+                    </div>
+                    <div class="modal-body">
+                        <h4>📝 CVE</h4>
+                        <p style="color:#58a6ff; font-family:monospace; font-size: 13px;">${r.cve}</p>
+                        <h4 style="color: ${reasonColor};">⚖️ Обоснование</h4>
+                        <p style="background: ${reasonColor}15; padding: 15px; border-radius: 6px; border-left: 4px solid ${reasonColor}; font-size: 13px; line-height: 1.6;">${r.reason || 'Подробные пояснения недоступны.'}</p>
+                        <h4>📝 Описание уязвимости</h4>
+                        <p>${r.desc || 'Описание отсутствует.'}</p>
+                    </div>
+                `;
+            }
+            // 2. Если кликнули на слабость CWE
+            else if (nodeInfo.type === 'cwe') {
                 contentDiv.innerHTML = `
                     <div class="modal-header">
                         <h2 style="margin: 0; font-size: 20px; color: #fff;">🐛 Класс уязвимости: ${r.cwe}</h2>
@@ -872,7 +954,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
                 `;
             } 
-            // 2. Если кликнули на целевое ПО
+            // 3. Если кликнули на целевое ПО
             else if (nodeInfo.type === 'sw') {
                 contentDiv.innerHTML = `
                     <div class="modal-header">
@@ -895,7 +977,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
                 `;
             } 
-            // 3. Стандартная карточка (Клик по вектору атаки или агрегации)
+            // 4. Стандартная карточка (Клик по вектору атаки или агрегации)
             else {
                 // Определяем цвет для блока реализуемости
                 let reasonColor = r.feas === 'РЕАЛИЗУЕМА' ? '#da3633' : (r.feas.includes('ЧАСТИЧНО') ? '#d29922' : (r.feas === 'НЕ РЕАЛИЗУЕМА' ? '#238636' : '#8b949e'));
@@ -913,6 +995,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <div class="grid-item"><span>Кем обнаружено:</span><strong>${r.found_by}</strong></div>
                     </div>
                     <div class="modal-body">
+                        <div class="sw-context">
+                            <h4>Состав агрегированной группы</h4>
+                            <ul>
+                                <li><strong>ПО (все значения):</strong> ${r.sw_all || r.sw}</li>
+                                <li><strong>Порты (все значения):</strong> ${r.port_all || r.port}</li>
+                                <li><strong>CWE (все значения):</strong> ${r.cwe_all || r.cwe}</li>
+                                <li><strong>CAPEC (все значения):</strong> ${r.capec_all || r.capec}</li>
+                            </ul>
+                        </div>
+
                         <div class="sw-context">
                             <h4>Контекст программного обеспечения</h4>
                             <ul>
@@ -943,8 +1035,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
                         <h4 style="color: #3fb950;">🛡️ Как защититься (Устранение)</h4>
                         <p class="rec-box">${r.rec}</p>
+
+                        <div class="group-members">
+                            <div class="group-members-head">Отдельные элементы, вошедшие в группу (уникальных: ${r.members_unique || (r.members || []).length}, всего записей: ${r.members_total || (r.members || []).length})</div>
+                            <div id="group-members-container"></div>
+                        </div>
                     </div>
                 `;
+                renderGroupMembers(r);
             }
             
             modal.style.display = "block";
@@ -952,6 +1050,32 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         function closeModal() { modal.style.display = "none"; }
         window.onclick = function(event) { if (event.target == modal) closeModal(); }
+
+        function renderGroupMembers(groupData) {
+            let holder = document.getElementById("group-members-container");
+            if (!holder) return;
+            let members = groupData.members || [];
+            if (members.length === 0) {
+                holder.innerHTML = '<div class="group-members-row"><div style="grid-column: 1/-1; color:#8b949e;">Нет данных по элементам группы.</div></div>';
+                return;
+            }
+            let html = "";
+            members.forEach((m, idx) => {
+                let memberId = "member_" + String(m.raw_id ?? (groupData.id + "_" + idx));
+                detailsMap[memberId] = { type: 'member', data: m, parentId: 'aggr_' + groupData.id };
+                let repeatBadge = (m.occurrences && m.occurrences > 1)
+                    ? `<br><small style="color:#e3b341;">Повторяется: ${m.occurrences}x</small>`
+                    : '';
+                html += `<div class="group-members-row">
+                    <div><strong>${m.sw || 'Неизвестное ПО'}</strong><br><span class="mono">${m.cve || 'N/A'}</span>${repeatBadge}</div>
+                    <div>${m.port || 'Н/Д'}</div>
+                    <div>${m.cwe || 'Н/Д'}</div>
+                    <div>${m.capec || 'Н/Д'}</div>
+                    <div><button class="agg-btn" onclick="openModal('${memberId}')">Открыть</button></div>
+                </div>`;
+            });
+            holder.innerHTML = html;
+        }
 
         window.onload = init;
     </script>
