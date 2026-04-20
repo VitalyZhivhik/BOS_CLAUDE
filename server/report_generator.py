@@ -25,13 +25,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         /* Фильтры и селектор карт */
         .controls-bar { display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px; background: #010409; padding: 15px; border-radius: 8px; border: 1px solid var(--border); }
+        .aggregation-bar { display: flex; flex-direction: column; gap: 10px; background: #161b22; padding: 12px; border-radius: 6px; border: 1px solid #30363d; }
+        .aggregation-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .aggregation-title { font-size: 13px; color: #58a6ff; font-weight: bold; text-transform: uppercase; }
+        .aggregation-hint { font-size: 12px; color: #8b949e; }
+        .aggregation-keys { display: flex; gap: 10px; flex-wrap: wrap; }
+        .agg-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 16px; border: 1px solid #30363d; background: #0d1117; cursor: pointer; user-select: none; }
+        .agg-chip input { accent-color: #58a6ff; }
+        .agg-chip span { font-size: 12px; color: #c9d1d9; }
+        .agg-btn { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 4px; padding: 6px 10px; cursor: pointer; font-size: 12px; }
+        .agg-btn:hover { background: #30363d; }
         .map-selector { display: flex; align-items: center; gap: 15px; background: #161b22; padding: 10px 15px; border-radius: 6px; border: 1px solid #58a6ff;}
         .map-selector label { font-size: 14px; color: #58a6ff; font-weight: bold; text-transform: uppercase; margin: 0;}
         .map-selector select { flex: 1; padding: 10px; background: var(--accent); color: #fff; border: none; border-radius: 4px; outline: none; font-size: 15px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.5);}
         .map-selector select:hover { background: #3182ce; }
         
-        .filters-bar { display: flex; gap: 15px; }
-        .filter-item { display: flex; flex-direction: column; flex: 1; }
+        .filters-bar { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 12px; width: 100%; }
+        .filter-item { display: flex; flex-direction: column; min-width: 0; }
         .filter-item label { font-size: 12px; color: #8b949e; margin-bottom: 5px; text-transform: uppercase; font-weight: bold; }
         .filter-item select { padding: 10px; background: var(--card); color: #c9d1d9; border: 1px solid var(--border); border-radius: 4px; outline: none; font-size: 14px; cursor: pointer; }
         .filter-item select:focus { border-color: var(--accent); }
@@ -111,7 +121,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .tool-atk { background: rgba(210,153,34,0.15); color: #e3b341; border: 1px solid #d29922; }
         .tool-def { background: rgba(35,134,54,0.15); color: #3fb950; border: 1px solid #238636; }
 
-        @media (max-width: 1000px) { .summary-grid { grid-template-columns: repeat(2, 1fr); } }
+        .sw-context { margin-top: 10px; padding: 12px; border-radius: 6px; background: #10161d; border: 1px solid var(--border); }
+        .sw-context h4 { margin: 0 0 8px 0; color: #58a6ff; border: none; padding: 0; }
+        .sw-context ul { margin: 0; padding-left: 18px; color: #c9d1d9; }
+        .sw-context li { margin-bottom: 6px; }
+
+        @media (max-width: 1200px) {
+            .filters-bar { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+        }
+        @media (max-width: 1000px) {
+            .summary-grid { grid-template-columns: repeat(2, 1fr); }
+            .map-selector { flex-direction: column; align-items: stretch; }
+            .filters-bar { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
@@ -119,7 +141,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <h1 style="margin-top: 20px;">🛡️ Интерактивная Карта Поверхности Атаки SOC</h1>
         
         <div class="stats">
-            <div class="stat-box"><div class="title">Агрегированных векторов (Схлопнуто)</div><div class="num" id="st-total" style="color: #58a6ff;">0</div></div>
+            <div class="stat-box"><div class="title" id="st-total-title">Записей в отчете</div><div class="num" id="st-total" style="color: #58a6ff;">0</div></div>
             <div class="stat-box" style="border-top: 3px solid #da3633;"><div class="title">Реализуемые (КРИТИЧНО)</div><div class="num" id="st-real" style="color: #ff7b72;">0</div></div>
             <div class="stat-box" style="border-top: 3px solid #d29922;"><div class="title">Частично реализуемые (ПРОВЕРИТЬ)</div><div class="num" id="st-part" style="color: #e3b341;">0</div></div>
             <div class="stat-box" style="border-top: 3px solid #238636;"><div class="title">Не реализуемые (ЗАБЛОКИРОВАНО)</div><div class="num" id="st-noreal" style="color: #3fb950;">0</div></div>
@@ -171,6 +193,25 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
             
             <div class="controls-bar">
+                <div class="aggregation-bar">
+                    <div class="aggregation-head">
+                        <div>
+                            <div class="aggregation-title">⚙️ Динамическая агрегация</div>
+                            <div class="aggregation-hint">Если ничего не выбрано — вывод без агрегации (каждая находка отдельно).</div>
+                        </div>
+                        <button class="agg-btn" onclick="resetAggregation()">Сбросить агрегацию</button>
+                    </div>
+                    <div class="aggregation-keys">
+                        <label class="agg-chip"><input type="checkbox" class="agg-key" value="sw" onchange="onAggregationChanged()"><span>ПО</span></label>
+                        <label class="agg-chip"><input type="checkbox" class="agg-key" value="port" onchange="onAggregationChanged()"><span>Порт</span></label>
+                        <label class="agg-chip"><input type="checkbox" class="agg-key" value="cwe" onchange="onAggregationChanged()"><span>CWE</span></label>
+                        <label class="agg-chip"><input type="checkbox" class="agg-key" value="capec" onchange="onAggregationChanged()"><span>CAPEC</span></label>
+                        <label class="agg-chip"><input type="checkbox" class="agg-key" value="feas" onchange="onAggregationChanged()"><span>Реализуемость</span></label>
+                        <label class="agg-chip"><input type="checkbox" class="agg-key" value="found_by" onchange="onAggregationChanged()"><span>Источник</span></label>
+                        <label class="agg-chip"><input type="checkbox" class="agg-key" value="sev" onchange="onAggregationChanged()"><span>Критичность</span></label>
+                    </div>
+                </div>
+
                 <div class="map-selector">
                     <label>🔍 ВЫБОР ТОПОЛОГИИ КАРТЫ:</label>
                     <select id="map-view-select" onchange="applyFilters()">
@@ -255,6 +296,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     <script type="text/javascript">
         var reportData = __REPORT_DATA__;
+        var rawFindingsData = __RAW_FINDINGS_DATA__;
         var rawCveData = __RAW_CVE_DATA__;
         var sysData = __SYS_DATA__;
         var summaryData = __SUMMARY_DATA__;
@@ -263,7 +305,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         var detailsMap = {};
 
         function init() {
-            populateFilters();
+            rebuildAggregatedData();
             applyFilters();
             renderRawCveTable();
             renderSummaryPanels();
@@ -408,7 +450,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 let tr = `<tr>
                     <td style="font-family: monospace; color: #58a6ff; font-weight: bold;">${c.cve}</td>
                     <td><span class="badge ${getSevClass(c.sev)}">${c.sev}</span></td>
-                    <td style="font-weight: 500;">${c.sw}</td>
+                    <td style="font-weight: 500;">
+                        ${c.sw}<br>
+                        <small style="color:#8b949e;">${c.sw_category || 'Компонент инфраструктуры'}</small>
+                    </td>
                     <td>${portStr}</td>
                     <td><span style="background: #161b22; padding: 4px 8px; border-radius: 4px; border: 1px solid #30363d; font-size: 12px;">${c.capec}</span></td>
                 </tr>`;
@@ -421,15 +466,152 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             el.style.display = el.style.display === "none" || el.style.display === "" ? "block" : "none";
         }
 
-        function populateFilters() {
+        function getSelectedAggregationKeys() {
+            return Array.from(document.querySelectorAll(".agg-key:checked")).map(x => x.value);
+        }
+
+        function getSeverityRank(sev) {
+            let s = (sev || "INFO").toUpperCase();
+            if (s === "CRITICAL") return 4;
+            if (s === "HIGH") return 3;
+            if (s === "MEDIUM") return 2;
+            if (s === "LOW") return 1;
+            return 0;
+        }
+
+        function getFeasRank(feas) {
+            let f = (feas || "").toUpperCase();
+            if (f === "РЕАЛИЗУЕМА") return 4;
+            if (f.includes("ЧАСТИЧНО")) return 3;
+            if (f.includes("ТРЕБУЕТ")) return 2;
+            if (f === "НЕ РЕАЛИЗУЕМА") return 1;
+            return 0;
+        }
+
+        function aggregateByKeys(items, keys) {
+            let map = {};
+            (items || []).forEach(item => {
+                let key = "";
+                if (!keys || keys.length === 0) {
+                    key = "__item_" + item.raw_id;
+                } else {
+                    key = keys.map(k => `${k}=${item[k] || ""}`).join("|");
+                }
+
+                if (!map[key]) {
+                    map[key] = {
+                        id: Object.keys(map).length,
+                        cve_set: new Set(),
+                        name_set: new Set(),
+                        found_by_set: new Set(),
+                        count: 0,
+                        max_sev_rank: -1,
+                        max_feas_rank: -1,
+                        base: item
+                    };
+                }
+
+                let g = map[key];
+                g.count += 1;
+                (item.cve || "").split(",").forEach(c => {
+                    let cc = c.trim();
+                    if (cc) g.cve_set.add(cc);
+                });
+                (item.name || "").split("/").forEach(n => {
+                    let nn = n.trim();
+                    if (nn) g.name_set.add(nn);
+                });
+                (item.found_by || "").split("&").forEach(src => {
+                    let ss = src.trim();
+                    if (ss) g.found_by_set.add(ss);
+                });
+
+                let sevRank = getSeverityRank(item.sev);
+                if (sevRank > g.max_sev_rank) {
+                    g.max_sev_rank = sevRank;
+                    g.sev = item.sev || "INFO";
+                }
+
+                let feasRank = getFeasRank(item.feas);
+                if (feasRank > g.max_feas_rank) {
+                    g.max_feas_rank = feasRank;
+                    g.feas = item.feas || "UNKNOWN";
+                }
+            });
+
+            return Object.keys(map).map(k => {
+                let g = map[k];
+                let b = g.base;
+                return {
+                    id: g.id,
+                    cve: Array.from(g.cve_set).sort().join(", "),
+                    cwe: b.cwe || "CWE-Неизвестно",
+                    cwe_desc: b.cwe_desc || "Описание отсутствует.",
+                    capec: b.capec || "CAPEC-Неизвестно",
+                    name: Array.from(g.name_set).sort().join(" / ") || (b.name || "Атака"),
+                    sw: b.sw || "Неизвестное ПО",
+                    port: b.port || "Локальный вектор (без порта)",
+                    feas: g.feas || "UNKNOWN",
+                    sev: g.sev || "INFO",
+                    desc: b.desc || "Описание отсутствует.",
+                    rec: b.rec || "Специфичных рекомендаций нет.",
+                    reason: b.reason || "Подробные пояснения недоступны.",
+                    count: g.count,
+                    found_by: Array.from(g.found_by_set).sort().join(" & ") || (b.found_by || "Сервер"),
+                    tools: b.tools || "",
+                    steps: b.steps || "",
+                    sw_category: b.sw_category || "",
+                    sw_purpose: b.sw_purpose || "",
+                    sw_impact: b.sw_impact || "",
+                    sw_scope: b.sw_scope || ""
+                };
+            });
+        }
+
+        function populateFilters(data) {
             let capecs = new Set(); let cwes = new Set(); let sws = new Set();
-            reportData.forEach(r => { capecs.add(r.capec); cwes.add(r.cwe); sws.add(r.sw); });
-            
-            let addOpt = (id, set) => {
+            (data || []).forEach(r => { capecs.add(r.capec); cwes.add(r.cwe); sws.add(r.sw); });
+
+            let refill = (id, set, firstLabel) => {
                 let el = document.getElementById(id);
+                let prev = el.value || "all";
+                el.innerHTML = `<option value="all">${firstLabel}</option>`;
                 Array.from(set).sort().forEach(x => { el.innerHTML += `<option value="${x}">${x}</option>`; });
+                el.value = Array.from(set).includes(prev) ? prev : "all";
             };
-            addOpt('f-sw', sws); addOpt('f-capec', capecs); addOpt('f-cwe', cwes);
+            refill("f-sw", sws, "-- Все приложения --");
+            refill("f-capec", capecs, "-- Все векторы --");
+            refill("f-cwe", cwes, "-- Все классы --");
+        }
+
+        function rebuildAggregatedData() {
+            let keys = getSelectedAggregationKeys();
+            reportData = aggregateByKeys(rawFindingsData || [], keys);
+            populateFilters(reportData);
+            updateAggregationHeader(keys, reportData.length);
+        }
+
+        function updateAggregationHeader(keys, total) {
+            let title = document.querySelector(".aggregation-hint");
+            let stTitle = document.getElementById("st-total-title");
+            if (!title) return;
+            if (!keys || keys.length === 0) {
+                title.textContent = `Без агрегации: ${total} записей. Каждая находка отображается отдельно.`;
+                if (stTitle) stTitle.textContent = "Найдено записей (без агрегации)";
+            } else {
+                title.textContent = `Агрегация по: ${keys.join(", ")}. Сформировано групп: ${total}.`;
+                if (stTitle) stTitle.textContent = "Сформировано агрегированных групп";
+            }
+        }
+
+        function onAggregationChanged() {
+            rebuildAggregatedData();
+            applyFilters();
+        }
+
+        function resetAggregation() {
+            document.querySelectorAll(".agg-key").forEach(x => { x.checked = false; });
+            onAggregationChanged();
         }
 
         function applyFilters() {
@@ -498,7 +680,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 
                 let tr = `<tr class="clickable-row" onclick="openModal('aggr_${r.id}')">
                     <td><strong style="color: #8b949e;">(Группа)</strong></td>
-                    <td><strong>${r.sw}</strong><br><small>Порт: ${r.port}</small></td>
+                    <td>
+                        <strong>${r.sw}</strong><br>
+                        <small>Порт: ${r.port}</small><br>
+                        <small style="color:#8b949e;">${r.sw_category || 'Тип не определен'}</small><br>
+                        <small style="color:#8b949e;">${r.sw_purpose || ''}</small>
+                    </td>
                     <td>${nameShort}${dupes}</td>
                     <td><span class="badge ${getSevClass(r.sev)}">${r.sev}</span></td>
                     <td><span class="badge ${getFeasClass(r.feas)}">${r.feas}</span></td>
@@ -696,7 +883,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             <div class="grid-item"><span>Обнаруженное программное обеспечение:</span><strong style="font-size: 18px; color: #fff;">${r.sw}</strong></div>
                             <div class="grid-item"><span>Открытый порт:</span><strong style="font-size: 16px; color: #58a6ff;">${r.port}</strong></div>
                         </div>
-                        <p style="color:#8b949e; font-size:13px; margin-top: 10px;">* Это реальная служба или системный компонент, который был просканирован OVAL-движком на вашем сервере.</p>
+                        <div class="sw-context">
+                            <h4>Что это за ПО и почему важно</h4>
+                            <ul>
+                                <li><strong>Тип/категория:</strong> ${r.sw_category || 'Не определено'}</li>
+                                <li><strong>Назначение:</strong> ${r.sw_purpose || 'Нет описания'}</li>
+                                <li><strong>Последствия успешной атаки:</strong> ${r.sw_impact || 'Требуется ручная оценка'}</li>
+                                <li><strong>Контекст:</strong> ${r.sw_scope || 'Локальный компонент инфраструктуры'}</li>
+                            </ul>
+                        </div>
                     </div>
                 `;
             } 
@@ -718,6 +913,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <div class="grid-item"><span>Кем обнаружено:</span><strong>${r.found_by}</strong></div>
                     </div>
                     <div class="modal-body">
+                        <div class="sw-context">
+                            <h4>Контекст программного обеспечения</h4>
+                            <ul>
+                                <li><strong>Тип/категория:</strong> ${r.sw_category || 'Не определено'}</li>
+                                <li><strong>Назначение:</strong> ${r.sw_purpose || 'Нет описания'}</li>
+                                <li><strong>Последствия успешной атаки:</strong> ${r.sw_impact || 'Требуется ручная оценка'}</li>
+                                <li><strong>Затрагиваемая зона:</strong> ${r.sw_scope || 'Локальный компонент инфраструктуры'}</li>
+                            </ul>
+                        </div>
+
                         <h4>📝 Включенные CVE (Агрегация из ${r.count} находок)</h4>
                         <p style="color:#58a6ff; font-family:monospace; font-size: 13px;">${r.cve}</p>
 
@@ -1208,10 +1413,84 @@ class ReportGenerator:
 
     def _get_worst_feas(self, feas_list):
         valid = [str(f).upper() for f in feas_list if f]
-        if any('РЕАЛИЗУЕМА' == f for f in valid): return 'РЕАЛИЗУЕМА'
-        if any('ЧАСТИЧНО' in f for f in valid): return 'ЧАСТИЧНО РЕАЛИЗУЕМА'
-        if any('НЕ РЕАЛИЗУЕМА' == f for f in valid): return 'НЕ РЕАЛИЗУЕМА'
+        # Поддерживаем разные представления статусов (RU/EN/legacy),
+        # чтобы отчёт совпадал со сводкой корреляции.
+        if any('РЕАЛИЗУЕМА' == f or f == 'FEASIBLE' for f in valid):
+            return 'РЕАЛИЗУЕМА'
+        if any('ЧАСТИЧНО' in f or 'PARTIALLY' in f for f in valid):
+            return 'ЧАСТИЧНО РЕАЛИЗУЕМА'
+        if any('ТРЕБУЕТ АНАЛИЗА' in f or 'REQUIRES_ANALYSIS' in f or 'REQUIRES ANALYSIS' in f for f in valid):
+            return 'ТРЕБУЕТ АНАЛИЗА'
+        if any('НЕ РЕАЛИЗУЕМА' == f or f == 'NOT_FEASIBLE' or f == 'NOT FEASIBLE' for f in valid):
+            return 'НЕ РЕАЛИЗУЕМА'
         return 'UNKNOWN'
+
+    def _build_software_context(self, sw_name: str, port: str, capec: str, cwe: str, vuln_desc: str) -> dict:
+        """
+        Формирует человеко-понятный контекст ПО для отчёта:
+        что это за компонент, его роль и возможные последствия компрометации.
+        """
+        sw_l = (sw_name or "").lower()
+        port_l = str(port or "").strip()
+        desc_l = (vuln_desc or "").lower()
+        capec_l = (capec or "").lower()
+        cwe_l = (cwe or "").lower()
+
+        category = "Системный/инфраструктурный компонент"
+        purpose = "Обеспечивает базовые функции хоста или сетевого сервиса."
+        impact = "Компрометация может привести к нарушению доступности или конфиденциальности."
+        scope = "Локальный контур сервера"
+
+        rules = [
+            (("mysql", "postgres", "mssql", "oracle", "redis", "mongodb", "database"),
+             "База данных",
+             "Хранение и обработка бизнес-данных и учётных записей.",
+             "Утечка/модификация данных, эскалация в приложениях, простои сервисов.",
+             "Контур данных и приложений"),
+            (("apache", "nginx", "iis", "http", "web", "tomcat", "news", "booking"),
+             "Веб-приложение/веб-сервер",
+             "Обработка пользовательских HTTP(S)-запросов и бизнес-логики.",
+             "Доступ к пользовательским сессиям, дефейс, удалённое выполнение кода, компрометация backend.",
+             "Публичный периметр"),
+            (("smb", "rdp", "ssh", "ftp", "smtp", "imap", "pop3", "winrm"),
+             "Сетевой сервис удалённого доступа/обмена",
+             "Обеспечивает удалённый доступ, передачу файлов или администрирование.",
+             "Компрометация учётных данных, lateral movement, захват хоста в домене.",
+             "Сетевой периметр и админ-контур"),
+            (("vmware", "hyper-v", "docker", "kubernetes"),
+             "Виртуализация/оркестрация",
+             "Управление виртуальными машинами и контейнерной инфраструктурой.",
+             "Компрометация гипервизора или оркестратора, масштабное влияние на несколько сервисов.",
+             "Инфраструктурное ядро"),
+            (("windows", "kernel", "lsa", "credential", "system component", "component"),
+             "Системный компонент ОС",
+             "Ключевые функции операционной системы и безопасности.",
+             "Повышение привилегий, обход защитных механизмов, полный контроль над узлом.",
+             "Хостовый уровень"),
+        ]
+
+        for keywords, cat, purp, imp, scp in rules:
+            if any(k in sw_l for k in keywords):
+                category, purpose, impact, scope = cat, purp, imp, scp
+                break
+
+        if port_l and port_l not in ("Локальный вектор (без порта)", "Локальный", "None", ""):
+            scope = f"{scope}; сетевой доступ через порт {port_l}"
+
+        # Дополнительный акцент по характеру уязвимости
+        if any(k in desc_l for k in ("remote code execution", "rce")) or "capec-242" in capec_l:
+            impact = "Высокий риск удалённого выполнения кода и последующего захвата узла/сервиса."
+        elif any(k in desc_l for k in ("sql", "injection")) or "cwe-89" in cwe_l:
+            impact = "Риск прямого доступа к данным и обхода прикладной логики через инъекцию."
+        elif "cwe-79" in cwe_l or "xss" in desc_l:
+            impact = "Риск компрометации пользовательских сессий и внедрения клиентского вредоносного кода."
+
+        return {
+            "category": category,
+            "purpose": purpose,
+            "impact": impact,
+            "scope": scope,
+        }
 
     def _build_summary_data(self, js_data, raw_js_data):
         """Строит данные для перечней CVE, CWE, CAPEC, ПО."""
@@ -1242,7 +1521,12 @@ class ReportGenerator:
             # ПО
             sw = item.get('sw', '')
             if sw and 'Неидентифицированн' not in sw:
-                all_software[sw] = item.get('port', '')
+                all_software[sw] = {
+                    "port": item.get('port', ''),
+                    "category": item.get('sw_category', ''),
+                    "purpose": item.get('sw_purpose', ''),
+                    "impact": item.get('sw_impact', ''),
+                }
 
         # Из сырых данных
         for item in raw_js_data:
@@ -1251,7 +1535,13 @@ class ReportGenerator:
                 all_cves.add(cve)
             sw = item.get('sw', '')
             if sw and 'Неидентифицированн' not in sw:
-                all_software[sw] = item.get('port', '')
+                if sw not in all_software:
+                    all_software[sw] = {
+                        "port": item.get('port', ''),
+                        "category": "",
+                        "purpose": "",
+                        "impact": "",
+                    }
 
         # Из данных Trivy (если есть)
         if self.trivy_result:
@@ -1301,8 +1591,18 @@ class ReportGenerator:
             capec_list.append({"id": c, "desc": desc})
 
         sw_list = []
-        for name, port in sorted(all_software.items()):
-            sw_list.append({"id": name, "desc": f"Порт: {port}" if port else ""})
+        for name, meta in sorted(all_software.items()):
+            port = meta.get("port", "")
+            cat = meta.get("category", "")
+            purp = meta.get("purpose", "")
+            parts = []
+            if cat:
+                parts.append(cat)
+            if port:
+                parts.append(f"Порт: {port}")
+            if purp:
+                parts.append(purp)
+            sw_list.append({"id": name, "desc": " | ".join(parts)})
 
         return {
             "cves": cve_list,
@@ -1473,6 +1773,13 @@ class ReportGenerator:
                         break
             
             feasibility_explanation = reasons_list[0] if reasons_list else "Подробные пояснения недоступны."
+            sw_ctx = self._build_software_context(
+                g['mapped_sw'],
+                port,
+                getattr(base_r, 'capec_id', None) or '',
+                cwe_id or '',
+                getattr(base_r, 'description', None) or ''
+            )
             
             js_data.append({
                 "id": i,
@@ -1491,12 +1798,17 @@ class ReportGenerator:
                 "count": g['count'], 
                 "found_by": found_by_joined,
                 "tools": tools,
-                "steps": steps
+                "steps": steps,
+                "sw_category": sw_ctx["category"],
+                "sw_purpose": sw_ctx["purpose"],
+                "sw_impact": sw_ctx["impact"],
+                "sw_scope": sw_ctx["scope"],
             })
 
-        # 2. Готовим сырые данные для Расширенного Меню
+        # 2. Готовим сырые данные для динамической агрегации и расширенного меню
+        raw_findings_data = []
         raw_js_data = []
-        for r in self.raw_results:
+        for idx, r in enumerate(self.raw_results):
             cve_str = getattr(r, 'cve_id', 'N/A')
             cve_list = [c.strip() for c in cve_str.split(',')] if cve_str else ["N/A"]
 
@@ -1508,6 +1820,39 @@ class ReportGenerator:
 
             # ИСПОЛЬЗУЕМ НОВЫЙ АЛГОРИТМ ДЛЯ СЫРЫХ ДАННЫХ
             real_sw = self.sw_enricher.identify_real_software(r, port)
+            sw_ctx_raw = self._build_software_context(
+                real_sw,
+                port,
+                getattr(r, 'capec_id', ''),
+                getattr(r, 'cwe_id', ''),
+                getattr(r, 'description', '')
+            )
+            cwe_id_raw = getattr(r, 'cwe_id', '') or 'CWE-Неизвестно'
+            cwe_desc_raw = self._get_cwe_description(cwe_id_raw)
+            found_by_raw = getattr(r, 'found_by', 'Сервер') if hasattr(r, 'found_by') else 'Сервер'
+            raw_findings_data.append({
+                "raw_id": idx,
+                "cve": cve_str if cve_str else "N/A",
+                "cwe": cwe_id_raw,
+                "cwe_desc": cwe_desc_raw,
+                "capec": getattr(r, 'capec_id', None) or 'CAPEC-Неизвестно',
+                "name": getattr(r, 'attack_name', None) or 'Атака',
+                "sw": real_sw,
+                "port": port,
+                "feas": self._get_worst_feas([getattr(r, 'feasibility', 'UNKNOWN')]),
+                "sev": getattr(r, 'severity', 'INFO'),
+                "desc": getattr(r, 'description', None) or 'Описание отсутствует.',
+                "rec": getattr(r, 'recommendation', None) or 'Специфичных рекомендаций нет.',
+                "reason": getattr(r, 'reason', None) or 'Подробные пояснения недоступны.',
+                "count": 1,
+                "found_by": found_by_raw,
+                "tools": getattr(r, 'attack_software', None) or "Burp Suite, SQLMap, Nmap",
+                "steps": getattr(r, 'attack_steps', None) or "1. Анализ порта.\\n2. Идентификация службы.\\n3. Подбор эксплоита.",
+                "sw_category": sw_ctx_raw["category"],
+                "sw_purpose": sw_ctx_raw["purpose"],
+                "sw_impact": sw_ctx_raw["impact"],
+                "sw_scope": sw_ctx_raw["scope"],
+            })
 
             for single_cve in cve_list:
                 if single_cve == "N/A" and len(cve_list) > 1:
@@ -1518,7 +1863,11 @@ class ReportGenerator:
                     "sev": getattr(r, 'severity', 'INFO'),
                     "sw": real_sw,
                     "port": port,
-                    "capec": getattr(r, 'capec_id', 'N/A')
+                    "capec": getattr(r, 'capec_id', 'N/A'),
+                    "sw_category": sw_ctx_raw["category"],
+                    "sw_purpose": sw_ctx_raw["purpose"],
+                    "sw_impact": sw_ctx_raw["impact"],
+                    "sw_scope": sw_ctx_raw["scope"],
                 })
 
         # 3. Готовим данные для перечней CVE/CWE/CAPEC/ПО
@@ -1536,6 +1885,7 @@ class ReportGenerator:
         
         with open(filepath, "w", encoding="utf-8") as f:
             html = HTML_TEMPLATE.replace('__REPORT_DATA__', json.dumps(js_data, ensure_ascii=False))
+            html = html.replace('__RAW_FINDINGS_DATA__', json.dumps(raw_findings_data, ensure_ascii=False))
             html = html.replace('__RAW_CVE_DATA__', json.dumps(raw_js_data, ensure_ascii=False))
             html = html.replace('__SYS_DATA__', json.dumps(sys_data, ensure_ascii=False))
             html = html.replace('__SUMMARY_DATA__', json.dumps(summary_data, ensure_ascii=False))
