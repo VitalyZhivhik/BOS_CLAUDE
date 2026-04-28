@@ -1,0 +1,12 @@
+{
+  "name": "Приоритетный для анализа атакующим",
+  "description": "Агрессивный профиль для анализа атакующим. Более либеральные критерии, больше потенциальных векторов.",
+  "max_score": 100,
+  "feasible_threshold": 50,
+  "partially_feasible_threshold": 30,
+  "not_feasible_threshold": 15,
+  "network_weight": 35,
+  "trivy_weight": 30,
+  "software_weight": 15,
+  "scanner_weight": 35
+}

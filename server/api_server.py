@@ -18,7 +18,7 @@ import os
 import sys
 import threading
 import logging
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -57,6 +57,9 @@ class ServerState:
         self.correlation_progress = 0  # 0-100
         self.correlation_message = ""  # Текущее сообщение
         self.on_correlation_progress = None  # Callback для GUI
+        self.last_correlation_payload = None
+        self.last_correlation_id = None
+        self.last_correlation_lock = threading.Lock()
 
 
 state = ServerState()
@@ -344,7 +347,7 @@ def start_server(base_dir: str = "", port: int = None):
     logger.info("Сервер ГОТОВ к приёму данных")
 
     # 4. HTTP-сервер
-    server = HTTPServer(("0.0.0.0", srv_port), RequestHandler)
+    server = ThreadingHTTPServer(("0.0.0.0", srv_port), RequestHandler)
     logger.info(f"Сервер запущен: http://0.0.0.0:{srv_port}")
     logger.info(f"Ожидание данных: POST http://<IP>:{srv_port}/analyze")
 

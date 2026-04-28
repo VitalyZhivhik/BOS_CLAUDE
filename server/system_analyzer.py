@@ -244,7 +244,7 @@ class SystemAnalyzer:
             logger.error(f"  [!] Ошибка встроенного сканера: {e}")
             self.progress_callback(95, "Ошибка при чтении базы данных.")
 
-    def run_trivy_scan(self, trivy_path: str = "") -> dict:
+    def run_trivy_scan(self, trivy_path: str = "", scan_options: dict = None) -> dict:
         """
         Запускает сканирование Trivy и сохраняет результаты в system_info.
         
@@ -272,7 +272,10 @@ class SystemAnalyzer:
                 return {"error": "Trivy не найден или недоступен"}
             
             # Запускаем сканирование
-            scan_result = scanner.scan_local_system(security_checks=False)
+            scan_result = scanner.scan_local_system(
+                security_checks=bool((scan_options or {}).get("security_checks", False)),
+                scan_options=scan_options or {},
+            )
             
             # Сохраняем результаты в system_info
             self.system_info.trivy_scan_result = {

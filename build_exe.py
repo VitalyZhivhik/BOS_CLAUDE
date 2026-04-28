@@ -41,6 +41,18 @@ def build(name, entry, extra_data=None, onefile=False):
     print(f"  СБОРКА: {name}")
     print(f"{'='*60}")
 
+    tools_src = os.path.join(PROJECT_DIR, "tools")
+    data_args = []
+    if os.path.isdir(tools_src):
+        data_args.append(f"tools{SEP}tools")
+        print(f"[+] В сборку включена папка tools/ (Trivy, Nuclei, Nmap и др.)")
+    else:
+        print(f"[!] Папка tools/ не найдена ({tools_src}) — внешние утилиты нужно положить рядом с EXE вручную")
+
+    profiles_src = os.path.join(PROJECT_DIR, "profiles")
+    if os.path.isdir(profiles_src):
+        data_args.append(f"profiles{SEP}profiles")
+
     cmd = [
         sys.executable, "-m", "PyInstaller",
         f"--name={name}",
@@ -51,12 +63,15 @@ def build(name, entry, extra_data=None, onefile=False):
         f"--add-data=common{SEP}common",
     ]
 
+    for d in data_args:
+        cmd.append(f"--add-data={d}")
+
     if extra_data:
         for d in extra_data:
             cmd.append(f"--add-data={d}")
 
     # Скрытые импорты для PyQt6
-    for mod in ["common", "common.config", "common.models", "common.logger"]:
+    for mod in ["common", "common.config", "common.models", "common.logger", "common.bundle_paths"]:
         cmd.append(f"--hidden-import={mod}")
 
     cmd.append(entry)
@@ -65,7 +80,7 @@ def build(name, entry, extra_data=None, onefile=False):
 
     if result.returncode == 0:
         if onefile:
-            print(f"[+] Собран: dist/{name}.exe")
+            print(f"[+] Собран: dist/{name}.exe (утилиты из tools/ внутри архива; при запуске — в временной папке)")
         else:
             exe_dir = os.path.join(PROJECT_DIR, "dist", name)
             # Копируем базы данных

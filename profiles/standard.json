@@ -1,0 +1,12 @@
+{
+  "name": "Стандартный (баланс)",
+  "description": "Баланс между точностью и скоростью анализа. Подходит для большинства сценариев.",
+  "max_score": 100,
+  "feasible_threshold": 60,
+  "partially_feasible_threshold": 40,
+  "not_feasible_threshold": 20,
+  "network_weight": 30,
+  "trivy_weight": 35,
+  "software_weight": 20,
+  "scanner_weight": 30
+}

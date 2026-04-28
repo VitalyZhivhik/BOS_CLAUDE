@@ -11,6 +11,7 @@
 import sys
 import os
 import json
+import ctypes
 import socket
 import urllib.request
 import urllib.error
@@ -36,10 +37,54 @@ from PyQt6.QtWidgets import (
     QComboBox, QListWidget, QListWidgetItem, QFormLayout,
     QScrollArea
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer
 from PyQt6.QtGui import QFont, QColor, QTextCursor, QIcon
 
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+_BOOT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _BOOT_DIR)
+
+from common.config import (TARGET_SERVER_HOST, TARGET_SERVER_PORT,
+                           SCAN_PORT_START, SCAN_PORT_END, SCAN_TIMEOUT)
+from common.models import ScanResult, OpenPort, AttackVector
+from common.logger import get_attacker_logger, GUILogHandler
+from common.bundle_paths import application_base_dir, tools_dir
+from attacker.attacker_agent import (
+    AttackVectorGenerator,
+    PortScanner,
+    infer_product_from_observation,
+)
+from server.attack_toolkit import AttackToolkit
+
+
+logger = get_attacker_logger()
+
+APP_DIR = application_base_dir()
+HISTORY_DIR = os.path.join(APP_DIR, "history")
+os.makedirs(HISTORY_DIR, exist_ok=True)
+
+ATTACKER_SCAN_PRESETS = {
+    "Fast": {
+        "nuclei": {"concurrency": 70, "timeout": 2, "retries": 0, "max_host_errors": 120000},
+        "nmap": {"timing": "T5", "min_rate": 500, "max_retries": 1, "script_timeout": 60, "threads": 20},
+    },
+    "Balanced": {
+        "nuclei": {"concurrency": 45, "timeout": 4, "retries": 1, "max_host_errors": 100000},
+        "nmap": {"timing": "T4", "min_rate": 300, "max_retries": 2, "script_timeout": 120, "threads": 12},
+    },
+    "Accurate": {
+        "nuclei": {"concurrency": 25, "timeout": 8, "retries": 2, "max_host_errors": 80000},
+        "nmap": {"timing": "T3", "min_rate": 150, "max_retries": 4, "script_timeout": 240, "threads": 8},
+    },
+}
+
+ATTACKER_PROFILE_MAP = {
+    "Быстрый (Fast)": "Fast",
+    "Сбалансированный (Balanced)": "Balanced",
+    "Точный (Accurate)": "Accurate",
+    "Fast": "Fast",
+    "Balanced": "Balanced",
+    "Accurate": "Accurate",
+}
 
 
 class NoWheelWhenUnfocusedSpinBox(QSpinBox):
@@ -51,31 +96,10 @@ class NoWheelWhenUnfocusedSpinBox(QSpinBox):
         else:
             event.ignore()
 
+
 def get_app_dir() -> str:
-    """Возвращает папку с .exe (frozen) или папку скрипта (Python)."""
-    if getattr(sys, 'frozen', False):  # запущено из PyInstaller EXE
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
-
-APP_DIR = get_app_dir()
-sys.path.insert(0, APP_DIR)
-HISTORY_DIR = os.path.join(APP_DIR, "history")
-os.makedirs(HISTORY_DIR, exist_ok=True)
-
-from common.config import (TARGET_SERVER_HOST, TARGET_SERVER_PORT,
-                           SCAN_PORT_START, SCAN_PORT_END, SCAN_TIMEOUT)
-from common.models import ScanResult, OpenPort, AttackVector
-from common.logger import get_attacker_logger, GUILogHandler
-from attacker.attacker_agent import (
-    AttackVectorGenerator,
-    PortScanner,
-    infer_product_from_observation,
-)
-from server.attack_toolkit import AttackToolkit
-
-
-
-logger = get_attacker_logger()
+    """Папка с .exe (frozen) или корень репозитория — для записи history и т.п."""
+    return application_base_dir()
 
 # ─────────────────────────── СТИЛЬ ───────────────────────────
 STYLE = """
@@ -324,7 +348,7 @@ class ScanWorker(QThread):
                         if parts:
                             pi.banner = " | ".join(parts)
                 except Exception:
-                    pass
+                    logger.debug("[SCAN] Не удалось снять HTTP-заголовки баннера", exc_info=True)
             elif port in (21, 22, 25, 110, 143):
                 try:
                     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -335,9 +359,9 @@ class ScanWorker(QThread):
                     if b:
                         pi.banner = b[:200]
                 except Exception:
-                    pass
+                    logger.debug("[SCAN] Не удалось получить баннер TCP-сервиса", exc_info=True)
         except Exception:
-            pass
+            logger.debug("[SCAN] Ошибка углубленного фингерпринтинга", exc_info=True)
         return pi
 
 
@@ -377,17 +401,47 @@ class SendWorker(QThread):
             self.error.emit(str(e))
 
 
+class PollCorrelationWorker(QThread):
+    result_ready = pyqtSignal(dict)
+    error = pyqtSignal(str)
+
+    def __init__(self, target, port):
+        super().__init__()
+        self.target = target
+        self.port = port
+
+    def run(self):
+        try:
+            url = f"http://{self.target}:{self.port}/last-correlation"
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, timeout=1.5) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+            self.result_ready.emit(payload)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
 class NucleiWorker(QThread):
     progress = pyqtSignal(str, int)
     log_msg = pyqtSignal(str)
     finished = pyqtSignal(list, float)   # vectors, elapsed
     error = pyqtSignal(str)
 
-    def __init__(self, target, open_ports):
+    def __init__(self, target, open_ports, settings=None):
         super().__init__()
         self.target = target
         self.open_ports = open_ports
-        self.nuclei_path = r"C:\BOS\tools\nuclei.exe"
+        self.settings = settings or {}
+        self.nuclei_path = ""
+        for p in (
+            os.path.join(tools_dir(), "nuclei.exe"),
+            os.path.join(tools_dir(), "nuclei", "nuclei.exe"),
+        ):
+            if os.path.isfile(p):
+                self.nuclei_path = p
+                break
+        if not self.nuclei_path:
+            self.nuclei_path = "nuclei"
 
     def run(self):
         t_start = time.time()
@@ -407,7 +461,10 @@ class NucleiWorker(QThread):
         self.log_msg.emit("═" * 60)
         self.log_msg.emit(f"  ▸ Цель:        {self.target}")
         self.log_msg.emit(f"  ▸ URL-ы:       {', '.join(urls)}")
-        self.log_msg.emit(f"  ▸ Параллельно: 50 шаблонов")
+        self.log_msg.emit(f"  ▸ Параллельно: {self.settings.get('concurrency', 50)} шаблонов")
+        self.log_msg.emit(
+            f"  ▸ Timeout/Retry: {self.settings.get('timeout', 2)}s / {self.settings.get('retries', 0)}"
+        )
         self.log_msg.emit("")
 
         logger.info(_log_phase(f"NUCLEI СКАНИРОВАНИЕ  [{self.target}]", "═"))
@@ -427,10 +484,10 @@ class NucleiWorker(QThread):
                 "-l", url_list_path,
                 "-json-export", temp_path,
                 "-ni", "-disable-update-check",
-                "-mhe", "100000",
-                "-c", "50",
-                "-timeout", "2",
-                "-retries", "0",
+                "-mhe", str(self.settings.get("max_host_errors", 100000)),
+                "-c", str(self.settings.get("concurrency", 50)),
+                "-timeout", str(self.settings.get("timeout", 2)),
+                "-retries", str(self.settings.get("retries", 0)),
                 "-stats", "-si", "2"
             ]
 
@@ -511,7 +568,7 @@ class NucleiWorker(QThread):
                                     inferred_product=nuc_inf,
                                 ))
                         except Exception:
-                            pass
+                            logger.debug("[NUCLEI] Пропущен некорректный элемент результата", exc_info=True)
 
             logger.info(_log_result_line("Найдено векторов:", len(vectors)))
             self.log_msg.emit(f"  ▸ Найдено векторов атак: {len(vectors)}")
@@ -526,7 +583,7 @@ class NucleiWorker(QThread):
                     try:
                         os.remove(p)
                     except Exception:
-                        pass
+                        logger.debug(f"[NUCLEI] Не удалось удалить временный файл: {p}", exc_info=True)
             self.finished.emit(vectors, elapsed if 'elapsed' in dir() else 0.0)
 
 
@@ -536,15 +593,19 @@ class NmapWorker(QThread):
     finished = pyqtSignal(list, float)   # vectors, elapsed
     error = pyqtSignal(str)
 
-    def __init__(self, target, open_ports):
+    def __init__(self, target, open_ports, settings=None):
         super().__init__()
         self.target = target
         self.open_ports = open_ports
-        portable_nmap = os.path.join(APP_DIR, "tools", "nmap.exe")
+        self.settings = settings or {}
+        portable_nmap = os.path.join(tools_dir(), "nmap.exe")
+        portable_nmap_sub = os.path.join(tools_dir(), "nmap", "nmap.exe")
         system_nmap_1  = r"C:\Program Files (x86)\Nmap\nmap.exe"
         system_nmap_2  = r"C:\Program Files\Nmap\nmap.exe"
         if os.path.exists(portable_nmap):
             self.nmap_path = portable_nmap
+        elif os.path.exists(portable_nmap_sub):
+            self.nmap_path = portable_nmap_sub
         elif os.path.exists(system_nmap_1):
             self.nmap_path = system_nmap_1
         else:
@@ -574,7 +635,11 @@ class NmapWorker(QThread):
         self.log_msg.emit("═" * 60)
         self.log_msg.emit(f"  ▸ Цель:   {self.target}")
         self.log_msg.emit(f"  ▸ Порты:  {ports_str}")
-        self.log_msg.emit(f"  ▸ Режим:  -sV --script vuln -T4")
+        self.log_msg.emit(
+            "  ▸ Режим:  -sV --script vuln "
+            f"-{self.settings.get('timing', 'T4')} --min-rate {self.settings.get('min_rate', 300)}"
+        )
+        self.log_msg.emit(f"  ▸ Потоки: {self.settings.get('threads', 10)}")
         self.log_msg.emit("")
 
         logger.info(_log_phase(f"NMAP (NSE) СКАНИРОВАНИЕ  [{self.target}]", "═"))
@@ -587,10 +652,11 @@ class NmapWorker(QThread):
             cmd = [
                 self.nmap_path,
                 "-sV", "--script", "vuln",
-                "-T4",
-                "--min-rate", "300",
-                "--max-retries", "2",
-                "--script-timeout", "2m",
+                f"-{self.settings.get('timing', 'T4')}",
+                "--min-rate", str(self.settings.get("min_rate", 300)),
+                "--min-parallelism", str(self.settings.get("threads", 10)),
+                "--max-retries", str(self.settings.get("max_retries", 2)),
+                "--script-timeout", f"{self.settings.get('script_timeout', 120)}s",
                 "-p", ports_str,
                 "-oX", temp_xml,
                 "--stats-every", "5s",
@@ -690,7 +756,7 @@ class NmapWorker(QThread):
                 try:
                     os.remove(temp_xml)
                 except Exception:
-                    pass
+                    logger.debug(f"[NMAP] Не удалось удалить временный XML: {temp_xml}", exc_info=True)
             self.finished.emit(vectors, elapsed)
 
 
@@ -712,6 +778,7 @@ class AttackerGUI(QMainWindow):
         self._scan_elapsed = 0.0
         self.attack_toolkit = None
         self._attack_vectors_data = []
+        self._last_correlation_id = None
 
         # Счётчики по источникам
         self._vectors_from_portscan = 0
@@ -727,6 +794,10 @@ class AttackerGUI(QMainWindow):
         self.log_signal.connect(self._append_log)
 
         self._load_history_tree()
+        self.poll_worker = None
+        self._server_pull_timer = QTimer(self)
+        self._server_pull_timer.timeout.connect(self._start_poll_server_correlation_worker)
+        self._server_pull_timer.start(3000)
 
         logger.info(_log_phase("АТАКУЮЩИЙ АГЕНТ ЗАПУЩЕН", "═"))
         logger.info(_log_result_line("Версия:", "2.0"))
@@ -734,6 +805,82 @@ class AttackerGUI(QMainWindow):
         logger.info(_log_result_line("Директория:", APP_DIR))
         logger.info(_log_result_line("История:", HISTORY_DIR))
         logger.info("")
+
+    def _apply_attacker_scan_profile(self):
+        profile = ATTACKER_PROFILE_MAP.get(self.scan_profile_combo.currentText(), "Balanced")
+        preset = ATTACKER_SCAN_PRESETS.get(profile, ATTACKER_SCAN_PRESETS["Balanced"])
+        self.nuclei_concurrency_spin.setValue(preset["nuclei"]["concurrency"])
+        self.nuclei_timeout_spin.setValue(preset["nuclei"]["timeout"])
+        self.nuclei_retries_spin.setValue(preset["nuclei"]["retries"])
+        self.nuclei_mhe_spin.setValue(preset["nuclei"]["max_host_errors"])
+        self.nmap_timing_combo.setCurrentText(preset["nmap"]["timing"])
+        self.nmap_min_rate_spin.setValue(preset["nmap"]["min_rate"])
+        self.nmap_retries_spin.setValue(preset["nmap"]["max_retries"])
+        self.nmap_script_timeout_spin.setValue(preset["nmap"]["script_timeout"])
+        self.nmap_threads_spin.setValue(preset["nmap"]["threads"])
+
+    def _get_local_hw_profile(self):
+        cpu_cores = max(1, os.cpu_count() or 1)
+        ram_gb = 8
+        try:
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+            mem = MEMORYSTATUSEX()
+            mem.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(mem))
+            ram_gb = max(1, int(mem.ullTotalPhys / (1024 ** 3)))
+        except Exception:
+            logger.debug("Не удалось определить ОЗУ для рекомендаций", exc_info=True)
+        return cpu_cores, ram_gb
+
+    def _apply_recommended_scan_resources(self):
+        cpu_cores, ram_gb = self._get_local_hw_profile()
+        if cpu_cores <= 4 or ram_gb <= 8:
+            prof = ATTACKER_SCAN_PRESETS["Accurate"]
+            self.scan_profile_combo.setCurrentText("Точный (Accurate)")
+        elif cpu_cores >= 12 and ram_gb >= 24:
+            prof = ATTACKER_SCAN_PRESETS["Fast"]
+            self.scan_profile_combo.setCurrentText("Быстрый (Fast)")
+        else:
+            prof = ATTACKER_SCAN_PRESETS["Balanced"]
+            self.scan_profile_combo.setCurrentText("Сбалансированный (Balanced)")
+        self.nuclei_concurrency_spin.setValue(min(150, max(10, cpu_cores * 4)))
+        self.nmap_threads_spin.setValue(min(60, max(4, cpu_cores * 2)))
+        self.nmap_min_rate_spin.setValue(min(2000, max(50, cpu_cores * 50)))
+        self.nuclei_timeout_spin.setValue(prof["nuclei"]["timeout"])
+        self.nuclei_retries_spin.setValue(prof["nuclei"]["retries"])
+        self.nuclei_mhe_spin.setValue(prof["nuclei"]["max_host_errors"])
+        self.nmap_timing_combo.setCurrentText(prof["nmap"]["timing"])
+        self.nmap_retries_spin.setValue(prof["nmap"]["max_retries"])
+        self.nmap_script_timeout_spin.setValue(prof["nmap"]["script_timeout"])
+        self.hw_info_label.setText(f"Обнаружено: CPU ядер {cpu_cores}, ОЗУ ~{ram_gb} ГБ")
+
+    def _get_nuclei_settings(self):
+        return {
+            "concurrency": max(5, min(self.nuclei_concurrency_spin.value(), 150)),
+            "timeout": max(1, min(self.nuclei_timeout_spin.value(), 30)),
+            "retries": max(0, min(self.nuclei_retries_spin.value(), 5)),
+            "max_host_errors": max(1000, min(self.nuclei_mhe_spin.value(), 200000)),
+        }
+
+    def _get_nmap_settings(self):
+        return {
+            "timing": self.nmap_timing_combo.currentText(),
+            "min_rate": max(20, min(self.nmap_min_rate_spin.value(), 2000)),
+            "threads": max(2, min(self.nmap_threads_spin.value(), 60)),
+            "max_retries": max(0, min(self.nmap_retries_spin.value(), 10)),
+            "script_timeout": max(20, min(self.nmap_script_timeout_spin.value(), 900)),
+        }
 
     # ──────────── UI ────────────
 
@@ -1063,9 +1210,104 @@ class AttackerGUI(QMainWindow):
         self.response_summary = QLabel("")
         self.response_summary.setStyleSheet("color:#888;font-size:11px;padding:4px;")
         rtl.addWidget(self.response_summary)
+        corr_hint = QLabel(
+            "Параметры, с которыми сервер выполнил последнюю корреляцию:"
+        )
+        corr_hint.setStyleSheet(_HINT_NEUTRAL)
+        corr_hint.setWordWrap(True)
+        rtl.addWidget(corr_hint)
+        self.response_settings_text = QTextEdit()
+        self.response_settings_text.setReadOnly(True)
+        self.response_settings_text.setFixedHeight(170)
+        self.response_settings_text.setPlainText("Параметры корреляции: —")
+        rtl.addWidget(self.response_settings_text)
         self.tabs.addTab(rpt, "📋 Ответ сервера")
 
-        # Вкладка 3: История (дерево)
+        # Вкладка 3: Настройки сканирования
+        scan_tab = QWidget()
+        scan_layout = QVBoxLayout(scan_tab)
+        scan_hint = QLabel(
+            "Управляйте скоростью и точностью Nuclei/Nmap. "
+            "Профиль можно использовать как быстрый пресет, затем вручную подстроить параметры. "
+            "Изменения применяются к одиночному и параллельному запуску сканеров."
+        )
+        scan_hint.setStyleSheet(_HINT_NEUTRAL)
+        scan_hint.setWordWrap(True)
+        scan_layout.addWidget(scan_hint)
+
+        scan_layout.addWidget(QLabel("Профиль сканирования:"))
+        self.scan_profile_combo = QComboBox()
+        self.scan_profile_combo.addItems([
+            "Быстрый (Fast)",
+            "Сбалансированный (Balanced)",
+            "Точный (Accurate)",
+        ])
+        self.scan_profile_combo.setCurrentText("Сбалансированный (Balanced)")
+        scan_layout.addWidget(self.scan_profile_combo)
+        self.hw_info_label = QLabel("Обнаружено: CPU/ОЗУ — нажмите рекомендацию")
+        self.hw_info_label.setStyleSheet("color:#777;font-size:10px;padding:2px 0;")
+        scan_layout.addWidget(self.hw_info_label)
+        self.btn_apply_hw_recommendation = QPushButton("Рекомендовать по ресурсам ПК")
+        self.btn_apply_hw_recommendation.setToolTip(
+            "Автоматически подбирает потоки и скорость сканирования по числу ядер CPU и объёму ОЗУ."
+        )
+        self.btn_apply_hw_recommendation.clicked.connect(self._apply_recommended_scan_resources)
+        scan_layout.addWidget(self.btn_apply_hw_recommendation)
+
+        nuclei_group = QGroupBox("Настройки Nuclei")
+        nuclei_layout = QFormLayout(nuclei_group)
+        nuclei_desc = QLabel(
+            "Nuclei: больше параллелизма ускоряет скан, но может увеличить нагрузку и пропуски на слабых целях."
+        )
+        nuclei_desc.setWordWrap(True)
+        nuclei_desc.setStyleSheet(_HINT_NEUTRAL)
+        nuclei_layout.addRow(nuclei_desc)
+        self.nuclei_concurrency_spin = QSpinBox()
+        self.nuclei_concurrency_spin.setRange(5, 150)
+        self.nuclei_timeout_spin = QSpinBox()
+        self.nuclei_timeout_spin.setRange(1, 30)
+        self.nuclei_retries_spin = QSpinBox()
+        self.nuclei_retries_spin.setRange(0, 5)
+        self.nuclei_mhe_spin = QSpinBox()
+        self.nuclei_mhe_spin.setRange(1000, 200000)
+        self.nuclei_mhe_spin.setSingleStep(5000)
+        nuclei_layout.addRow("Потоки/параллелизм (-c):", self.nuclei_concurrency_spin)
+        nuclei_layout.addRow("Таймаут запроса (сек):", self.nuclei_timeout_spin)
+        nuclei_layout.addRow("Количество повторов:", self.nuclei_retries_spin)
+        nuclei_layout.addRow("Предел ошибок хоста (-mhe):", self.nuclei_mhe_spin)
+        scan_layout.addWidget(nuclei_group)
+
+        nmap_group = QGroupBox("Настройки Nmap")
+        nmap_layout = QFormLayout(nmap_group)
+        nmap_desc = QLabel(
+            "Nmap: высокий timing/min-rate ускоряет скан, но может снизить полноту обнаружения."
+        )
+        nmap_desc.setWordWrap(True)
+        nmap_desc.setStyleSheet(_HINT_NEUTRAL)
+        nmap_layout.addRow(nmap_desc)
+        self.nmap_timing_combo = QComboBox()
+        self.nmap_timing_combo.addItems(["T2", "T3", "T4", "T5"])
+        self.nmap_threads_spin = QSpinBox()
+        self.nmap_threads_spin.setRange(2, 60)
+        self.nmap_min_rate_spin = QSpinBox()
+        self.nmap_min_rate_spin.setRange(20, 2000)
+        self.nmap_retries_spin = QSpinBox()
+        self.nmap_retries_spin.setRange(0, 10)
+        self.nmap_script_timeout_spin = QSpinBox()
+        self.nmap_script_timeout_spin.setRange(20, 900)
+        self.nmap_script_timeout_spin.setSingleStep(10)
+        nmap_layout.addRow("Профиль скорости (Timing):", self.nmap_timing_combo)
+        nmap_layout.addRow("Потоки сканирования:", self.nmap_threads_spin)
+        nmap_layout.addRow("Минимальная скорость пакетов:", self.nmap_min_rate_spin)
+        nmap_layout.addRow("Максимум повторов:", self.nmap_retries_spin)
+        nmap_layout.addRow("Таймаут NSE-скрипта (сек):", self.nmap_script_timeout_spin)
+        scan_layout.addWidget(nmap_group)
+        scan_layout.addStretch()
+        self.scan_profile_combo.currentTextChanged.connect(lambda _p: self._apply_attacker_scan_profile())
+        self._apply_attacker_scan_profile()
+        self.tabs.addTab(scan_tab, "⚙️ Настройки")
+
+        # Вкладка 4: История (дерево)
         ht = QWidget()
         htl = QVBoxLayout(ht)
 
@@ -1519,9 +1761,11 @@ class AttackerGUI(QMainWindow):
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         self.scanner_output_right.clear()  # Очищаем правую панель
-        self.tabs.setCurrentIndex(4)
+        self.tabs.setCurrentIndex(5)
 
-        self.nuclei_worker = NucleiWorker(self.target_input.text(), self.open_ports)
+        nuclei_settings = self._get_nuclei_settings()
+        logger.info(f"[NUCLEI] Применённые настройки: {nuclei_settings}")
+        self.nuclei_worker = NucleiWorker(self.target_input.text(), self.open_ports, nuclei_settings)
         self.nuclei_worker.progress.connect(self._on_scanner_progress)
         self.nuclei_worker.log_msg.connect(self._append_scanner_log_right)  # Правая панель
         self.nuclei_worker.finished.connect(
@@ -1537,9 +1781,11 @@ class AttackerGUI(QMainWindow):
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         self.scanner_output_left.clear()  # Очищаем левую панель
-        self.tabs.setCurrentIndex(4)
+        self.tabs.setCurrentIndex(5)
 
-        self.nmap_worker = NmapWorker(self.target_input.text(), self.open_ports)
+        nmap_settings = self._get_nmap_settings()
+        logger.info(f"[NMAP] Применённые настройки: {nmap_settings}")
+        self.nmap_worker = NmapWorker(self.target_input.text(), self.open_ports, nmap_settings)
         self.nmap_worker.progress.connect(self._on_scanner_progress)
         self.nmap_worker.log_msg.connect(self._append_scanner_log_left)  # Левая панель
         self.nmap_worker.finished.connect(
@@ -1584,7 +1830,7 @@ class AttackerGUI(QMainWindow):
         self.progress_bar_nmap.setFormat("Nmap: ожидание...")
         
         self.scanner_output.clear()
-        self.tabs.setCurrentIndex(4)
+        self.tabs.setCurrentIndex(5)
         
         # Счётчики для завершения
         self._parallel_completed = {"nuclei": False, "nmap": False}
@@ -1600,7 +1846,11 @@ class AttackerGUI(QMainWindow):
         
         # Запускаем Nuclei
         logger.info("  ▸ Запуск Nuclei...")
-        self.nuclei_worker = NucleiWorker(self.target_input.text(), self.open_ports)
+        nuclei_settings = self._get_nuclei_settings()
+        nmap_settings = self._get_nmap_settings()
+        logger.info(f"[PARALLEL] Nuclei settings: {nuclei_settings}")
+        logger.info(f"[PARALLEL] Nmap settings: {nmap_settings}")
+        self.nuclei_worker = NucleiWorker(self.target_input.text(), self.open_ports, nuclei_settings)
         self.nuclei_worker.progress.connect(self._on_nuclei_parallel_progress)
         self.nuclei_worker.log_msg.connect(lambda msg: self._append_scanner_log_left(msg))
         self.nuclei_worker.finished.connect(self._on_parallel_nuclei_done)
@@ -1609,7 +1859,7 @@ class AttackerGUI(QMainWindow):
         
         # Запускаем Nmap
         logger.info("  ▸ Запуск Nmap...")
-        self.nmap_worker = NmapWorker(self.target_input.text(), self.open_ports)
+        self.nmap_worker = NmapWorker(self.target_input.text(), self.open_ports, nmap_settings)
         self.nmap_worker.progress.connect(self._on_nmap_parallel_progress)
         self.nmap_worker.log_msg.connect(lambda msg: self._append_scanner_log_right(msg))
         self.nmap_worker.finished.connect(self._on_parallel_nmap_done)
@@ -2102,7 +2352,7 @@ class AttackerGUI(QMainWindow):
                                 d = json.load(f)
                             vec_count = str(len(d.get("attack_vectors", [])))
                         except Exception:
-                            pass
+                            logger.debug(f"[HISTORY] Не удалось прочитать файл истории: {fpath}", exc_info=True)
 
                         # Иконка по типу
                         icon = {"PortScan": "🔌", "NucleiScan": "🌐", "NmapScan": "🗺"}.get(
@@ -2133,7 +2383,7 @@ class AttackerGUI(QMainWindow):
                         d = json.load(f)
                     vec_count = str(len(d.get("attack_vectors", [])))
                 except Exception:
-                    pass
+                    logger.debug(f"[HISTORY] Не удалось прочитать legacy-файл: {fpath}", exc_info=True)
 
                 fi = QTreeWidgetItem(old_item)
                 fi.setText(0, f"  📄  {fname}")
@@ -2312,47 +2562,113 @@ class AttackerGUI(QMainWindow):
                     "background:#1a1a1a;border:1px solid #3a5a3a;border-radius:4px;padding:8px;")
                 self.btn_check.setText("1. Связь установлена ✔")
                 logger.info("  ✔  Статус соединения восстановлен по успешному /analyze")
-            sm      = result.get("summary", {})
-            details = result.get("details", [])
-            self.response_table.setRowCount(0)
-            for it in details:
-                r = self.response_table.rowCount()
-                self.response_table.insertRow(r)
-                self.response_table.setItem(r, 0, QTableWidgetItem(str(it.get("cve_id", ""))))
-                sev = str(it.get("severity", ""))
-                si = QTableWidgetItem(sev)
-                si.setForeground(QColor(
-                    {"CRITICAL": "#ff4444", "HIGH": "#ff8844",
-                     "MEDIUM": "#ccaa44", "LOW": "#44aa44"}.get(sev, "#888")))
-                self.response_table.setItem(r, 1, si)
-                from common.models import normalize_feasibility
-                feas_norm = normalize_feasibility(it.get("feasibility", ""))
-                fi = QTableWidgetItem(feas_norm)
-                fi.setForeground(QColor(
-                    "#c55" if feas_norm == "РЕАЛИЗУЕМА"
-                    else "#5a9" if feas_norm == "НЕ РЕАЛИЗУЕМА"
-                    else "#d29922"))
-                self.response_table.setItem(r, 2, fi)
-                self.response_table.setItem(r, 3, QTableWidgetItem(str(it.get("attack_name", ""))))
-                self.response_table.setItem(r, 4, QTableWidgetItem(str(it.get("recommendation", ""))[:150]))
-
-            from common.models import feasibility_counters
-            counters = feasibility_counters(details, value_getter=lambda d: d.get("feasibility"))
-            self.response_summary.setText(
-                f"Всего: {counters['total']}  |  🔴 Реализуемых: {counters['feasible']}  |  "
-                f"🟡 Частичных: {counters['partially_feasible']}  |  "
-                f"🟢 Нереализуемых: {counters['not_feasible']}  |  "
-                f"⚪ Требуют анализа: {counters['requires_analysis']}"
-            )
+            self._apply_server_correlation_result(result, source_note="Источник: прямой ответ /analyze")
             logger.info(_log_phase("ОТВЕТ СЕРВЕРА ПОЛУЧЕН", "─"))
-            logger.info(_log_result_line("Всего уязвимостей:", counters["total"]))
-            logger.info(_log_result_line("Реализуемых:", counters["feasible"]))
-            logger.info(_log_result_line("Частичных:", counters["partially_feasible"]))
-            logger.info(_log_result_line("Нереализуемых:", counters["not_feasible"]))
-            logger.info(_log_result_line("Требуют анализа:", counters["requires_analysis"]))
             self.tabs.setCurrentIndex(2)
         else:
             QMessageBox.warning(self, "Ответ сервера", f"Ошибка: {result.get('error', '?')}")
+
+    def _apply_server_correlation_result(self, result: dict, source_note: str = ""):
+        """Обновляет вкладку ответа сервера из payload корреляции."""
+        details = result.get("details", [])
+        self.response_table.setRowCount(0)
+        for it in details:
+            r = self.response_table.rowCount()
+            self.response_table.insertRow(r)
+            self.response_table.setItem(r, 0, QTableWidgetItem(str(it.get("cve_id", ""))))
+            sev = str(it.get("severity", ""))
+            si = QTableWidgetItem(sev)
+            si.setForeground(QColor(
+                {"CRITICAL": "#ff4444", "HIGH": "#ff8844",
+                 "MEDIUM": "#ccaa44", "LOW": "#44aa44"}.get(sev, "#888")))
+            self.response_table.setItem(r, 1, si)
+            from common.models import normalize_feasibility
+            feas_norm = normalize_feasibility(it.get("feasibility", ""))
+            fi = QTableWidgetItem(feas_norm)
+            fi.setForeground(QColor(
+                "#c55" if feas_norm == "РЕАЛИЗУЕМА"
+                else "#5a9" if feas_norm == "НЕ РЕАЛИЗУЕМА"
+                else "#d29922"))
+            self.response_table.setItem(r, 2, fi)
+            self.response_table.setItem(r, 3, QTableWidgetItem(str(it.get("attack_name", ""))))
+            self.response_table.setItem(r, 4, QTableWidgetItem(str(it.get("recommendation", ""))[:150]))
+
+        from common.models import feasibility_counters
+        counters = feasibility_counters(details, value_getter=lambda d: d.get("feasibility"))
+        self.response_summary.setText(
+            f"Всего: {counters['total']}  |  🔴 Реализуемых: {counters['feasible']}  |  "
+            f"🟡 Частичных: {counters['partially_feasible']}  |  "
+            f"🟢 Нереализуемых: {counters['not_feasible']}  |  "
+            f"⚪ Требуют анализа: {counters['requires_analysis']}"
+        )
+
+        settings = result.get("settings_used") or {}
+        if settings:
+            settings_text = (
+                "ПАРАМЕТРЫ КОРРЕЛЯЦИИ\n\n"
+                f"• max_score: {settings.get('max_score', '-')}\n"
+                f"• feasible_threshold: {settings.get('feasible_threshold', '-')}\n"
+                f"• partially_feasible_threshold: {settings.get('partially_feasible_threshold', '-')}\n"
+                f"• not_feasible_threshold: {settings.get('not_feasible_threshold', '-')}\n"
+                f"• network_weight: {settings.get('network_weight', '-')}\n"
+                f"• trivy_weight: {settings.get('trivy_weight', '-')}\n"
+                f"• software_weight: {settings.get('software_weight', '-')}\n"
+                f"• scanner_weight: {settings.get('scanner_weight', '-')}"
+            )
+            if source_note:
+                settings_text += f"\n\nИсточник: {source_note}"
+            self.response_settings_text.setPlainText(settings_text)
+        else:
+            self.response_settings_text.setPlainText(
+                "Параметры корреляции: нет данных"
+                + (f"\nИсточник: {source_note}" if source_note else "")
+            )
+
+        correlation_id = result.get("correlation_id")
+        if correlation_id:
+            self._last_correlation_id = correlation_id
+
+        logger.info(_log_result_line("Всего уязвимостей:", counters["total"]))
+        logger.info(_log_result_line("Реализуемых:", counters["feasible"]))
+        logger.info(_log_result_line("Частичных:", counters["partially_feasible"]))
+        logger.info(_log_result_line("Нереализуемых:", counters["not_feasible"]))
+        logger.info(_log_result_line("Требуют анализа:", counters["requires_analysis"]))
+
+    def _start_poll_server_correlation_worker(self):
+        """Запускает polling в отдельном потоке, чтобы не блокировать UI."""
+        if not self.connected_to_server:
+            return
+        if self.poll_worker and self.poll_worker.isRunning():
+            return
+        target = self.target_input.text().strip()
+        port = self.port_spin.value()
+        if not target:
+            return
+        self.poll_worker = PollCorrelationWorker(target, port)
+        self.poll_worker.result_ready.connect(self._on_poll_correlation_result)
+        self.poll_worker.error.connect(self._on_poll_correlation_error)
+        self.poll_worker.finished.connect(self._on_poll_correlation_finished)
+        self.poll_worker.start()
+
+    def _on_poll_correlation_result(self, payload):
+        """Применяет данные синхронизации, если пришла новая корреляция."""
+        try:
+            if payload.get("status") != "success":
+                return
+            corr_id = payload.get("correlation_id")
+            if corr_id and corr_id != self._last_correlation_id:
+                self._apply_server_correlation_result(
+                    payload,
+                    source_note="Источник: синхронизация с сервера",
+                )
+        except Exception:
+            logger.debug("[SYNC] Ошибка применения данных синхронизации", exc_info=True)
+
+    def _on_poll_correlation_error(self, error):
+        logger.debug(f"[SYNC] Ошибка polling /last-correlation: {error}")
+
+    def _on_poll_correlation_finished(self):
+        self.poll_worker = None
 
     def _on_send_error(self, error):
         self.btn_send.setText("5. Отправить на сервер для анализа")

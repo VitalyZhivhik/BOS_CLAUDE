@@ -37,6 +37,36 @@ class AttackCorrelator:
         self.trivy_result = trivy_result  # Результаты сканирования Trivy
         self.results: list[VulnerabilityMatch] = []
         self.progress_callback = None  # Callback для прогресса
+        
+        # Параметры корреляции по умолчанию
+        self.max_score = 100
+        self.feasible_threshold = 60
+        self.partially_feasible_threshold = 40
+        self.not_feasible_threshold = 20
+        self.network_weight = 30
+        self.trivy_weight = 35
+        self.software_weight = 20
+        self.scanner_weight = 30
+        
+        # Загружаем настройки из глобального состояния, если они есть
+        self._load_correlation_settings()
+    
+    def _load_correlation_settings(self):
+        """Загружает настройки корреляции из глобального состояния."""
+        try:
+            from server.api_server import state
+            settings = getattr(state, 'correlation_settings', None)
+            if settings:
+                self.max_score = settings.get('max_score', 100)
+                self.feasible_threshold = settings.get('feasible_threshold', 60)
+                self.partially_feasible_threshold = settings.get('partially_feasible_threshold', 40)
+                self.not_feasible_threshold = settings.get('not_feasible_threshold', 20)
+                self.network_weight = settings.get('network_weight', 30)
+                self.trivy_weight = settings.get('trivy_weight', 35)
+                self.software_weight = settings.get('software_weight', 20)
+                self.scanner_weight = settings.get('scanner_weight', 30)
+        except ImportError:
+            pass  # API сервер может быть не запущен
 
     def set_progress_callback(self, callback):
         """Устанавливает callback для отслеживания прогресса."""
@@ -313,8 +343,14 @@ class AttackCorrelator:
         score_details = []
         blockers = []
         uncertainty_flags = []
+        network_points = 0
+        scanner_points = 0
+        trivy_points = 0
+        software_points = 0
+        patch_points = 0
+        protection_points = 0
         
-        # Фактор 1: Сетевая доступность (30 баллов)
+        # Фактор 1: Сетевая доступность (используем network_weight)
         required_ports = cve.get("requires_port", [])
         open_port_nums = set()
         if isinstance(self.system_info.open_ports, list):
@@ -328,12 +364,15 @@ class AttackCorrelator:
             # Если есть конкретные требуемые порты - проверяем их
             matched_ports = [p for p in required_ports if p in open_port_nums]
             if matched_ports:
-                port_score = min(30, len(matched_ports) / len(required_ports) * 30)
+                port_score = min(self.network_weight, len(matched_ports) / len(required_ports) * self.network_weight)
                 score += port_score
+                network_points += port_score
                 score_details.append(f"Порты открыты: {matched_ports}")
             else:
                 # Если порты требуются но не открыты - снижаем баллы
-                score -= 10
+                penalty = int(self.network_weight * 0.3)
+                score -= penalty
+                network_points -= penalty
                 score_details.append(f"Требуемые порты закрыты: {required_ports}")
                 blockers.append("Требуемые порты закрыты")
         else:
@@ -343,38 +382,68 @@ class AttackCorrelator:
                 # Проверяем наличие веб-портов
                 web_ports = {80, 443, 8080, 8443}
                 if web_ports.intersection(open_port_nums):
-                    score += 25
+                    awarded = int(self.network_weight * 0.8)
+                    score += awarded
+                    network_points += awarded
                     score_details.append("Веб-порты открыты")
                 else:
-                    score += 10
+                    awarded = int(self.network_weight * 0.3)
+                    score += awarded
+                    network_points += awarded
                     score_details.append("Веб-порты не обнаружены")
                     uncertainty_flags.append("Неочевидная сетевая доступность веб-вектора")
             else:
                 # Для других атак считаем что сеть доступна
-                score += 15
+                awarded = int(self.network_weight * 0.5)
+                score += awarded
+                network_points += awarded
                 score_details.append("Сетевой доступ предполагается")
                 uncertainty_flags.append("Сетевой доступ оценён эвристически")
+            
+        # Фактор 1.5: Подтверждение активным сканером (Nmap / Nuclei)
+        scanner_confirmed = False
+        av_name_upper = (av.name or "").upper()
+        av_tools_upper = (getattr(av, "tools_used", "") or "").upper()
+        if "[NMAP]" in av_name_upper or "[NUCLEI]" in av_name_upper or "NMAP" in av_tools_upper or "NUCLEI" in av_tools_upper:
+            scanner_confirmed = True
+            score += self.scanner_weight
+            scanner_points += self.scanner_weight
+            score_details.append("Уязвимость подтверждена активным сетевым сканером")
         
-        # Фактор 2: Подтверждение Trivy (35 баллов)
+        # Фактор 2: Подтверждение Trivy (используем trivy_weight)
         cve_id = cve.get("id", "")
         trivy_confirmed, trivy_details, trivy_severity = self._check_trivy_vulnerability(cve_id)
         
         if trivy_confirmed:
             if trivy_severity in ["CRITICAL", "HIGH"]:
-                score += 35
+                score += self.trivy_weight
+                trivy_points += self.trivy_weight
                 score_details.append("Trivy подтвердил (критично)")
             elif trivy_severity == "MEDIUM":
-                score += 25
+                awarded = int(self.trivy_weight * 0.7)
+                score += awarded
+                trivy_points += awarded
                 score_details.append("Trivy подтвердил (средне)")
             else:
-                score += 15
+                awarded = int(self.trivy_weight * 0.4)
+                score += awarded
+                trivy_points += awarded
                 score_details.append("Trivy подтвердил (низко)")
         else:
             # Trivy не подтвердил: без штрафа/бонуса, это зона неопределённости
             score_details.append("Trivy не подтвердил уязвимость")
             uncertainty_flags.append("Нет подтверждения Trivy")
+            if self.trivy_result and not scanner_confirmed:
+                # Trivy сканировал и не нашел, а сетевые сканеры тоже молчат - сильно занижаем балл
+                penalty = int(self.trivy_weight * 0.4)
+                score -= penalty
+                trivy_points -= penalty
+                score_details.append("Trivy сканировал систему, но не подтвердил уязвимость")
+            else:
+                score_details.append("Trivy не подтвердил уязвимость")
+                uncertainty_flags.append("Нет подтверждения Trivy")
         
-        # Фактор 3: Уязвимое ПО обнаружено (20 баллов)
+        # Фактор 3: Уязвимое ПО обнаружено (используем software_weight)
         sw_names_lower = set()
         if isinstance(self.system_info.installed_software, list):
             for sw in self.system_info.installed_software:
@@ -392,53 +461,71 @@ class AttackCorrelator:
                 break
         
         if vulnerable_sw_found:
-            score += 20
+            score += self.software_weight
+            software_points += self.software_weight
             score_details.append("Уязвимое ПО обнаружено")
         else:
             # Проверяем по target_service из вектора атаки
             if av.target_service:
                 av_svc_lower = av.target_service.lower()
                 if any(av_svc_lower in installed for installed in sw_names_lower):
-                    score += 10
+                    awarded = int(self.software_weight * 0.5)
+                    score += awarded
+                    software_points += awarded
                     score_details.append("ПО по вектору атаки обнаружено")
                 else:
                     blockers.append("ПО из вектора атаки не обнаружено")
+                    # Если сканер подтвердил уязвимость, мы не блокируем её из-за отсутствия ПО в реестре
+                    if not scanner_confirmed:
+                        blockers.append("ПО из вектора атаки не обнаружено")
+                    else:
+                        score_details.append("ПО не в реестре, но служба подтверждена сканером")
             else:
                 blockers.append("Целевое уязвимое ПО не обнаружено")
+                if not scanner_confirmed:
+                    blockers.append("Целевое уязвимое ПО не обнаружено")
         
         # Фактор 4: Отсутствие патчей/обновлений (10 баллов)
         if not self.system_info.updates_installed:
             score += 10
+            patch_points += 10
             score_details.append("Обновления не установлены")
         else:
             score += 5
+            patch_points += 5
             score_details.append("Обновления установлены")
         
         # Фактор 5: Слабые средства защиты (5 баллов)
         # Снижаем требования к средствам защиты
         if not self.system_info.firewall_active:
             score += 3
+            protection_points += 3
             score_details.append("Брандмауэр отключён")
         if not self.system_info.antivirus_active:
             score += 2
+            protection_points += 2
             score_details.append("Антивирус отключён")
         
-        # Определяем реализуемость на основе score (ПОВЫШЕННЫЕ ПОРОГИ)
-        has_hard_evidence = trivy_confirmed or vulnerable_sw_found
+        # Определяем реализуемость на основе score с использованием параметров из класса
+        has_hard_evidence = trivy_confirmed or vulnerable_sw_found or scanner_confirmed
 
-        if score >= 70 and not blockers:
-            feasibility = AttackFeasibility.FEASIBLE
-        elif blockers:
+        # Ограничиваем score диапазоном 0-max_score
+        score = max(0, min(self.max_score, score))
+
+        # Определяем реализуемость на основе пороговых значений
+        if blockers:
             # Если есть блокеры, обычно считаем атаку нереализуемой.
             # Частичную оценку оставляем только для конфликтного случая:
             # есть подтверждающие признаки, но часть условий не выполнена.
-            if has_hard_evidence and score >= 50:
+            if has_hard_evidence and score >= self.partially_feasible_threshold:
                 feasibility = AttackFeasibility.PARTIALLY_FEASIBLE
             else:
                 feasibility = AttackFeasibility.NOT_FEASIBLE
-        elif score >= 55:
+        elif score >= self.feasible_threshold:
             feasibility = AttackFeasibility.FEASIBLE
-        elif score <= 30:
+        elif score >= self.partially_feasible_threshold:
+            feasibility = AttackFeasibility.PARTIALLY_FEASIBLE
+        elif score <= self.not_feasible_threshold:
             feasibility = AttackFeasibility.NOT_FEASIBLE
         elif uncertainty_flags and not has_hard_evidence:
             # REQUIRES_ANALYSIS оставляем для действительно "серой зоны":
@@ -473,6 +560,44 @@ class AttackCorrelator:
             "factors": {
                 "score_detail_lines": list(score_details),
                 "protection": list(protection_notes),
+                "score_breakdown": [
+                    {
+                        "key": "network",
+                        "label": "Сетевая доступность",
+                        "points": int(round(network_points)),
+                        "max_points": int(self.network_weight),
+                    },
+                    {
+                        "key": "scanner",
+                        "label": "Подтверждение активным сканером",
+                        "points": int(round(scanner_points)),
+                        "max_points": int(self.scanner_weight),
+                    },
+                    {
+                        "key": "trivy",
+                        "label": "Подтверждение Trivy",
+                        "points": int(round(trivy_points)),
+                        "max_points": int(self.trivy_weight),
+                    },
+                    {
+                        "key": "software",
+                        "label": "Уязвимое ПО",
+                        "points": int(round(software_points)),
+                        "max_points": int(self.software_weight),
+                    },
+                    {
+                        "key": "patches",
+                        "label": "Состояние обновлений",
+                        "points": int(round(patch_points)),
+                        "max_points": 10,
+                    },
+                    {
+                        "key": "protection",
+                        "label": "Ослабление защиты",
+                        "points": int(round(protection_points)),
+                        "max_points": 5,
+                    },
+                ],
             },
             "trivy": {
                 "confirmed": bool(trivy_confirmed),

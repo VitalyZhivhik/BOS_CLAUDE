@@ -11,9 +11,9 @@
   - Интеграция AttackToolkit и ReportHistory
   - Вкладка «Обнаруженное ПО» (показ сырых данных от сканера)
 """
-import sys, os, json, socket, threading, webbrowser
+import sys, os, json, socket, threading, webbrowser, ctypes
 from datetime import datetime
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QTextEdit, QGroupBox, QSpinBox,
@@ -24,9 +24,10 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QColor, QTextCursor
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, PROJECT_DIR)
+_BOOT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _BOOT_DIR)
 from common.config import SERVER_HOST, SERVER_PORT
+from common.bundle_paths import application_base_dir, bundle_resources_root
 from common.models import from_json_scan_result, AttackVector, Severity
 from common.logger import get_server_logger, GUILogHandler
 from server.system_analyzer import SystemAnalyzer
@@ -38,6 +39,40 @@ from server.report_history import ReportHistory, ReportRecord
 from server.scan_history import ScanHistory, ScanRecord
 from server.local_vuln_scanner import LocalVulnScanner, ScanReport
 logger = get_server_logger()
+PROJECT_DIR = application_base_dir()
+BUNDLE_ROOT = bundle_resources_root()
+TRIVY_SCAN_PROFILES = {
+    "Fast": {
+        "timeout_minutes": 8,
+        "severities": ["HIGH", "CRITICAL"],
+        "scanners": ["vuln"],
+        "threads": 8,
+        "security_checks": False,
+    },
+    "Balanced": {
+        "timeout_minutes": 15,
+        "severities": ["MEDIUM", "HIGH", "CRITICAL"],
+        "scanners": ["vuln"],
+        "threads": 5,
+        "security_checks": False,
+    },
+    "Accurate": {
+        "timeout_minutes": 30,
+        "severities": ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+        "scanners": ["vuln", "secret"],
+        "threads": 3,
+        "security_checks": True,
+    },
+}
+
+TRIVY_PROFILE_MAP = {
+    "Быстрый (Fast)": "Fast",
+    "Сбалансированный (Balanced)": "Balanced",
+    "Точный (Accurate)": "Accurate",
+    "Fast": "Fast",
+    "Balanced": "Balanced",
+    "Accurate": "Accurate",
+}
 # ─────────────────────────────────────────
 #  Стили
 # ─────────────────────────────────────────
@@ -147,7 +182,7 @@ class DBLoadWorker(QThread):
     error = pyqtSignal(str)
     def run(self):
         try:
-            db = VulnerabilityDatabase(PROJECT_DIR)
+            db = VulnerabilityDatabase(BUNDLE_ROOT)
             db.load_all()
             self.finished.emit(db)
         except Exception as e:
@@ -171,7 +206,7 @@ class ToolkitLoadWorker(QThread):
     error = pyqtSignal(str)
     def run(self):
         try:
-            tk = AttackToolkit(PROJECT_DIR)
+            tk = AttackToolkit(BUNDLE_ROOT)
             tk.load()
             self.finished.emit(tk)
         except Exception as e:
@@ -183,19 +218,129 @@ class TrivyScanWorker(QThread):
     progress = pyqtSignal(int, str)  # percent, message
     error = pyqtSignal(str)
     
-    def __init__(self, system_analyzer, trivy_path=""):
+    def __init__(self, system_analyzer, trivy_path="", scan_options=None):
         super().__init__()
         self.system_analyzer = system_analyzer
         self.trivy_path = trivy_path
+        self.scan_options = scan_options or {}
     
     def run(self):
         try:
             self.progress.emit(0, "Запуск сканирования Trivy...")
-            result = self.system_analyzer.run_trivy_scan(self.trivy_path)
+            result = self.system_analyzer.run_trivy_scan(self.trivy_path, self.scan_options)
             self.progress.emit(100, "Сканирование Trivy завершено")
             self.finished.emit(result)
         except Exception as e:
             logger.error(f"Ошибка сканирования Trivy: {e}", exc_info=True)
+            self.error.emit(str(e))
+
+
+class CorrelationRestartWorker(QThread):
+    finished = pyqtSignal(dict)
+    progress = pyqtSignal(int, str)
+    error = pyqtSignal(str)
+
+    def __init__(
+        self,
+        system_info,
+        vuln_db,
+        trivy_result,
+        last_scan_data,
+        toolkit,
+        vuln_scan_report,
+        system_summary,
+        settings,
+    ):
+        super().__init__()
+        self.system_info = system_info
+        self.vuln_db = vuln_db
+        self.trivy_result = trivy_result
+        self.last_scan_data = last_scan_data
+        self.toolkit = toolkit
+        self.vuln_scan_report = vuln_scan_report
+        self.system_summary = system_summary
+        self.settings = settings
+
+    def run(self):
+        try:
+            self.progress.emit(0, "🔄 Перезапуск корреляции...")
+            sr = from_json_scan_result(self.last_scan_data)
+            cor = AttackCorrelator(
+                self.system_info,
+                self.vuln_db,
+                trivy_result=self.trivy_result,
+            )
+            if self.settings:
+                cor.max_score = self.settings.get('max_score', 100)
+                cor.feasible_threshold = self.settings.get('feasible_threshold', 60)
+                cor.partially_feasible_threshold = self.settings.get('partially_feasible_threshold', 40)
+                cor.not_feasible_threshold = self.settings.get('not_feasible_threshold', 20)
+                cor.network_weight = self.settings.get('network_weight', 30)
+                cor.trivy_weight = self.settings.get('trivy_weight', 35)
+                cor.software_weight = self.settings.get('software_weight', 20)
+                cor.scanner_weight = self.settings.get('scanner_weight', 30)
+            cor.set_progress_callback(lambda p, m: self.progress.emit(p, m))
+
+            results = cor.correlate(sr)
+            summary = cor.get_summary()
+
+            rd = os.path.join(PROJECT_DIR, "reports")
+            os.makedirs(rd, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            rep = ReportGenerator(
+                self.system_summary or {},
+                results,
+                summary,
+                toolkit=self.toolkit,
+                local_scan_report=self.vuln_scan_report,
+                attacker_scan_data=self.last_scan_data,
+            )
+            hp = rep.generate_html(os.path.join(rd, f"report_{ts}.html"))
+            jp = rep.generate_json(os.path.join(rd, f"report_{ts}.json"))
+
+            settings_used = self.settings or {
+                "max_score": cor.max_score,
+                "feasible_threshold": cor.feasible_threshold,
+                "partially_feasible_threshold": cor.partially_feasible_threshold,
+                "not_feasible_threshold": cor.not_feasible_threshold,
+                "network_weight": cor.network_weight,
+                "trivy_weight": cor.trivy_weight,
+                "software_weight": cor.software_weight,
+                "scanner_weight": cor.scanner_weight,
+            }
+            payload = {
+                "status": "success",
+                "correlation_id": ts,
+                "summary": summary,
+                "settings_used": settings_used,
+                "html_report": hp,
+                "results_count": len(results),
+                "details": [
+                    {
+                        "cve_id": str(r.cve_id) if r.cve_id else "",
+                        "attack_name": str(r.attack_name) if r.attack_name else "",
+                        "severity": getattr(r.severity, 'name', str(r.severity)),
+                        "feasibility": __import__(
+                            "common.models",
+                            fromlist=["normalize_feasibility"],
+                        ).normalize_feasibility(getattr(r, "feasibility", None)),
+                        "description": str(r.description) if r.description else "",
+                        "recommendation": str(r.recommendation) if r.recommendation else "",
+                    }
+                    for r in results
+                ],
+            }
+            self.progress.emit(100, "✅ Корреляция перезапущена")
+            self.finished.emit({
+                "results": results,
+                "summary": summary,
+                "html_path": hp,
+                "json_path": jp,
+                "correlation_id": ts,
+                "payload": payload,
+            })
+        except Exception as e:
+            logger.error(f"Ошибка перезапуска корреляции: {e}", exc_info=True)
             self.error.emit(str(e))
 # ─────────────────────────────────────────
 #  Главное окно
@@ -227,6 +372,7 @@ class ServerGUI(QMainWindow):
         self.actual_server_port = None
         self._last_scan_data = {}        # Данные от атакующего (для схем)
         self._last_results = []          # Результаты корреляции
+        self.restart_correlation_worker = None
         self._build_ui()
         self.setStyleSheet(STYLE)
         self.update_results_signal.connect(self._update_results_table_slot)
@@ -235,7 +381,7 @@ class ServerGUI(QMainWindow):
         gh = GUILogHandler(self._on_log_message)
         gh.setLevel(10)
         logger.addHandler(gh)
-        validate_tools_database_at_startup(PROJECT_DIR)
+        validate_tools_database_at_startup(BUNDLE_ROOT)
         self.client_connected_signal.connect(self._on_client_connected)
         self.analysis_done_signal.connect(self._on_server_analysis_done)
         # Синхронизируем историю с диском при старте
@@ -260,6 +406,7 @@ class ServerGUI(QMainWindow):
         self._build_trivy_history_tab()  # НОВАЯ ВКЛАДКА ИСТОРИИ TRIVY
         self._build_vuln_tab()
         self._build_correlation_tab()
+        self._build_settings_tab()  # НОВАЯ ВКЛАДКА НАСТРОЙКИ
         self._build_history_tab()
         self._build_log_tab()
         ml.addWidget(self.tabs, 1)
@@ -456,6 +603,7 @@ class ServerGUI(QMainWindow):
         self.port_status_label.setStyleSheet("font-size:9px;")
         self.port_status_label.setWordWrap(True)
         pl.addWidget(self.port_status_label)
+
         ll.addWidget(pg)
 
         # Отчёт - уменьшены
@@ -500,6 +648,66 @@ class ServerGUI(QMainWindow):
         
         scroll.setWidget(left)
         return scroll
+
+    def _apply_trivy_profile(self):
+        profile_key = TRIVY_PROFILE_MAP.get(self.trivy_profile_combo.currentText(), "Balanced")
+        preset = TRIVY_SCAN_PROFILES.get(profile_key, TRIVY_SCAN_PROFILES["Balanced"])
+        self.trivy_timeout_spin.setValue(preset["timeout_minutes"])
+        self.trivy_severity_combo.setCurrentText(",".join(preset["severities"]))
+        self.trivy_checks_combo.setCurrentText(",".join(preset["scanners"]))
+        self.trivy_threads_spin.setValue(preset["threads"])
+
+    def _get_local_hw_profile(self):
+        cpu_cores = max(1, os.cpu_count() or 1)
+        ram_gb = 8
+        try:
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+            mem = MEMORYSTATUSEX()
+            mem.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(mem))
+            ram_gb = max(1, int(mem.ullTotalPhys / (1024 ** 3)))
+        except Exception:
+            logger.debug("Не удалось определить ОЗУ для Trivy-рекомендаций", exc_info=True)
+        return cpu_cores, ram_gb
+
+    def _apply_recommended_trivy_resources(self):
+        cpu_cores, ram_gb = self._get_local_hw_profile()
+        if cpu_cores <= 4 or ram_gb <= 8:
+            self.trivy_profile_combo.setCurrentText("Точный (Accurate)")
+            threads = max(2, cpu_cores - 1)
+        elif cpu_cores >= 12 and ram_gb >= 24:
+            self.trivy_profile_combo.setCurrentText("Быстрый (Fast)")
+            threads = min(16, cpu_cores)
+        else:
+            self.trivy_profile_combo.setCurrentText("Сбалансированный (Balanced)")
+            threads = min(10, max(3, cpu_cores // 2))
+        self.trivy_threads_spin.setValue(threads)
+        self.trivy_hw_info_label.setText(f"Обнаружено: CPU ядер {cpu_cores}, ОЗУ ~{ram_gb} ГБ")
+
+    def _get_trivy_scan_options(self):
+        severities = [s.strip().upper() for s in self.trivy_severity_combo.currentText().split(",") if s.strip()]
+        scanners = [s.strip() for s in self.trivy_checks_combo.currentText().split(",") if s.strip()]
+        options = {
+            "timeout_minutes": max(1, min(self.trivy_timeout_spin.value(), 120)),
+            "severities": severities or ["MEDIUM", "HIGH", "CRITICAL"],
+            "scanners": scanners or ["vuln"],
+            "threads": max(1, min(self.trivy_threads_spin.value(), 32)),
+            "security_checks": "secret" in scanners,
+        }
+        logger.info(f"[TRIVY] Применённые настройки: {options}")
+        return options
+
     def _build_system_tab(self):
         st = QWidget()
         stl = QVBoxLayout(st)
@@ -679,18 +887,18 @@ class ServerGUI(QMainWindow):
         info.setStyleSheet("color:#888;font-size:10px;padding:4px;")
         info.setWordWrap(True)
         rtl.addWidget(info)
-        
+
         # Прогресс корреляции
         self.correlation_progress_label = QLabel("⚪ Ожидание данных от атакующего...")
         self.correlation_progress_label.setStyleSheet("color:#666;font-size:11px;padding:4px;")
         rtl.addWidget(self.correlation_progress_label)
-        
+
         self.correlation_progress_bar = QProgressBar()
         self.correlation_progress_bar.setFixedHeight(20)
         self.correlation_progress_bar.setVisible(False)
         self.correlation_progress_bar.setValue(0)
         rtl.addWidget(self.correlation_progress_bar)
-        
+
         self.results_table = QTableWidget(0, 5)
         self.results_table.setHorizontalHeaderLabels(["CVE", "Серьёзность", "Реализуемость", "Атака", "Описание"])
         self.results_table.horizontalHeader().setStretchLastSection(True)
@@ -706,6 +914,443 @@ class ServerGUI(QMainWindow):
         self.correlation_summary.setStyleSheet("color:#888;font-size:11px;padding:4px;")
         rtl.addWidget(self.correlation_summary)
         self.tabs.addTab(rt, "📊 Корреляция")
+    def _build_settings_tab(self):
+        """Вкладка настроек: корреляция + сканирование."""
+        # Создаём основной контейнер с возможностью скролла
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                background: #1a1a1a;
+                border: 1px solid #333;
+                border-radius: 3px;
+            }
+            QScrollBar:vertical {
+                background: #1a1a1a;
+                width: 6px;
+                border: none;
+            }
+            QScrollBar::handle:vertical {
+                background: #444;
+                border-radius: 3px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #555;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+                border: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: #1a1a1a;
+            }
+            QScrollBar:horizontal {
+                background: #1a1a1a;
+                height: 6px;
+                border: none;
+            }
+            QScrollBar::handle:horizontal {
+                background: #444;
+                border-radius: 3px;
+                min-width: 20px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background: #555;
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                width: 0;
+                border: none;
+            }
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+                background: #1a1a1a;
+            }
+        """)
+        
+        # Создаём контейнер для содержимого
+        content_widget = QWidget()
+        content_widget.setStyleSheet("background: #1a1a1a;")
+        stl = QVBoxLayout(content_widget)
+        stl.setSpacing(10)
+        stl.setContentsMargins(15, 15, 15, 15)
+
+        # Заголовок
+        title = QLabel("⚙️ НАСТРОЙКИ КОРРЕЛЯЦИИ АТАК")
+        title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        title.setStyleSheet("color:#888;padding:6px 0;")
+        stl.addWidget(title)
+
+        # Описание
+        desc = QLabel(
+            "Настройте параметры оценки реализуемости атак. "
+            "Эти параметры используются при корреляции векторов атак с конфигурацией сервера. "
+            "Сначала нажмите «Применить настройки» или «Применить профиль», затем при наличии данных от атакующего — «Перезапустить корреляцию»."
+        )
+        desc.setStyleSheet(_HINT_NEUTRAL)
+        desc.setWordWrap(True)
+        stl.addWidget(desc)
+        
+        # Добавляем разделитель
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        separator.setStyleSheet("color:#333;")
+        stl.addWidget(separator)
+
+        # Группа параметров - Пороги реализуемости
+        thresholds_group = QGroupBox("Пороги реализуемости (Score)")
+        thresholds_layout = QVBoxLayout(thresholds_group)
+
+        # Максимальное значение score
+        max_score_layout = QHBoxLayout()
+        max_score_layout.addWidget(QLabel("Максимальное значение score:"))
+        self.max_score_spin = QSpinBox()
+        self.max_score_spin.setRange(50, 200)
+        self.max_score_spin.setValue(100)
+        self.max_score_spin.setFixedWidth(80)
+        max_score_layout.addWidget(self.max_score_spin)
+        thresholds_layout.addLayout(max_score_layout)
+
+        # Порог для FEASIBLE
+        feasible_layout = QHBoxLayout()
+        feasible_layout.addWidget(QLabel("Порог для РЕАЛИЗУЕМА (>=):"))
+        self.feasible_threshold_spin = QSpinBox()
+        self.feasible_threshold_spin.setRange(30, 150)
+        self.feasible_threshold_spin.setValue(60)
+        self.feasible_threshold_spin.setFixedWidth(80)
+        feasible_layout.addWidget(self.feasible_threshold_spin)
+        thresholds_layout.addLayout(feasible_layout)
+
+        # Порог для PARTIALLY_FEASIBLE
+        partially_layout = QHBoxLayout()
+        partially_layout.addWidget(QLabel("Порог для ЧАСТИЧНО РЕАЛИЗУЕМА (>=):"))
+        self.partially_threshold_spin = QSpinBox()
+        self.partially_threshold_spin.setRange(20, 80)
+        self.partially_threshold_spin.setValue(40)
+        self.partially_threshold_spin.setFixedWidth(80)
+        partially_layout.addWidget(self.partially_threshold_spin)
+        thresholds_layout.addLayout(partially_layout)
+
+        # Порог для NOT_FEASIBLE
+        not_feasible_layout = QHBoxLayout()
+        not_feasible_layout.addWidget(QLabel("Порог для НЕ РЕАЛИЗУЕМА (<=):"))
+        self.not_feasible_threshold_spin = QSpinBox()
+        self.not_feasible_threshold_spin.setRange(10, 50)
+        self.not_feasible_threshold_spin.setValue(20)
+        self.not_feasible_threshold_spin.setFixedWidth(80)
+        not_feasible_layout.addWidget(self.not_feasible_threshold_spin)
+        thresholds_layout.addLayout(not_feasible_layout)
+
+        stl.addWidget(thresholds_group)
+
+        # Группа параметров - Веса факторов
+        weights_group = QGroupBox("Веса факторов (баллы)")
+        weights_layout = QVBoxLayout(weights_group)
+
+        # Вес для сетевой доступности
+        network_weight_layout = QHBoxLayout()
+        network_weight_layout.addWidget(QLabel("Сетевая доступность:"))
+        self.network_weight_spin = QSpinBox()
+        self.network_weight_spin.setRange(10, 50)
+        self.network_weight_spin.setValue(30)
+        self.network_weight_spin.setFixedWidth(80)
+        network_weight_layout.addWidget(self.network_weight_spin)
+        weights_layout.addLayout(network_weight_layout)
+
+        # Вес для подтверждения Trivy
+        trivy_weight_layout = QHBoxLayout()
+        trivy_weight_layout.addWidget(QLabel("Подтверждение Trivy:"))
+        self.trivy_weight_spin = QSpinBox()
+        self.trivy_weight_spin.setRange(10, 50)
+        self.trivy_weight_spin.setValue(35)
+        self.trivy_weight_spin.setFixedWidth(80)
+        trivy_weight_layout.addWidget(self.trivy_weight_spin)
+        weights_layout.addLayout(trivy_weight_layout)
+
+        # Вес для уязвимого ПО
+        software_weight_layout = QHBoxLayout()
+        software_weight_layout.addWidget(QLabel("Уязвимое ПО обнаружено:"))
+        self.software_weight_spin = QSpinBox()
+        self.software_weight_spin.setRange(10, 40)
+        self.software_weight_spin.setValue(20)
+        self.software_weight_spin.setFixedWidth(80)
+        software_weight_layout.addWidget(self.software_weight_spin)
+        weights_layout.addLayout(software_weight_layout)
+
+        # Вес для подтверждения сканером
+        scanner_weight_layout = QHBoxLayout()
+        scanner_weight_layout.addWidget(QLabel("Подтверждение сканером:"))
+        self.scanner_weight_spin = QSpinBox()
+        self.scanner_weight_spin.setRange(10, 50)
+        self.scanner_weight_spin.setValue(30)
+        self.scanner_weight_spin.setFixedWidth(80)
+        scanner_weight_layout.addWidget(self.scanner_weight_spin)
+        weights_layout.addLayout(scanner_weight_layout)
+
+        stl.addWidget(weights_group)
+
+        # Группа профилей корреляции
+        profiles_group = QGroupBox("Готовые профили корреляции")
+        profiles_layout = QVBoxLayout(profiles_group)
+        
+        # Выбор профиля
+        profile_layout = QHBoxLayout()
+        profile_layout.addWidget(QLabel("Выберите профиль:"))
+        self.profile_combo = QComboBox()
+        self.profile_combo.addItem("-- Выберите профиль --")
+        self.profile_combo.addItem("Стандартный (баланс)")
+        self.profile_combo.addItem("Приоритетный для анализа на сервере")
+        self.profile_combo.addItem("Приоритетный для анализа атакующим")
+        self.profile_combo.addItem("Загрузить из файла...")
+        self.profile_combo.currentTextChanged.connect(self._on_profile_selected)
+        profile_layout.addWidget(self.profile_combo)
+        profiles_layout.addLayout(profile_layout)
+        
+        # Описание профиля
+        self.profile_description = QLabel("Выберите профиль для просмотра описания")
+        self.profile_description.setStyleSheet("color:#888;font-size:11px;padding:4px;")
+        self.profile_description.setWordWrap(True)
+        profiles_layout.addWidget(self.profile_description)
+        
+        # Кнопка применения профиля
+        self.btn_apply_profile = QPushButton("📊 Применить профиль")
+        self.btn_apply_profile.clicked.connect(self._apply_profile)
+        self.btn_apply_profile.setEnabled(False)
+        profiles_layout.addWidget(self.btn_apply_profile)
+        
+        stl.addWidget(profiles_group)
+
+        # Кнопка применения настроек (только сохранение в состояние сервера, без пересчёта)
+        self.btn_apply_settings = QPushButton("✅ Применить настройки")
+        self.btn_apply_settings.setStyleSheet("QPushButton { background: #2a4a2a; }")
+        self.btn_apply_settings.clicked.connect(self._apply_correlation_settings)
+        stl.addWidget(self.btn_apply_settings)
+
+        # Кнопка сброса к значениям по умолчанию
+        self.btn_reset_settings = QPushButton("🔙 Сбросить к значениям по умолчанию")
+        self.btn_reset_settings.clicked.connect(self._reset_correlation_settings)
+        stl.addWidget(self.btn_reset_settings)
+
+        # Пересчёт по последним данным атакующего (после применения настроек или профиля)
+        self.btn_restart_correlation = QPushButton("🔄 Перезапустить корреляцию")
+        self.btn_restart_correlation.setToolTip(
+            "Пересчитать результаты по последним данным от атакующего с текущими параметрами "
+            "(сначала примените настройки или профиль, если меняли их)."
+        )
+        self.btn_restart_correlation.setStyleSheet("QPushButton { background: #4a2a4a; }")
+        self.btn_restart_correlation.clicked.connect(self._restart_correlation)
+        self.btn_restart_correlation.setEnabled(False)
+        stl.addWidget(self.btn_restart_correlation)
+
+        # Статус применения настроек
+        self.settings_status_label = QLabel("⚪ Настройки не применены")
+        self.settings_status_label.setStyleSheet("color:#666;font-size:11px;padding:4px;")
+        stl.addWidget(self.settings_status_label)
+
+        # Текущие параметры корреляции (информационно)
+        current_settings_group = QGroupBox("Текущие параметры корреляции")
+        current_settings_layout = QVBoxLayout(current_settings_group)
+        self.current_settings_text = QTextEdit()
+        self.current_settings_text.setReadOnly(True)
+        self.current_settings_text.setFixedHeight(120)
+        self.current_settings_text.setPlainText(
+            "Текущие параметры будут отображены после загрузки баз данных и выполнения корреляции."
+        )
+        current_settings_layout.addWidget(self.current_settings_text)
+        stl.addWidget(current_settings_group)
+
+        # Устанавливаем содержимое корреляции в скролл-область
+        scroll_area.setWidget(content_widget)
+
+        # Подвкладка 2: Настройки сканирования (Trivy)
+        scan_settings = QWidget()
+        scan_layout = QVBoxLayout(scan_settings)
+        scan_layout.setContentsMargins(12, 12, 12, 12)
+        scan_layout.setSpacing(10)
+
+        scan_title = QLabel("⚙️ Настройки сканирования Trivy")
+        scan_title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        scan_title.setStyleSheet("color:#888;padding:6px 0;")
+        scan_layout.addWidget(scan_title)
+
+        scan_desc = QLabel(
+            "Параметры управляют скоростью и полнотой сканирования Trivy. "
+            "Более быстрые режимы сокращают время, но могут пропускать часть находок."
+        )
+        scan_desc.setStyleSheet(_HINT_NEUTRAL)
+        scan_desc.setWordWrap(True)
+        scan_layout.addWidget(scan_desc)
+
+        trivy_group = QGroupBox("Параметры Trivy")
+        trivy_layout = QFormLayout(trivy_group)
+        self.trivy_profile_combo = QComboBox()
+        self.trivy_profile_combo.addItems([
+            "Быстрый (Fast)",
+            "Сбалансированный (Balanced)",
+            "Точный (Accurate)",
+        ])
+        self.trivy_profile_combo.setCurrentText("Сбалансированный (Balanced)")
+        trivy_layout.addRow("Профиль сканирования:", self.trivy_profile_combo)
+        self.trivy_hw_info_label = QLabel("Обнаружено: CPU/ОЗУ — нажмите рекомендацию")
+        self.trivy_hw_info_label.setStyleSheet("color:#777;font-size:10px;padding:2px 0;")
+        trivy_layout.addRow(self.trivy_hw_info_label)
+        self.btn_trivy_recommend = QPushButton("Рекомендовать по ресурсам сервера")
+        self.btn_trivy_recommend.setToolTip(
+            "Подбор числа потоков Trivy и профиля на основе ядер CPU и объёма ОЗУ."
+        )
+        self.btn_trivy_recommend.clicked.connect(self._apply_recommended_trivy_resources)
+        trivy_layout.addRow(self.btn_trivy_recommend)
+
+        self.trivy_timeout_spin = QSpinBox()
+        self.trivy_timeout_spin.setRange(1, 120)
+        trivy_layout.addRow("Таймаут сканирования (мин):", self.trivy_timeout_spin)
+        self.trivy_threads_spin = QSpinBox()
+        self.trivy_threads_spin.setRange(1, 32)
+        trivy_layout.addRow("Потоки сканирования:", self.trivy_threads_spin)
+
+        self.trivy_severity_combo = QComboBox()
+        self.trivy_severity_combo.addItems([
+            "HIGH,CRITICAL",
+            "MEDIUM,HIGH,CRITICAL",
+            "LOW,MEDIUM,HIGH,CRITICAL",
+        ])
+        trivy_layout.addRow("Уровни критичности:", self.trivy_severity_combo)
+
+        self.trivy_checks_combo = QComboBox()
+        self.trivy_checks_combo.addItems(["vuln", "vuln,secret"])
+        trivy_layout.addRow("Типы проверок:", self.trivy_checks_combo)
+        scan_layout.addWidget(trivy_group)
+
+        scan_help = QLabel(
+            "Пояснение: «Типы проверок» = vuln (поиск CVE), secret (поиск секретов в файлах). "
+            "Профиль применяет рекомендуемые значения, после чего можно скорректировать поля вручную."
+        )
+        scan_help.setStyleSheet(_HINT_NEUTRAL)
+        scan_help.setWordWrap(True)
+        scan_layout.addWidget(scan_help)
+        scan_layout.addStretch()
+
+        self.trivy_profile_combo.currentTextChanged.connect(lambda _p: self._apply_trivy_profile())
+        self._apply_trivy_profile()
+
+        # Корневой контейнер вкладки "Настройки" с подвкладками
+        settings_root = QWidget()
+        settings_root_layout = QVBoxLayout(settings_root)
+        settings_root_layout.setContentsMargins(0, 0, 0, 0)
+        settings_root_layout.setSpacing(6)
+        sub_tabs = QTabWidget()
+        sub_tabs.addTab(scroll_area, "Настройки корреляции")
+        sub_tabs.addTab(scan_settings, "Настройки сканирования")
+        settings_root_layout.addWidget(sub_tabs)
+        self.tabs.addTab(settings_root, "⚙️ Настройки")
+    def _apply_correlation_settings(self):
+        """Применить пользовательские настройки корреляции."""
+        try:
+            # Собираем настройки
+            settings = {
+                'max_score': self.max_score_spin.value(),
+                'feasible_threshold': self.feasible_threshold_spin.value(),
+                'partially_feasible_threshold': self.partially_threshold_spin.value(),
+                'not_feasible_threshold': self.not_feasible_threshold_spin.value(),
+                'network_weight': self.network_weight_spin.value(),
+                'trivy_weight': self.trivy_weight_spin.value(),
+                'software_weight': self.software_weight_spin.value(),
+                'scanner_weight': self.scanner_weight_spin.value(),
+            }
+
+            # Сохраняем настройки в глобальном состоянии
+            from server.api_server import state
+            state.correlation_settings = settings
+
+            # Обновляем статус
+            self.settings_status_label.setText("✅ Настройки применены")
+            self.settings_status_label.setStyleSheet("color:#8a8;font-size:11px;padding:4px;")
+
+            # Обновляем текст текущих параметров
+            self._update_current_settings_text(settings)
+
+            hint = (
+                "Параметры сохранены. Чтобы пересчитать таблицу и отчёт по уже полученным данным атакующего, "
+                "нажмите «Перезапустить корреляцию»."
+                if self._last_scan_data
+                else "Параметры сохранены. После получения данных от атакующего корреляция выполнится с этими "
+                "параметрами; для повторного пересчёта используйте «Перезапустить корреляцию»."
+            )
+            QMessageBox.information(self, "Настройки применены", hint)
+            self._sync_restart_correlation_button_state()
+
+        except Exception as e:
+            logger.error(f"Ошибка применения настроек: {e}", exc_info=True)
+            QMessageBox.critical(self, "Ошибка", f"Не удалось применить настройки:\n{e}")
+    def _reset_correlation_settings(self):
+        """Сбросить настройки к значениям по умолчанию."""
+        try:
+            # Значения по умолчанию
+            self.max_score_spin.setValue(100)
+            self.feasible_threshold_spin.setValue(60)
+            self.partially_threshold_spin.setValue(40)
+            self.not_feasible_threshold_spin.setValue(20)
+            self.network_weight_spin.setValue(30)
+            self.trivy_weight_spin.setValue(35)
+            self.software_weight_spin.setValue(20)
+            self.scanner_weight_spin.setValue(30)
+
+            # Сбрасываем настройки в глобальном состоянии
+            from server.api_server import state
+            state.correlation_settings = None
+
+            # Обновляем статус
+            self.settings_status_label.setText("ℹ️ Используются значения по умолчанию")
+            self.settings_status_label.setStyleSheet("color:#666;font-size:11px;padding:4px;")
+
+            # Обновляем текст текущих параметров
+            default_settings = {
+                'max_score': 100,
+                'feasible_threshold': 60,
+                'partially_feasible_threshold': 40,
+                'not_feasible_threshold': 20,
+                'network_weight': 30,
+                'trivy_weight': 35,
+                'software_weight': 20,
+                'scanner_weight': 30,
+            }
+            self._update_current_settings_text(default_settings)
+
+            QMessageBox.information(
+                self, "Настройки сброшены",
+                "Параметры корреляции сброшены к значениям по умолчанию. "
+                "Для пересчёта по данным атакующего нажмите «Перезапустить корреляцию», если такие данные уже есть.",
+            )
+            self._sync_restart_correlation_button_state()
+
+        except Exception as e:
+            logger.error(f"Ошибка сброса настроек: {e}", exc_info=True)
+            QMessageBox.critical(self, "Ошибка", f"Не удалось сбросить настройки:\n{e}")
+    def _update_current_settings_text(self, settings):
+        """Обновить текст с текущими параметрами корреляции."""
+        try:
+            text = "ТЕКУЩИЕ ПАРАМЕТРЫ КОРРЕЛЯЦИИ:\n\n"
+            text += f"📊 Пороги реализуемости:\n"
+            text += f"   • Максимальный score: {settings['max_score']}\n"
+            text += f"   • РЕАЛИЗУЕМА (>=): {settings['feasible_threshold']}\n"
+            text += f"   • ЧАСТИЧНО РЕАЛИЗУЕМА (>=): {settings['partially_feasible_threshold']}\n"
+            text += f"   • НЕ РЕАЛИЗУЕМА (<=): {settings['not_feasible_threshold']}\n\n"
+            text += f"⚖️  Веса факторов:\n"
+            text += f"   • Сетевая доступность: {settings['network_weight']} баллов\n"
+            text += f"   • Подтверждение Trivy: {settings['trivy_weight']} баллов\n"
+            text += f"   • Уязвимое ПО: {settings['software_weight']} баллов\n"
+            text += f"   • Подтверждение сканером: {settings['scanner_weight']} баллов\n\n"
+            text += "💡 Эти параметры используются для оценки реализуемости атак."
+
+            self.current_settings_text.setPlainText(text)
+
+        except Exception as e:
+            logger.error(f"Ошибка обновления текста параметров: {e}", exc_info=True)
+            self.current_settings_text.setPlainText(
+                f"Ошибка отображения параметров: {e}"
+            )
     def _build_attack_selector_tab(self):
         """Вкладка ручного выбора вектора атаки."""
         at = QWidget()
@@ -932,6 +1577,7 @@ class ServerGUI(QMainWindow):
         self.btn_vuln_scan.setEnabled(True)
         # НЕ разблокируем кнопку сервера здесь - ждём Trivy
         self._update_stats()
+        self._sync_restart_correlation_button_state()
     def _on_db_error(self, e):
         self.btn_load_db.setText("2. Загрузить базы CVE/CWE/CAPEC/MITRE")
         self.btn_load_db.setEnabled(True)
@@ -1077,7 +1723,7 @@ class ServerGUI(QMainWindow):
             description=f"Вектор атаки выбран вручную: {cve_id}",
             target_service=v.get("attack_types", [""])[0] if v.get("attack_types") else "",
         ))
-        cor = AttackCorrelator(self.system_info, self.vuln_db)
+        cor = AttackCorrelator(self.system_info, self.vuln_db, trivy_result=getattr(self, 'trivy_result', None))
         results = cor.correlate(scan_result)
         summary = cor.get_summary()
         rd = os.path.join(PROJECT_DIR, "reports")
@@ -1163,7 +1809,11 @@ class ServerGUI(QMainWindow):
         self.trivy_status_label.setText("🔄 Сканирование Trivy...")
         self.trivy_status_label.setStyleSheet("color:#a85;font-size:11px;padding:4px;")
         
-        self.trivy_worker = TrivyScanWorker(self.system_analyzer if hasattr(self, 'system_analyzer') else None)
+        scan_options = self._get_trivy_scan_options()
+        self.trivy_worker = TrivyScanWorker(
+            self.system_analyzer if hasattr(self, 'system_analyzer') else None,
+            scan_options=scan_options,
+        )
         self.trivy_worker.finished.connect(self._on_trivy_scan_done)
         self.trivy_worker.progress.connect(self._on_trivy_scan_progress)
         self.trivy_worker.error.connect(self._on_trivy_scan_error)
@@ -1182,7 +1832,7 @@ class ServerGUI(QMainWindow):
         if summary.get("error"):
             self.trivy_status_label.setText(f"❌ Ошибка: {summary['error']}")
             self.trivy_status_label.setStyleSheet("color:#b55;font-size:11px;padding:4px;")
-            QMessageBox.warning(self, "Ошибка Trivy", f"Не удалось完成 сканирование:\n{summary['error']}")
+            QMessageBox.warning(self, "Ошибка Trivy", f"Не удалось завершить сканирование:\n{summary['error']}")
             self.btn_trivy_scan.setText("3б. Сканирование Trivy (ошибка)")
             self.btn_trivy_scan.setEnabled(True)
             return
@@ -1193,6 +1843,13 @@ class ServerGUI(QMainWindow):
         # Сохраняем полный результат Trivy для корреляции
         if hasattr(self, 'system_analyzer') and self.system_analyzer:
             self.trivy_result = getattr(self.system_analyzer.system_info, 'trivy_scan_result', None)
+            
+            # Динамически обновляем глобальный state API-сервера, если он уже запущен
+            try:
+                from server.api_server import state
+                state.trivy_result = self.trivy_result
+            except ImportError:
+                pass
 
         # Обновляем статус
         total = summary.get("total_vulns", 0)
@@ -1366,6 +2023,16 @@ class ServerGUI(QMainWindow):
             # Сохраняем в формат, понятный коррелятору
             self.trivy_result = {"vulnerabilities": vulns}
             
+            if self.system_info:
+                self.system_info.trivy_scan_result = self.trivy_result
+                
+            # Динамически обновляем глобальный state API-сервера
+            try:
+                from server.api_server import state
+                state.trivy_result = self.trivy_result
+            except ImportError:
+                pass
+            
             # Заполняем таблицу
             self.trivy_table.setRowCount(0)
             sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "UNKNOWN": 4, "INFO": 5}
@@ -1462,6 +2129,11 @@ class ServerGUI(QMainWindow):
         state.on_client_connected = lambda ip: gui.client_connected_signal.emit(ip)
         state.on_analysis_complete = lambda s, p: gui.analysis_done_signal.emit(s, p)
         state.on_correlation_progress = lambda p, m: gui.correlation_progress_signal.emit(p, m)
+        if not hasattr(state, "last_correlation_lock"):
+            state.last_correlation_lock = threading.Lock()
+        with state.last_correlation_lock:
+            state.last_correlation_payload = None
+            state.last_correlation_id = None
         
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
@@ -1479,6 +2151,13 @@ class ServerGUI(QMainWindow):
                         self._r(200, {"status": "running", "ready": state.ready, "hostname": hn, "clients": state.connected_clients})
                     elif self.path == "/system-info":
                         self._r(200, ss)
+                    elif self.path == "/last-correlation":
+                        with state.last_correlation_lock:
+                            payload = getattr(state, "last_correlation_payload", None)
+                        if payload:
+                            self._r(200, payload)
+                        else:
+                            self._r(404, {"status": "empty", "error": "Корреляция ещё не выполнялась"})
                     else:
                         self._r(200, {"message": "Security Assessment Server", "ready": state.ready})
                 except Exception as e:
@@ -1531,9 +2210,21 @@ class ServerGUI(QMainWindow):
                     gui.last_report_path = hp
                     # Добавляем в историю
                     gui._add_to_history(results, summary, ts, hp, jp)
+                    settings_used = getattr(state, "correlation_settings", None) or {
+                        "max_score": cor.max_score,
+                        "feasible_threshold": cor.feasible_threshold,
+                        "partially_feasible_threshold": cor.partially_feasible_threshold,
+                        "not_feasible_threshold": cor.not_feasible_threshold,
+                        "network_weight": cor.network_weight,
+                        "trivy_weight": cor.trivy_weight,
+                        "software_weight": cor.software_weight,
+                        "scanner_weight": cor.scanner_weight,
+                    }
                     resp = {
                         "status": "success",
+                        "correlation_id": ts,
                         "summary": summary,
+                        "settings_used": settings_used,
                         "html_report": hp,
                         "results_count": len(results),
                         "details": [
@@ -1550,6 +2241,9 @@ class ServerGUI(QMainWindow):
                             for r in results
                         ],
                     }
+                    with state.last_correlation_lock:
+                        state.last_correlation_payload = resp
+                        state.last_correlation_id = ts
                     self._r(200, resp)
                     logger.info(f"[API] Ответ 200 OK. Результатов: {len(results)}")
                     if state.on_analysis_complete:
@@ -1570,7 +2264,8 @@ class ServerGUI(QMainWindow):
             def log_message(self, *a):
                 pass
         try:
-            self.http_server = HTTPServer(("0.0.0.0", port), Handler)
+            self.http_server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+            self.http_server.daemon_threads = True
             self.actual_server_port = port
             self.server_thread = threading.Thread(target=self.http_server.serve_forever, daemon=True)
             self.server_thread.start()
@@ -1678,6 +2373,7 @@ class ServerGUI(QMainWindow):
                 f"🟢 Нереализуемых: {counters['not_feasible']}  |  "
                 f"⚪ Требуют анализа: {counters['requires_analysis']}"
             )
+            self._sync_restart_correlation_button_state()
         except Exception as e:
             logger.error(f"[UI] Сбой при заполнении таблицы: {e}", exc_info=True)
     def _on_result_double_click(self, index):
@@ -1871,7 +2567,7 @@ class ServerGUI(QMainWindow):
         if self.vuln_db and self.system_info and not results:
             from common.models import ScanResult
             sr = ScanResult(scanner_ip="manual", target_ip="manual", scan_timestamp=datetime.now().isoformat())
-            cor = AttackCorrelator(self.system_info, self.vuln_db)
+            cor = AttackCorrelator(self.system_info, self.vuln_db, trivy_result=getattr(self, 'trivy_result', None))
             results = cor.correlate(sr)
             summary = cor.get_summary()
         rd = os.path.join(PROJECT_DIR, "reports")
@@ -1905,6 +2601,240 @@ class ServerGUI(QMainWindow):
         )
         if p:
             open(p, "w", encoding="utf-8").write(t)
+    
+    # ─────────────────────────────────────────
+    #  Методы для работы с профилями корреляции
+    # ─────────────────────────────────────────
+    def _on_profile_selected(self, profile_name):
+        """Обработка выбора профиля."""
+        logger.info(f"[PROFILE] Выбран профиль: {profile_name}")
+        
+        if profile_name == "-- Выберите профиль --":
+            self.profile_description.setText("Выберите профиль для просмотра описания")
+            self.btn_apply_profile.setEnabled(False)
+            return
+        
+        if profile_name == "Загрузить из файла...":
+            self._load_profile_from_file()
+            return
+        
+        # Загружаем профиль из файла (явная карта имён -> файлов)
+        profile_file_map = {
+            "Стандартный (баланс)": "standard.json",
+            "Приоритетный для анализа на сервере": "server_priority.json",
+            "Приоритетный для анализа атакующим": "attacker_priority.json",
+        }
+        profile_file = profile_file_map.get(profile_name, f"{profile_name.lower().replace(' ', '_')}.json")
+        profile_path = os.path.join(BUNDLE_ROOT, "profiles", profile_file)
+        if not os.path.exists(profile_path):
+            profile_path = os.path.join(PROJECT_DIR, "profiles", profile_file)
+        logger.info(f"[PROFILE] Путь к профилю: {profile_path}")
+        
+        if os.path.exists(profile_path):
+            try:
+                with open(profile_path, 'r', encoding='utf-8') as f:
+                    profile = json.load(f)
+                
+                logger.info(f"[PROFILE] Профиль загружен: {profile.get('name', profile_name)}")
+                logger.info(f"[PROFILE] Параметры профиля: max_score={profile.get('max_score')}, "
+                          f"feasible_threshold={profile.get('feasible_threshold')}, "
+                          f"network_weight={profile.get('network_weight')}")
+                
+                self.profile_description.setText(f"{profile.get('name', profile_name)}\n\n{profile.get('description', '')}")
+                self.btn_apply_profile.setEnabled(True)
+                
+                # Сохраняем текущий профиль для применения
+                self._current_profile = profile
+                
+            except Exception as e:
+                logger.error(f"Ошибка загрузки профиля {profile_name}: {e}", exc_info=True)
+                self.profile_description.setText(f"Ошибка загрузки профиля: {e}")
+                self.btn_apply_profile.setEnabled(False)
+        else:
+            logger.warning(f"[PROFILE] Файл профиля не найден: {profile_path}")
+            self.profile_description.setText(f"Файл профиля не найден: {profile_path}")
+            self.btn_apply_profile.setEnabled(False)
+    
+    def _load_profile_from_file(self):
+        """Загрузка профиля из файла."""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Загрузить профиль корреляции", 
+            PROJECT_DIR, 
+            "JSON Files (*.json)"
+        )
+        if not path:
+            self.profile_combo.setCurrentIndex(0)
+            return
+        
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                profile = json.load(f)
+            
+            # Проверяем обязательные поля
+            required_fields = ['max_score', 'feasible_threshold', 'partially_feasible_threshold', 
+                             'not_feasible_threshold', 'network_weight', 'trivy_weight', 
+                             'software_weight', 'scanner_weight']
+            
+            for field in required_fields:
+                if field not in profile:
+                    raise ValueError(f"Отсутствует обязательное поле: {field}")
+            
+            # Добавляем профиль в комбобокс
+            profile_name = profile.get('name', os.path.basename(path).replace('.json', ''))
+            self.profile_combo.addItem(profile_name)
+            self.profile_combo.setCurrentText(profile_name)
+            
+            # Сохраняем профиль
+            self._current_profile = profile
+            self.profile_description.setText(f"{profile.get('name', 'Пользовательский профиль')}\n\n{profile.get('description', 'Загружен из файла')}")
+            self.btn_apply_profile.setEnabled(True)
+            
+        except Exception as e:
+            logger.error(f"Ошибка загрузки профиля из файла: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить профиль:\n{e}")
+            self.profile_combo.setCurrentIndex(0)
+    
+    def _apply_profile(self):
+        """Применить выбранный профиль к настройкам."""
+        logger.info(f"[PROFILE] Попытка применения профиля")
+        
+        if not hasattr(self, '_current_profile') or not self._current_profile:
+            logger.warning("[PROFILE] Нет текущего профиля для применения")
+            return
+        
+        try:
+            profile = self._current_profile
+            logger.info(f"[PROFILE] Применение профиля: {profile.get('name', 'Пользовательский')}")
+            logger.info(f"[PROFILE] Устанавливаем значения: max_score={profile['max_score']}, "
+                      f"feasible_threshold={profile['feasible_threshold']}, "
+                      f"network_weight={profile['network_weight']}")
+            
+            # Устанавливаем значения из профиля
+            self.max_score_spin.setValue(profile['max_score'])
+            self.feasible_threshold_spin.setValue(profile['feasible_threshold'])
+            self.partially_threshold_spin.setValue(profile['partially_feasible_threshold'])
+            self.not_feasible_threshold_spin.setValue(profile['not_feasible_threshold'])
+            self.network_weight_spin.setValue(profile['network_weight'])
+            self.trivy_weight_spin.setValue(profile['trivy_weight'])
+            self.software_weight_spin.setValue(profile['software_weight'])
+            self.scanner_weight_spin.setValue(profile['scanner_weight'])
+            
+            logger.info(f"[PROFILE] Значения установлены в интерфейсе")
+            
+            # Сохраняем настройки в глобальном состоянии
+            from server.api_server import state
+            state.correlation_settings = profile
+            logger.info(f"[PROFILE] Настройки сохранены в глобальном состоянии")
+            
+            # Обновляем статус
+            self.settings_status_label.setText(f"✅ Применён профиль: {profile.get('name', 'Пользовательский')}")
+            self.settings_status_label.setStyleSheet("color:#8a8;font-size:11px;padding:4px;")
+            
+            # Обновляем текст текущих параметров
+            self._update_current_settings_text(profile)
+            
+            self._sync_restart_correlation_button_state()
+            logger.info("[PROFILE] Состояние кнопки перезапуска корреляции обновлено")
+
+            extra = (
+                "\n\nНажмите «Перезапустить корреляцию», чтобы пересчитать результаты по текущим данным атакующего."
+                if self._last_scan_data
+                else "\n\nПосле получения данных от атакующего станет доступна кнопка «Перезапустить корреляцию» для пересчёта с этим профилем."
+            )
+            QMessageBox.information(
+                self, "Профиль применён",
+                f"Профиль «{profile.get('name', 'Пользовательский')}» применён.{extra}",
+            )
+            
+            logger.info(f"[PROFILE] Профиль успешно применён")
+            
+        except Exception as e:
+            logger.error(f"Ошибка применения профиля: {e}", exc_info=True)
+            QMessageBox.critical(self, "Ошибка", f"Не удалось применить профиль:\n{e}")
+    
+    def _sync_restart_correlation_button_state(self):
+        """Включает «Перезапустить корреляцию», если есть данные последнего скана и готовность к расчёту."""
+        if not hasattr(self, "btn_restart_correlation"):
+            return
+        can = bool(self._last_scan_data) and self.system_info is not None and self.vuln_db is not None
+        self.btn_restart_correlation.setEnabled(can)
+
+    def _restart_correlation(self):
+        """Перезапустить корреляцию с новыми параметрами."""
+        if not self.system_info or not self.vuln_db:
+            QMessageBox.warning(self, "Нет данных", "Сначала выполните анализ системы и загрузите базы данных.")
+            return
+        
+        if not self._last_scan_data:
+            QMessageBox.warning(self, "Нет данных от атакующего", "Нет данных от атакующего для перезапуска корреляции.")
+            return
+
+        # Показываем прогресс
+        self.correlation_progress_label.setText("🔄 Перезапуск корреляции...")
+        self.correlation_progress_label.setStyleSheet("color:#a85;font-size:11px;padding:4px;")
+        self.correlation_progress_bar.setVisible(True)
+        self.correlation_progress_bar.setValue(0)
+        self.btn_restart_correlation.setEnabled(False)
+
+        from server.api_server import state
+        settings = getattr(state, 'correlation_settings', None)
+        self.restart_correlation_worker = CorrelationRestartWorker(
+            system_info=self.system_info,
+            vuln_db=self.vuln_db,
+            trivy_result=getattr(self, 'trivy_result', None),
+            last_scan_data=self._last_scan_data,
+            toolkit=self.toolkit,
+            vuln_scan_report=self.vuln_scan_report,
+            system_summary=self.system_summary,
+            settings=settings,
+        )
+        self.restart_correlation_worker.progress.connect(self.correlation_progress_signal.emit)
+        self.restart_correlation_worker.finished.connect(self._on_restart_correlation_finished)
+        self.restart_correlation_worker.error.connect(self._on_restart_correlation_error)
+        self.restart_correlation_worker.finished.connect(self._on_restart_correlation_worker_finished)
+        self.restart_correlation_worker.error.connect(self._on_restart_correlation_worker_finished)
+        self.restart_correlation_worker.start()
+
+    def _on_restart_correlation_finished(self, data):
+        results = data["results"]
+        summary = data["summary"]
+        hp = data["html_path"]
+        jp = data["json_path"]
+        ts = data["correlation_id"]
+
+        self._last_results = results
+        self.last_report_path = hp
+        self._add_to_history(results, summary, ts, hp, jp)
+
+        from server.api_server import state
+        if not hasattr(state, "last_correlation_lock"):
+            state.last_correlation_lock = threading.Lock()
+        with state.last_correlation_lock:
+            state.last_correlation_payload = data["payload"]
+            state.last_correlation_id = ts
+
+        self.update_results_signal.emit(results)
+        self.correlation_progress_label.setText("✅ Корреляция перезапущена")
+        self.correlation_progress_label.setStyleSheet("color:#8a8;font-size:11px;padding:4px;")
+        QMessageBox.information(
+            self, "Корреляция перезапущена",
+            f"Корреляция успешно перезапущена с новыми параметрами.\n\n"
+            f"Найдено {len(results)} результатов.\n"
+            f"Отчёт сохранён: {os.path.basename(hp)}"
+        )
+        QTimer.singleShot(2000, lambda: self.correlation_progress_bar.setVisible(False))
+        self._sync_restart_correlation_button_state()
+
+    def _on_restart_correlation_error(self, error):
+        self.correlation_progress_bar.setVisible(False)
+        self.correlation_progress_label.setText("❌ Ошибка перезапуска")
+        self.correlation_progress_label.setStyleSheet("color:#b55;font-size:11px;padding:4px;")
+        QMessageBox.critical(self, "Ошибка", f"Не удалось перезапустить корреляцию:\n{error}")
+        self._sync_restart_correlation_button_state()
+
+    def _on_restart_correlation_worker_finished(self, *_):
+        self.restart_correlation_worker = None
+    
     # ─────────────────────────────────────────
     #  Закрытие
     # ─────────────────────────────────────────

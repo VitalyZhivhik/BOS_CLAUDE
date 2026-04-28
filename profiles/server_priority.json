@@ -1,0 +1,12 @@
+{
+  "name": "Приоритетный для анализа на сервере",
+  "description": "Консервативный профиль для серверного анализа. Более строгие критерии, меньше ложных срабатываний.",
+  "max_score": 100,
+  "feasible_threshold": 70,
+  "partially_feasible_threshold": 50,
+  "not_feasible_threshold": 30,
+  "network_weight": 25,
+  "trivy_weight": 40,
+  "software_weight": 25,
+  "scanner_weight": 20
+}

@@ -15,15 +15,40 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "."))
 
 from common.logger import get_server_logger
+from common.bundle_paths import bundle_resources_root
 
 logger = get_server_logger()
 
 class NmapScanner:
     """Интеграция с Nmap для сканирования уязвимостей."""
 
-    def __init__(self, target: str):
+    def __init__(self, target: str, settings: Optional[Dict] = None):
         self.target = target
-        self.nmap_path = "nmap"
+        self.settings = settings or {}
+        self.nmap_path = self._find_nmap()
+    
+    def _find_nmap(self) -> str:
+        """Поиск исполняемого файла Nmap."""
+        base_dir = bundle_resources_root()
+        tools_root = os.path.join(base_dir, "tools")
+
+        possible_paths = [
+            os.path.join(tools_root, "nmap.exe"),
+            os.path.join(tools_root, "nmap", "nmap.exe"),
+            "nmap",
+        ]
+        
+        logger.info(f"[NMAP] Базовая директория: {base_dir}")
+        logger.info(f"[NMAP] Поиск Nmap в {len(possible_paths)} локациях...")
+        
+        for path in possible_paths:
+            logger.debug(f"[NMAP] Проверка: {path}")
+            if os.path.exists(path):
+                logger.info(f"[NMAP] ✅ Найден по пути: {path}")
+                return path
+        
+        logger.warning(f"[NMAP] ❌ Исполняемый файл Nmap не найден. Проверенные пути: {possible_paths}")
+        return "nmap"  # Fallback на PATH
 
     def scan_vulnerabilities(self, ports: List[int] = None) -> List[Dict]:
         """
@@ -45,6 +70,11 @@ class NmapScanner:
         cmd = [
             self.nmap_path,
             "-sV", "-sC", "--script", "vuln",
+            f"-{self.settings.get('timing', 'T4')}",
+            "--min-rate", str(self.settings.get("min_rate", 250)),
+            "--min-parallelism", str(self.settings.get("threads", 10)),
+            "--max-retries", str(self.settings.get("max_retries", 2)),
+            "--script-timeout", f"{self.settings.get('script_timeout', 120)}s",
             "-p", port_list,
             self.target,
             "-oX", "-"
@@ -52,7 +82,12 @@ class NmapScanner:
 
         try:
             logger.info(f"Запуск Nmap для сканирования уязвимостей: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=int(self.settings.get("process_timeout", 240)),
+            )
 
             if result.returncode == 0:
                 vulnerabilities = self._parse_nmap_xml(result.stdout)
@@ -143,9 +178,33 @@ class NmapScanner:
 class NucleiScanner:
     """Интеграция с Nuclei для сканирования уязвимостей."""
 
-    def __init__(self, target: str):
+    def __init__(self, target: str, settings: Optional[Dict] = None):
         self.target = target
-        self.nuclei_path = "nuclei"
+        self.settings = settings or {}
+        self.nuclei_path = self._find_nuclei()
+    
+    def _find_nuclei(self) -> str:
+        """Поиск исполняемого файла Nuclei."""
+        base_dir = bundle_resources_root()
+        tools_root = os.path.join(base_dir, "tools")
+
+        possible_paths = [
+            os.path.join(tools_root, "nuclei.exe"),
+            os.path.join(tools_root, "nuclei", "nuclei.exe"),
+            "nuclei",
+        ]
+        
+        logger.info(f"[NUCLEI] Базовая директория: {base_dir}")
+        logger.info(f"[NUCLEI] Поиск Nuclei в {len(possible_paths)} локациях...")
+        
+        for path in possible_paths:
+            logger.debug(f"[NUCLEI] Проверка: {path}")
+            if os.path.exists(path):
+                logger.info(f"[NUCLEI] ✅ Найден по пути: {path}")
+                return path
+        
+        logger.warning(f"[NUCLEI] ❌ Исполняемый файл Nuclei не найден. Проверенные пути: {possible_paths}")
+        return "nuclei"  # Fallback на PATH
 
     def scan_vulnerabilities(self, ports: List[int] = None) -> List[Dict]:
         """
@@ -169,12 +228,21 @@ class NucleiScanner:
             "-u", target_url,
             "-t", "cves/",
             "-json",
-            "-silent"
+            "-silent",
+            "-c", str(self.settings.get("concurrency", 40)),
+            "-timeout", str(self.settings.get("timeout", 4)),
+            "-retries", str(self.settings.get("retries", 1)),
+            "-mhe", str(self.settings.get("max_host_errors", 100000)),
         ]
 
         try:
             logger.info(f"Запуск Nuclei для сканирования уязвимостей: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=int(self.settings.get("process_timeout", 300)),
+            )
 
             if result.returncode == 0 and result.stdout:
                 vulnerabilities = self._parse_nuclei_json(result.stdout)
@@ -229,10 +297,11 @@ class NucleiScanner:
 class IntegratedScanner:
     """Интегрированный сканер уязвимостей (Nmap + Nuclei)."""
 
-    def __init__(self, target: str):
+    def __init__(self, target: str, settings: Optional[Dict] = None):
         self.target = target
-        self.nmap_scanner = NmapScanner(target)
-        self.nuclei_scanner = NucleiScanner(target)
+        settings = settings or {}
+        self.nmap_scanner = NmapScanner(target, settings=settings.get("nmap"))
+        self.nuclei_scanner = NucleiScanner(target, settings=settings.get("nuclei"))
 
     def scan_all_vulnerabilities(self, ports: List[int]) -> List[Dict]:
         """
