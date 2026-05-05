@@ -1,0 +1,2259 @@
+[
+  {
+    "id": "CWE-1004",
+    "name": "Sensitive Cookie Without 'HttpOnly' Flag",
+    "abstraction": "Variant",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "variant",
+    "description": "The product uses a cookie to store sensitive information, but the cookie is not marked with the HttpOnly flag.",
+    "extended_description": "",
+    "likelihood_of_exploit": "Medium",
+    "common_consequences": [
+      {
+        "scope": [
+          "Confidentiality"
+        ],
+        "impact": [
+          "Read Application Data"
+        ],
+        "note": "If the HttpOnly flag is not set, then sensitive information stored in the cookie may be exposed to unintended parties."
+      },
+      {
+        "scope": [
+          "Integrity"
+        ],
+        "impact": [
+          "Gain Privileges or Assume Identity"
+        ],
+        "note": "If the cookie in question is an authentication cookie, then not setting the HttpOnly flag may allow an adversary to steal authentication data (e.g., a session ID) and assume the identity of the user."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": [
+        "Web Based",
+        "Web Server"
+      ]
+    },
+    "demonstrative_examples": [
+      "In this example, a cookie is used to store a session ID for a client's interaction with a website. The intention is that the cookie will be sent to the website with each request made by the client."
+    ],
+    "observed_examples": [
+      {
+        "cve_id": "CVE-2024-47833",
+        "description": "python library for ML and data science does not use the HTTPOnly security attribute for session cookies",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2024-47833"
+      },
+      {
+        "cve_id": "CVE-2022-24045",
+        "description": "Web application for a room automation system has client-side Javascript that sets a sensitive cookie without the HTTPOnly security attribute, allowing the cookie to be accessed.",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2022-24045"
+      },
+      {
+        "cve_id": "CVE-2014-3852",
+        "description": "CMS written in Python does not include the HTTPOnly flag in a Set-Cookie header, allowing remote attackers to obtain potentially sensitive information via script access to this cookie.",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2014-3852"
+      },
+      {
+        "cve_id": "CVE-2015-4138",
+        "description": "Appliance for managing encrypted communications does not use HttpOnly flag.",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2015-4138"
+      }
+    ],
+    "related_cve": [
+      "CVE-2014-3852",
+      "CVE-2015-4138",
+      "CVE-2022-24045",
+      "CVE-2024-47833"
+    ],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-732"
+      }
+    ],
+    "detection_methods": [
+      "automated_static_analysis"
+    ],
+    "detection_methods_detailed": [
+      {
+        "method": "Automated Static Analysis",
+        "description": "Automated static analysis, commonly referred to as Static Application Security Testing (SAST), can find some instances of this weakness by analyzing source code (or binary/compiled code) without having to execute it. Typically, this is done by building a model of data flow and control flow, then searching for potentially-vulnerable patterns that connect \"sources\" (origins of input) with \"sinks\" (destinations where the data interacts with external components, a lower layer such as the OS, etc.)",
+        "effectiveness": "High"
+      }
+    ],
+    "mitigation": "Leverage the HttpOnly flag when setting a sensitive cookie in a response.",
+    "mitigations_detailed": [
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "Leverage the HttpOnly flag when setting a sensitive cookie in a response.",
+        "effectiveness": "High",
+        "effectiveness_notes": "While this mitigation is effective for protecting cookies from a browser's own scripting engine, third-party components or plugins may have their own engines that allow access to cookies. Attackers might also be able to use XmlHttpResponse to read the headers directly and obtain the cookie."
+      }
+    ],
+    "requires_technology": [
+      "web based",
+      "web server"
+    ]
+  },
+  {
+    "id": "CWE-1007",
+    "name": "Insufficient Visual Distinction of Homoglyphs Presented to User",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The product displays information or identifiers to a user, but the display mechanism does not make it easy for the user to distinguish between visually similar or identical glyphs (homoglyphs), which may cause the user to misinterpret a glyph and perform an unintended, insecure action.",
+    "extended_description": "Some glyphs, pictures, or icons can be semantically distinct to a program, while appearing very similar or identical to a human user. These are referred to as homoglyphs. For example, the lowercase \"l\" (ell) and uppercase \"I\" (eye) have different character codes, but these characters can be displayed in exactly the same way to a user, depending on the font. This can also occur between different character sets. For example, the Latin capital letter \"A\" and the Greek capital letter \"Α\" (Alpha) are treated as distinct by programs, but may be displayed in exactly the same way to a user. Accent marks may also cause letters to appear very similar, such as the Latin capital letter grave mark \"À\" and its equivalent \"Á\" with the acute accent. Adversaries can exploit this visual similarity for attacks such as phishing, e.g. by providing a link to an attacker-controlled hostname that looks like a hostname that the victim trusts. In a different use of homoglyphs, an adversary may create a back door username that is visually similar to the username of a regular user, which then makes it more difficult for a system administrator to detect the malicious username while reviewing logs.",
+    "likelihood_of_exploit": "Medium",
+    "common_consequences": [
+      {
+        "scope": [
+          "Integrity",
+          "Confidentiality"
+        ],
+        "impact": [
+          "Other"
+        ],
+        "note": "An attacker may ultimately redirect a user to a malicious website, by deceiving the user into believing the URL they are accessing is a trusted domain. However, the attack can also be used to forge log entries by using homoglyphs in usernames. Homoglyph manipulations are often the first step towards executing advanced attacks such as stealing a user's credentials, Cross-Site Scripting (XSS), or log forgery. If an attacker redirects a user to a malicious site, the attacker can mimic a trusted domain to steal account credentials and perform actions on behalf of the user, without the user's knowledge. Similarly, an attacker could create a username for a website that contains homoglyph characters, making it difficult for an admin to review logs and determine which users performed which actions."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Architecture and Design",
+        "note": "This weakness may occur when characters from various character sets are allowed to be interchanged within a URL, username, email address, etc. without any notification to the user or underlying system being used."
+      },
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": [
+        "Not Technology-Specific",
+        "Web Based"
+      ]
+    },
+    "demonstrative_examples": [
+      "The following looks like a simple, trusted URL that a user may frequently access.",
+      "The following displays an example of how creating usernames containing homoglyphs can lead to log forgery."
+    ],
+    "observed_examples": [
+      {
+        "cve_id": "CVE-2013-7236",
+        "description": "web forum allows impersonation of users with homoglyphs in account names",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2013-7236"
+      },
+      {
+        "cve_id": "CVE-2012-0584",
+        "description": "Improper character restriction in URLs in web browser",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2012-0584"
+      },
+      {
+        "cve_id": "CVE-2009-0652",
+        "description": "Incomplete denylist does not include homoglyphs of \"/\" and \"?\" characters in URLs",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2009-0652"
+      },
+      {
+        "cve_id": "CVE-2017-5015",
+        "description": "web browser does not convert hyphens to punycode, allowing IDN spoofing in URLs",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2017-5015"
+      },
+      {
+        "cve_id": "CVE-2005-0233",
+        "description": "homoglyph spoofing using punycode in URLs and certificates",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2005-0233"
+      },
+      {
+        "cve_id": "CVE-2005-0234",
+        "description": "homoglyph spoofing using punycode in URLs and certificates",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2005-0234"
+      },
+      {
+        "cve_id": "CVE-2005-0235",
+        "description": "homoglyph spoofing using punycode in URLs and certificates",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2005-0235"
+      }
+    ],
+    "related_cve": [
+      "CVE-2005-0233",
+      "CVE-2005-0234",
+      "CVE-2005-0235",
+      "CVE-2009-0652",
+      "CVE-2012-0584",
+      "CVE-2013-7236",
+      "CVE-2017-5015"
+    ],
+    "related_capec": [
+      "CAPEC-632"
+    ],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-451"
+      }
+    ],
+    "detection_methods": [
+      "manual_dynamic_analysis"
+    ],
+    "detection_methods_detailed": [
+      {
+        "method": "Manual Dynamic Analysis",
+        "description": "If utilizing user accounts, attempt to submit a username that contains homoglyphs. Similarly, check to see if links containing homoglyphs can be sent via email, web browsers, or other mechanisms.",
+        "effectiveness": "Moderate"
+      }
+    ],
+    "mitigation": "Use a browser that displays Punycode for IDNs in the URL and status bars, or which color code various scripts in URLs. Due to the prominence of homoglyph attacks, several browsers now help safeguard against this attack via the use of Punycode. For example, Mozilla Firefox and Google Chrome will display IDNs as Punycode if top-level domains do not restrict which characters can be used in domain names or if labels mix scripts for different languages.; Use an email client that has strict filters and prevents messages that mix character sets to end up in a user's inbox. Certain email clients such as Google's GMail prevent the use of non-Latin characters in email addresses or in links contained within emails. This helps prevent homoglyph attacks by flagging these emails and redirecting them to a user's spam folder.",
+    "mitigations_detailed": [
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "Use a browser that displays Punycode for IDNs in the URL and status bars, or which color code various scripts in URLs. Due to the prominence of homoglyph attacks, several browsers now help safeguard against this attack via the use of Punycode. For example, Mozilla Firefox and Google Chrome will display IDNs as Punycode if top-level domains do not restrict which characters can be used in domain names or if labels mix scripts for different languages.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      },
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "Use an email client that has strict filters and prevents messages that mix character sets to end up in a user's inbox. Certain email clients such as Google's GMail prevent the use of non-Latin characters in email addresses or in links contained within emails. This helps prevent homoglyph attacks by flagging these emails and redirecting them to a user's spam folder.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      }
+    ],
+    "requires_technology": [
+      "not technology-specific",
+      "web based"
+    ]
+  },
+  {
+    "id": "CWE-102",
+    "name": "Struts: Duplicate Validation Forms",
+    "abstraction": "Variant",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "variant",
+    "description": "The product uses multiple validation forms with the same name, which might cause the Struts Validator to validate a form that the programmer does not expect.",
+    "extended_description": "If two validation forms have the same name, the Struts Validator arbitrarily chooses one of the forms to use for input validation and discards the other. This decision might not correspond to the programmer's expectations, possibly leading to resultant weaknesses. Moreover, it indicates that the validation logic is not up-to-date, and can indicate that other, more subtle validation errors are present.",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Integrity"
+        ],
+        "impact": [
+          "Unexpected State"
+        ],
+        "note": ""
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Java"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [
+      "These two Struts validation forms have the same name."
+    ],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-694"
+      },
+      {
+        "nature": "ChildOf",
+        "id": "CWE-1173"
+      },
+      {
+        "nature": "ChildOf",
+        "id": "CWE-20"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "The DTD or schema validation will not catch the duplicate occurrence of the same form name. To find the issue in the implementation, manual checks or automated static analysis could be applied to the xml configuration files.",
+    "mitigations_detailed": [
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "The DTD or schema validation will not catch the duplicate occurrence of the same form name. To find the issue in the implementation, manual checks or automated static analysis could be applied to the xml configuration files.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      }
+    ],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1021",
+    "name": "Improper Restriction of Rendered UI Layers or Frames",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The web application does not restrict or incorrectly restricts frame objects or UI layers that belong to another application or domain.",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Access Control"
+        ],
+        "impact": [
+          "Gain Privileges or Assume Identity",
+          "Bypass Protection Mechanism",
+          "Read Application Data",
+          "Modify Application Data"
+        ],
+        "note": "An attacker can trick a user into performing actions that are masked and hidden from the user's view. The impact varies widely, depending on the functionality of the underlying application. For example, in a social media application, clickjacking could be used to trick the user into changing privacy settings."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": [
+        "Not Technology-Specific",
+        "Web Based"
+      ]
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [
+      {
+        "cve_id": "CVE-2017-7440",
+        "description": "E-mail preview feature in a desktop application allows clickjacking attacks via a crafted e-mail message",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2017-7440"
+      },
+      {
+        "cve_id": "CVE-2017-5697",
+        "description": "Hardware/firmware product has insufficient clickjacking protection in its web user interface",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2017-5697"
+      },
+      {
+        "cve_id": "CVE-2017-4015",
+        "description": "Clickjacking in data-loss prevention product via HTTP response header.",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2017-4015"
+      },
+      {
+        "cve_id": "CVE-2016-2496",
+        "description": "Tapjacking in permission dialog for mobile OS allows access of private storage using a partially-overlapping window.",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2016-2496"
+      },
+      {
+        "cve_id": "CVE-2015-1241",
+        "description": "Tapjacking in web browser related to page navigation and touch/gesture events.",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2015-1241"
+      },
+      {
+        "cve_id": "CVE-2017-0492",
+        "description": "System UI in mobile OS allows a malicious application to create a UI overlay of the entire screen to gain privileges.",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2017-0492"
+      }
+    ],
+    "related_cve": [
+      "CVE-2015-1241",
+      "CVE-2016-2496",
+      "CVE-2017-0492",
+      "CVE-2017-4015",
+      "CVE-2017-5697",
+      "CVE-2017-7440"
+    ],
+    "related_capec": [
+      "CAPEC-103",
+      "CAPEC-181",
+      "CAPEC-222",
+      "CAPEC-504",
+      "CAPEC-506",
+      "CAPEC-587",
+      "CAPEC-654"
+    ],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-441"
+      },
+      {
+        "nature": "ChildOf",
+        "id": "CWE-610"
+      },
+      {
+        "nature": "ChildOf",
+        "id": "CWE-451"
+      }
+    ],
+    "detection_methods": [
+      "automated_static_analysis"
+    ],
+    "detection_methods_detailed": [
+      {
+        "method": "Automated Static Analysis",
+        "description": "Automated static analysis, commonly referred to as Static Application Security Testing (SAST), can find some instances of this weakness by analyzing source code (or binary/compiled code) without having to execute it. Typically, this is done by building a model of data flow and control flow, then searching for potentially-vulnerable patterns that connect \"sources\" (origins of input) with \"sinks\" (destinations where the data interacts with external components, a lower layer such as the OS, etc.)",
+        "effectiveness": "High"
+      }
+    ],
+    "mitigation": "The use of X-Frame-Options allows developers of web content to restrict the usage of their application within the form of overlays, frames, or iFrames. The developer can indicate from which domains can frame the content. The concept of X-Frame-Options is well documented, but implementation of this protection mechanism is in development to cover gaps. There is a need for allowing frames from multiple domains.; A developer can use a \"frame-breaker\" script in each page that should not be framed. This is very helpful for legacy browsers that do not support X-Frame-Options security feature previously mentioned. It is also important to note that this tactic has been circumvented or bypassed. Improper usage of frames can persist in the web application through nested frames. The \"frame-breaking\" script does not intuitively account for multiple nested frames that can be presented to the user.; This defense-in-depth technique can be used to prevent the improper usage of frames in web applications. It prioritizes the valid sources of data to be loaded into the application through the usage of declarative policies. Based on which implementation of Content Security Policy is in use, the developer should use the \"frame-ancestors\" directive or the \"frame-src\" directive to mitigate this weakness. Both directives allow for the placement of restrictions when it comes to allowing embedded content.",
+    "mitigations_detailed": [
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "The use of X-Frame-Options allows developers of web content to restrict the usage of their application within the form of overlays, frames, or iFrames. The developer can indicate from which domains can frame the content. The concept of X-Frame-Options is well documented, but implementation of this protection mechanism is in development to cover gaps. There is a need for allowing frames from multiple domains.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      },
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "A developer can use a \"frame-breaker\" script in each page that should not be framed. This is very helpful for legacy browsers that do not support X-Frame-Options security feature previously mentioned. It is also important to note that this tactic has been circumvented or bypassed. Improper usage of frames can persist in the web application through nested frames. The \"frame-breaking\" script does not intuitively account for multiple nested frames that can be presented to the user.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      },
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "This defense-in-depth technique can be used to prevent the improper usage of frames in web applications. It prioritizes the valid sources of data to be loaded into the application through the usage of declarative policies. Based on which implementation of Content Security Policy is in use, the developer should use the \"frame-ancestors\" directive or the \"frame-src\" directive to mitigate this weakness. Both directives allow for the placement of restrictions when it comes to allowing embedded content.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      },
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "In addition to frames or iframes as previously mentioned, the web application is expected to place restrictions on whether it is allowed to be rendered within objects, embed, or applet elements.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      }
+    ],
+    "requires_technology": [
+      "not technology-specific",
+      "web based"
+    ]
+  },
+  {
+    "id": "CWE-1022",
+    "name": "Use of Web Link to Untrusted Target with window.opener Access",
+    "abstraction": "Variant",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "variant",
+    "description": "The web application produces links to untrusted external sites outside of its sphere of control, but it does not properly prevent the external site from modifying security-critical properties of the window.opener object, such as the location property.",
+    "extended_description": "When a user clicks a link to an external site (\"target\"), the target=\"_blank\" attribute causes the target site's contents to be opened in a new window or tab, which runs in the same process as the original page. The window.opener object records information about the original page that offered the link. If an attacker can run script on the target page, then they could read or modify certain properties of the window.opener object, including the location property - even if the original and target site are not the same origin. An attacker can modify the location property to automatically redirect the user to a malicious site, e.g. as part of a phishing attack. Since this redirect happens in the original window/tab - which is not necessarily visible, since the browser is focusing the display on the new target page - the user might not notice any suspicious redirection.",
+    "likelihood_of_exploit": "Medium",
+    "common_consequences": [
+      {
+        "scope": [
+          "Confidentiality"
+        ],
+        "impact": [
+          "Alter Execution Logic"
+        ],
+        "note": "The user may be redirected to an untrusted page that contains undesired content or malicious script code."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Architecture and Design",
+        "note": "This weakness is introduced during the design of an application when the architect does not specify that a linked external document should not be able to alter the location of the calling page."
+      },
+      {
+        "phase": "Implementation",
+        "note": "This weakness is introduced during the coding of an application when the developer does not include the noopener and/or noreferrer value for the rel attribute."
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific",
+        "JavaScript"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": [
+        "Web Based",
+        "Web Server"
+      ]
+    },
+    "demonstrative_examples": [
+      "In this example, the application opens a link in a named window/tab without taking precautions to prevent the called page from tampering with the calling page's location in the browser."
+    ],
+    "observed_examples": [
+      {
+        "cve_id": "CVE-2022-4927",
+        "description": "Library software does not use rel: \"noopener noreferrer\" setting, allowing tabnabbing attacks to redirect to a malicious page",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2022-4927"
+      }
+    ],
+    "related_cve": [
+      "CVE-2022-4927"
+    ],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-266"
+      }
+    ],
+    "detection_methods": [
+      "automated_static_analysis"
+    ],
+    "detection_methods_detailed": [
+      {
+        "method": "Automated Static Analysis",
+        "description": "Automated static analysis, commonly referred to as Static Application Security Testing (SAST), can find some instances of this weakness by analyzing source code (or binary/compiled code) without having to execute it. Typically, this is done by building a model of data flow and control flow, then searching for potentially-vulnerable patterns that connect \"sources\" (origins of input) with \"sinks\" (destinations where the data interacts with external components, a lower layer such as the OS, etc.)",
+        "effectiveness": "High"
+      }
+    ],
+    "mitigation": "Specify in the design that any linked external document must not be granted access to the location object of the calling page.; When creating a link to an external document using the <a> tag with a defined target, for example \"_blank\" or a named frame, provide the rel attribute with a value \"noopener noreferrer\". If opening the external document in a new window via javascript, then reset the opener by setting it equal to null.; Do not use \"_blank\" targets. However, this can affect the usability of the application.",
+    "mitigations_detailed": [
+      {
+        "phase": [
+          "Architecture and Design"
+        ],
+        "strategy": "",
+        "description": "Specify in the design that any linked external document must not be granted access to the location object of the calling page.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      },
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "When creating a link to an external document using the <a> tag with a defined target, for example \"_blank\" or a named frame, provide the rel attribute with a value \"noopener noreferrer\". If opening the external document in a new window via javascript, then reset the opener by setting it equal to null.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      },
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "Do not use \"_blank\" targets. However, this can affect the usability of the application.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      }
+    ],
+    "requires_technology": [
+      "web based",
+      "web server"
+    ]
+  },
+  {
+    "id": "CWE-1023",
+    "name": "Incomplete Comparison with Missing Factors",
+    "abstraction": "Class",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "class",
+    "description": "The product performs a comparison between entities that must consider multiple factors or characteristics of each entity, but the comparison does not include one or more of these factors.",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Integrity",
+          "Access Control"
+        ],
+        "impact": [
+          "Alter Execution Logic",
+          "Bypass Protection Mechanism"
+        ],
+        "note": "An incomplete comparison can lead to resultant weaknesses, e.g., by operating on the wrong object or making a security decision without considering a required factor."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": [
+        "Not Technology-Specific"
+      ]
+    },
+    "demonstrative_examples": [
+      "Consider an application in which Truck objects are defined to be the same if they have the same make, the same model, and were manufactured in the same year.",
+      "This example defines a fixed username and password. The AuthenticateUser() function is intended to accept a username and a password from an untrusted user, and check to ensure that it matches the username and password. If the username and password match, AuthenticateUser() is intended to indicate that authentication succeeded."
+    ],
+    "observed_examples": [
+      {
+        "cve_id": "CVE-2005-2782",
+        "description": "PHP remote file inclusion in web application that filters \"http\" and \"https\" URLs, but not \"ftp\".",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2005-2782"
+      },
+      {
+        "cve_id": "CVE-2014-6394",
+        "description": "Product does not prevent access to restricted directories due to partial string comparison with a public directory",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2014-6394"
+      }
+    ],
+    "related_cve": [
+      "CVE-2005-2782",
+      "CVE-2014-6394"
+    ],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-697"
+      }
+    ],
+    "detection_methods": [
+      "manual_static_analysis"
+    ],
+    "detection_methods_detailed": [
+      {
+        "method": "Manual Static Analysis",
+        "description": "Thoroughly test the comparison scheme before deploying code into production. Perform positive testing as well as negative testing.",
+        "effectiveness": ""
+      }
+    ],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": [
+      "not technology-specific"
+    ]
+  },
+  {
+    "id": "CWE-1024",
+    "name": "Comparison of Incompatible Types",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The product performs a comparison between two entities, but the entities are of different, incompatible types that cannot be guaranteed to provide correct results when they are directly compared.",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Varies by Context"
+        ],
+        "note": ""
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": "In languages that are strictly typed but support casting/conversion, such as C or C++, the programmer might assume that casting one entity to the same type as another entity will ensure that the comparison will be performed correctly, but this cannot be guaranteed. In languages that are not strictly typed, such as PHP or JavaScript, there may be implicit casting/conversion to a type that the programmer is unaware of, causing unexpected results; for example, the string \"123\" might be converted to a number type."
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "JavaScript",
+        "PHP",
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-697"
+      }
+    ],
+    "detection_methods": [
+      "automated_static_analysis",
+      "manual_static_analysis"
+    ],
+    "detection_methods_detailed": [
+      {
+        "method": "Automated Static Analysis",
+        "description": "Automated static analysis, commonly referred to as Static Application Security Testing (SAST), can find some instances of this weakness by analyzing source code (or binary/compiled code) without having to execute it. Typically, this is done by building a model of data flow and control flow, then searching for potentially-vulnerable patterns that connect \"sources\" (origins of input) with \"sinks\" (destinations where the data interacts with external components, a lower layer such as the OS, etc.)",
+        "effectiveness": ""
+      },
+      {
+        "method": "Manual Static Analysis",
+        "description": "Thoroughly test the comparison scheme before deploying code into production. Perform positive testing as well as negative testing.",
+        "effectiveness": ""
+      }
+    ],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1025",
+    "name": "Comparison Using Wrong Factors",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The code performs a comparison between two entities, but the comparison examines the wrong factors or characteristics of the entities, which can lead to incorrect results and resultant weaknesses.",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Varies by Context"
+        ],
+        "note": "This can lead to incorrect results and resultant weaknesses. For example, the code might inadvertently compare references to objects, instead of the relevant contents of those objects, causing two \"equal\" objects to be considered unequal."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [
+      "In the example below, two Java String objects are declared and initialized with the same string values. An if statement is used to determine if the strings are equivalent."
+    ],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-697"
+      }
+    ],
+    "detection_methods": [
+      "manual_static_analysis"
+    ],
+    "detection_methods_detailed": [
+      {
+        "method": "Manual Static Analysis",
+        "description": "Thoroughly test the comparison scheme before deploying code into production. Perform positive testing as well as negative testing.",
+        "effectiveness": ""
+      }
+    ],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-103",
+    "name": "Struts: Incomplete validate() Method Definition",
+    "abstraction": "Variant",
+    "structure": "Simple",
+    "status": "Draft",
+    "category": "variant",
+    "description": "The product has a validator form that either does not define a validate() method, or defines a validate() method but does not call super.validate().",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Unexpected State",
+          "Varies by Context"
+        ],
+        "note": "If the code does not call super.validate(), the Validation Framework cannot check the contents of the form against a validation form. In other words, the validation framework will be disabled for the given form. Disabling the validation framework for a form exposes the product to numerous types of attacks."
+      },
+      {
+        "scope": [
+          "Confidentiality",
+          "Integrity",
+          "Availability",
+          "Other"
+        ],
+        "impact": [
+          "Other"
+        ],
+        "note": "Although J2EE applications are not generally susceptible to memory corruption attacks, if a J2EE application interfaces with native code that does not perform array bounds checking, an attacker may be able to use an input validation mistake in the J2EE application to launch a buffer overflow attack."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Java"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [
+      "In the following Java example the class RegistrationForm is a Struts framework ActionForm Bean that will maintain user input data from a registration webpage for an online business site. The user will enter registration data and the RegistrationForm bean in the Struts framework will maintain the user data. Tthe RegistrationForm class implements the validate method to validate the user input…"
+    ],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-573"
+      },
+      {
+        "nature": "ChildOf",
+        "id": "CWE-20"
+      }
+    ],
+    "detection_methods": [
+      "automated_static_analysis"
+    ],
+    "detection_methods_detailed": [
+      {
+        "method": "Automated Static Analysis",
+        "description": "Automated static analysis, commonly referred to as Static Application Security Testing (SAST), can find some instances of this weakness by analyzing source code (or binary/compiled code) without having to execute it. Typically, this is done by building a model of data flow and control flow, then searching for potentially-vulnerable patterns that connect \"sources\" (origins of input) with \"sinks\" (destinations where the data interacts with external components, a lower layer such as the OS, etc.)",
+        "effectiveness": "High"
+      }
+    ],
+    "mitigation": "Implement the validate() method and call super.validate() within that method.",
+    "mitigations_detailed": [
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "Implement the validate() method and call super.validate() within that method.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      }
+    ],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1037",
+    "name": "Processor Optimization Removal or Modification of Security-critical Code",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The developer builds a security-critical protection mechanism into the software, but the processor optimizes the execution of the program such that the mechanism is removed or modified.",
+    "extended_description": "",
+    "likelihood_of_exploit": "Low",
+    "common_consequences": [
+      {
+        "scope": [
+          "Integrity"
+        ],
+        "impact": [
+          "Bypass Protection Mechanism"
+        ],
+        "note": "A successful exploitation of this weakness will change the order of an application's execution and will likely be used to bypass specific protection mechanisms. This bypass can be exploited further to potentially read data that should otherwise be unaccessible."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Architecture and Design",
+        "note": "Optimizations built into the design of the processor can have unintended consequences during the execution of an application."
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": [
+        "Processor Hardware"
+      ]
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [
+      {
+        "cve_id": "CVE-2017-5715",
+        "description": "Intel, ARM, and AMD processor optimizations related to speculative execution and branch prediction cause access control checks to be bypassed when placing data into the cache. Often known as \"Spectre\".",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2017-5715"
+      },
+      {
+        "cve_id": "CVE-2017-5753",
+        "description": "Intel, ARM, and AMD processor optimizations related to speculative execution and branch prediction cause access control checks to be bypassed when placing data into the cache. Often known as \"Spectre\".",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2017-5753"
+      },
+      {
+        "cve_id": "CVE-2017-5754",
+        "description": "Intel processor optimizations related to speculative execution cause access control checks to be bypassed when placing data into the cache. Often known as \"Meltdown\".",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2017-5754"
+      }
+    ],
+    "related_cve": [
+      "CVE-2017-5715",
+      "CVE-2017-5753",
+      "CVE-2017-5754"
+    ],
+    "related_capec": [
+      "CAPEC-663"
+    ],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-1038"
+      }
+    ],
+    "detection_methods": [
+      "white_box"
+    ],
+    "detection_methods_detailed": [
+      {
+        "method": "White Box",
+        "description": "In theory this weakness can be detected through the use of white box testing techniques where specifically crafted test cases are used in conjunction with debuggers to verify the order of statements being executed.",
+        "effectiveness": "Opportunistic"
+      }
+    ],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": [
+      "processor hardware"
+    ]
+  },
+  {
+    "id": "CWE-1038",
+    "name": "Insecure Automated Optimizations",
+    "abstraction": "Class",
+    "structure": "Simple",
+    "status": "Draft",
+    "category": "class",
+    "description": "The product uses a mechanism that automatically optimizes code, e.g. to improve a characteristic such as performance, but the optimizations can have an unintended side effect that might violate an intended security assumption.",
+    "extended_description": "",
+    "likelihood_of_exploit": "Low",
+    "common_consequences": [
+      {
+        "scope": [
+          "Integrity"
+        ],
+        "impact": [
+          "Alter Execution Logic"
+        ],
+        "note": "The optimizations alter the order of execution resulting in side effects that were not intended by the original developer."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Architecture and Design",
+        "note": "Optimizations built into the design of a product can have unintended consequences during execution."
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [
+      "The following code reads a password from the user, uses the password to connect to a back-end mainframe, and then attempts to scrub the password from memory using memset()."
+    ],
+    "observed_examples": [
+      {
+        "cve_id": "CVE-2017-5715",
+        "description": "Intel, ARM, and AMD processor optimizations related to speculative execution and branch prediction cause access control checks to be bypassed when placing data into the cache. Often known as \"Spectre\".",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2017-5715"
+      },
+      {
+        "cve_id": "CVE-2008-1685",
+        "description": "C compiler optimization, as allowed by specifications, removes code that is used to perform checks to detect integer overflows.",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2008-1685"
+      }
+    ],
+    "related_cve": [
+      "CVE-2008-1685",
+      "CVE-2017-5715"
+    ],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-435"
+      },
+      {
+        "nature": "ChildOf",
+        "id": "CWE-758"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1039",
+    "name": "Inadequate Detection or Handling of Adversarial Input Perturbations in Automated Recognition Mechanism",
+    "abstraction": "Class",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "class",
+    "description": "The product uses an automated mechanism such as machine learning to recognize complex data inputs (e.g. image or audio) as a particular concept or category, but it does not properly detect or handle inputs that have been modified or constructed in a way that causes the mechanism to detect a different, incorrect concept.",
+    "extended_description": "When techniques such as machine learning are used to automatically classify input streams, and those classifications are used for security-critical decisions, then any mistake in classification can introduce a vulnerability that allows attackers to cause the product to make the wrong security decision or disrupt service of the automated mechanism. If the mechanism is not developed or \"trained\" with enough input data or has not adequately undergone test and evaluation, then attackers may be able to craft malicious inputs that intentionally trigger the incorrect classification. Targeted technologies include, but are not necessarily limited to: automated speech recognition automated image recognition automated cyber defense Chatbot, LLMs, generative AI For example, an attacker might modify road signs or road surface markings to trick autonomous vehicles into misreading the sign/marking and performing a dangerous action. Another example includes an attacker that crafts highly specific and complex prompts to \"jailbreak\" a chatbot to bypass safety or privacy mechanisms, better known as prompt injection attacks.",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Integrity"
+        ],
+        "impact": [
+          "Bypass Protection Mechanism"
+        ],
+        "note": "When the automated recognition is used in a protection mechanism, an attacker may be able to craft inputs that are misinterpreted in a way that grants excess privileges."
+      },
+      {
+        "scope": [
+          "Availability"
+        ],
+        "impact": [
+          "DoS: Resource Consumption (Other)",
+          "DoS: Instability"
+        ],
+        "note": "There could be disruption to the service of the automated recognition system, which could cause further downstream failures of the software."
+      },
+      {
+        "scope": [
+          "Confidentiality"
+        ],
+        "impact": [
+          "Read Application Data"
+        ],
+        "note": "This weakness could lead to breaches of data privacy through exposing features of the training data, e.g., by using membership inference attacks or prompt injection attacks."
+      },
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Varies by Context"
+        ],
+        "note": "The consequences depend on how the application applies or integrates the affected algorithm."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Architecture and Design",
+        "note": "This issue can be introduced into the automated algorithm itself due to inadequate training data used as well as lack of validation, verification, testing, and evaluation of the algorithm. These factors can affect the overall robustness of the algorithm when introduced into operational settings."
+      },
+      {
+        "phase": "Implementation",
+        "note": "The developer might not apply external validation of inputs into the algorithm."
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": [
+        "AI/ML"
+      ]
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [
+      {
+        "cve_id": "CVE-2025-26644",
+        "description": "biometric authentication capability allows attackers to spoof biometric data and bypass authentication using adversarial input perturbations that cause the ML model to accepting the input",
+        "link": "https://www.cve.org/CVERecord?id=CVE-2025-26644"
+      }
+    ],
+    "related_cve": [
+      "CVE-2025-26644"
+    ],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-693"
+      },
+      {
+        "nature": "ChildOf",
+        "id": "CWE-697"
+      }
+    ],
+    "detection_methods": [
+      "dynamic_analysis_with_manual_results_interpretation",
+      "dynamic_analysis_with_manual_results_interpretation",
+      "architecture_or_design_review"
+    ],
+    "detection_methods_detailed": [
+      {
+        "method": "Dynamic Analysis with Manual Results Interpretation",
+        "description": "Use indicators from model performance deviations such as sudden drops in accuracy or unexpected outputs to verify the model.",
+        "effectiveness": ""
+      },
+      {
+        "method": "Dynamic Analysis with Manual Results Interpretation",
+        "description": "Use indicators from input data collection mechanisms to verify that inputs are statistically within the distribution of the training and test data.",
+        "effectiveness": ""
+      },
+      {
+        "method": "Architecture or Design Review",
+        "description": "Use multiple models or model ensembling techniques to check for consistency of predictions/inferences.",
+        "effectiveness": ""
+      }
+    ],
+    "mitigation": "Algorithmic modifications such as model pruning or compression can help mitigate this weakness. Model pruning ensures that only weights that are most relevant to the task are used in the inference of incoming data and has shown resilience to adversarial perturbed data.; Consider implementing adversarial training, a method that introduces adversarial examples into the training data to promote robustness of algorithm at inference time.; Consider implementing model hardening to fortify the internal structure of the algorithm, including techniques such as regularization and optimization to desensitize algorithms to minor input perturbations and/or changes.",
+    "mitigations_detailed": [
+      {
+        "phase": [
+          "Architecture and Design"
+        ],
+        "strategy": "",
+        "description": "Algorithmic modifications such as model pruning or compression can help mitigate this weakness. Model pruning ensures that only weights that are most relevant to the task are used in the inference of incoming data and has shown resilience to adversarial perturbed data.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      },
+      {
+        "phase": [
+          "Architecture and Design"
+        ],
+        "strategy": "",
+        "description": "Consider implementing adversarial training, a method that introduces adversarial examples into the training data to promote robustness of algorithm at inference time.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      },
+      {
+        "phase": [
+          "Architecture and Design"
+        ],
+        "strategy": "",
+        "description": "Consider implementing model hardening to fortify the internal structure of the algorithm, including techniques such as regularization and optimization to desensitize algorithms to minor input perturbations and/or changes.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      },
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "Consider implementing multiple models or using model ensembling techniques to improve robustness of individual model weaknesses against adversarial input perturbations.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      },
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "Incorporate uncertainty estimations into the algorithm that trigger human intervention or secondary/fallback software when reached. This could be when inference predictions and confidence scores are abnormally high/low comparative to expected model performance.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      },
+      {
+        "phase": [
+          "Integration"
+        ],
+        "strategy": "",
+        "description": "Reactive defenses such as input sanitization, defensive distillation, and input transformations can all be implemented before input data reaches the algorithm for inference.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      },
+      {
+        "phase": [
+          "Integration"
+        ],
+        "strategy": "",
+        "description": "Consider reducing the output granularity of the inference/prediction such that attackers cannot gain additional information due to leakage in order to craft adversarially perturbed data.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      }
+    ],
+    "requires_technology": [
+      "ai/ml"
+    ]
+  },
+  {
+    "id": "CWE-104",
+    "name": "Struts: Form Bean Does Not Extend Validation Class",
+    "abstraction": "Variant",
+    "structure": "Simple",
+    "status": "Draft",
+    "category": "variant",
+    "description": "If a form bean does not extend an ActionForm subclass of the Validator framework, it can expose the application to other weaknesses related to insufficient input validation.",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Other"
+        ],
+        "note": "Bypassing the validation framework for a form exposes the application to numerous types of attacks. Unchecked input is an important component of vulnerabilities like cross-site scripting, process control, and SQL injection."
+      },
+      {
+        "scope": [
+          "Confidentiality",
+          "Integrity",
+          "Availability",
+          "Other"
+        ],
+        "impact": [
+          "Other"
+        ],
+        "note": "Although J2EE applications are not generally susceptible to memory corruption attacks, if a J2EE application interfaces with native code that does not perform array bounds checking, an attacker may be able to use an input validation mistake in the J2EE application to launch a buffer overflow attack."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Java"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [
+      "In the following Java example the class RegistrationForm is a Struts framework ActionForm Bean that will maintain user information from a registration webpage for an online business site. The user will enter registration data and through the Struts framework the RegistrationForm bean will maintain the user data."
+    ],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-573"
+      },
+      {
+        "nature": "ChildOf",
+        "id": "CWE-20"
+      }
+    ],
+    "detection_methods": [
+      "automated_static_analysis"
+    ],
+    "detection_methods_detailed": [
+      {
+        "method": "Automated Static Analysis",
+        "description": "Automated static analysis, commonly referred to as Static Application Security Testing (SAST), can find some instances of this weakness by analyzing source code (or binary/compiled code) without having to execute it. Typically, this is done by building a model of data flow and control flow, then searching for potentially-vulnerable patterns that connect \"sources\" (origins of input) with \"sinks\" (destinations where the data interacts with external components, a lower layer such as the OS, etc.)",
+        "effectiveness": "High"
+      }
+    ],
+    "mitigation": "Ensure that all forms extend one of the Validation Classes.",
+    "mitigations_detailed": [
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "Ensure that all forms extend one of the Validation Classes.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      }
+    ],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1041",
+    "name": "Use of Redundant Code",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The product has multiple functions, methods, procedures, macros, etc. that contain the same code.",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Reduce Maintainability"
+        ],
+        "note": "This issue makes it more difficult to maintain the product, which indirectly affects security by making it more difficult or time-consuming to find and/or fix vulnerabilities. For example, if there are two copies of the same code, the programmer might fix a weakness in one copy while forgetting to fix the same weakness in another copy."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [
+      "In the following Java example the code performs some complex math when specific test conditions are met. The math is the same in each case and the equations are repeated within the code. Unfortunately if a future change needs to be made then that change needs to be made in all locations. This opens the door to mistakes being made and the changes not being made in the same way in each instance."
+    ],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-710"
+      }
+    ],
+    "detection_methods": [
+      "automated_static_analysis"
+    ],
+    "detection_methods_detailed": [
+      {
+        "method": "Automated Static Analysis",
+        "description": "Automated static analysis, commonly referred to as Static Application Security Testing (SAST), can find some instances of this weakness by analyzing source code (or binary/compiled code) without having to execute it. Typically, this is done by building a model of data flow and control flow, then searching for potentially-vulnerable patterns that connect \"sources\" (origins of input) with \"sinks\" (destinations where the data interacts with external components, a lower layer such as the OS, etc.)",
+        "effectiveness": ""
+      }
+    ],
+    "mitigation": "Merge common functionality into a single function and then call that function from across the entire code base.",
+    "mitigations_detailed": [
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "Merge common functionality into a single function and then call that function from across the entire code base.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      }
+    ],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1042",
+    "name": "Static Member Data Element outside of a Singleton Class Element",
+    "abstraction": "Variant",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "variant",
+    "description": "The code contains a member element that is declared as static (but not final), in which its parent class element is not a singleton class - that is, a class element that can be used only once in the 'to' association of a Create action.",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Reduce Performance"
+        ],
+        "note": "This issue can make the product perform more slowly. If the relevant code is reachable by an attacker, then this performance problem might introduce a vulnerability."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-1176"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1043",
+    "name": "Data Element Aggregating an Excessively Large Number of Non-Primitive Elements",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The product uses a data element that has an excessively large number of sub-elements with non-primitive data types such as structures or aggregated objects.",
+    "extended_description": "While the interpretation of \"excessively large\" may vary for each product or developer, CISQ recommends a default of 5 sub-elements.",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Reduce Performance"
+        ],
+        "note": "This issue can make the product perform more slowly. If the relevant code is reachable by an attacker, then this performance problem might introduce a vulnerability."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-1093"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1044",
+    "name": "Architecture with Number of Horizontal Layers Outside of Expected Range",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The product's architecture contains too many - or too few - horizontal layers.",
+    "extended_description": "While the interpretation of \"expected range\" may vary for each product or developer, CISQ recommends a default minimum of 4 layers and maximum of 8 layers.",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Reduce Maintainability"
+        ],
+        "note": "This issue makes it more difficult to maintain the product, which indirectly affects security by making it more difficult or time-consuming to find and/or fix vulnerabilities. It also might make it easier to introduce vulnerabilities."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Architecture and Design",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-710"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1045",
+    "name": "Parent Class with a Virtual Destructor and a Child Class without a Virtual Destructor",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "A parent class has a virtual destructor method, but the parent has a child class that does not have a virtual destructor.",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Reduce Reliability"
+        ],
+        "note": "This issue can prevent the product from running reliably, since the child might not perform essential destruction operations. If the relevant code is reachable by an attacker, then this reliability problem might introduce a vulnerability, such as a memory leak (CWE-401)."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-1076"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1046",
+    "name": "Creation of Immutable Text Using String Concatenation",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The product creates an immutable text string using string concatenation operations.",
+    "extended_description": "When building a string via a looping feature (e.g., a FOR or WHILE loop), the use of += to append to the existing string will result in the creation of a new object with each iteration, which can be inefficient in comparison with use of text buffer data elements.",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Reduce Performance"
+        ],
+        "note": "This issue can make the product perform more slowly. If the relevant code is reachable by an attacker, then this could be influenced to create performance problem."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-1176"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1047",
+    "name": "Modules with Circular Dependencies",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The product contains modules in which one module has references that cycle back to itself, i.e., there are circular dependencies.",
+    "extended_description": "As an example, with Java, this weakness might indicate cycles between packages.",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Reduce Maintainability"
+        ],
+        "note": "This issue makes it more difficult to maintain the product due to insufficient modularity, which indirectly affects security by making it more difficult or time-consuming to find and/or fix vulnerabilities. It can also prevent the product from running reliably. If the relevant code is reachable by an attacker, then this reliability problem might introduce a vulnerability."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      },
+      {
+        "phase": "Architecture and Design",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-1120"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1048",
+    "name": "Invokable Control Element with Large Number of Outward Calls",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The code contains callable control elements that contain an excessively large number of references to other application objects external to the context of the callable, i.e. a Fan-Out value that is excessively large.",
+    "extended_description": "While the interpretation of \"excessively large Fan-Out value\" may vary for each product or developer, CISQ recommends a default of 5 referenced objects.",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Reduce Maintainability",
+          "Increase Analytical Complexity"
+        ],
+        "note": "This issue makes it more difficult to maintain the product, which indirectly affects security by making it more difficult or time-consuming to find and/or fix vulnerabilities. It also might make it easier to introduce vulnerabilities."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      },
+      {
+        "phase": "Architecture and Design",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-710"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1049",
+    "name": "Excessive Data Query Operations in a Large Data Table",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The product performs a data query with a large number of joins and sub-queries on a large data table.",
+    "extended_description": "While the interpretation of \"large data table\" and \"large number of joins or sub-queries\" may vary for each product or developer, CISQ recommends a default of 1 million rows for a \"large\" data table, a default minimum of 5 joins, and a default minimum of 3 sub-queries.",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Reduce Performance"
+        ],
+        "note": "This issue can make the product perform more slowly. If the relevant code is reachable by an attacker, then this performance problem might introduce a vulnerability."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-1176"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-105",
+    "name": "Struts: Form Field Without Validator",
+    "abstraction": "Variant",
+    "structure": "Simple",
+    "status": "Draft",
+    "category": "variant",
+    "description": "The product has a form field that is not validated by a corresponding validation form, which can introduce other weaknesses related to insufficient input validation.",
+    "extended_description": "Omitting validation for even a single input field may give attackers the leeway they need to compromise the product. Although J2EE applications are not generally susceptible to memory corruption attacks, if a J2EE application interfaces with native code that does not perform array bounds checking, an attacker may be able to use an input validation mistake in the J2EE application to launch a buffer overflow attack.",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Integrity"
+        ],
+        "impact": [
+          "Unexpected State"
+        ],
+        "note": ""
+      },
+      {
+        "scope": [
+          "Integrity"
+        ],
+        "impact": [
+          "Bypass Protection Mechanism"
+        ],
+        "note": "If unused fields are not validated, shared business logic in an action may allow attackers to bypass the validation checks that are performed for other uses of the form."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": "Some products use the same ActionForm for more than one purpose. In situations like this, some fields may go unused under some action mappings."
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Java"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [
+      "In the following example the Java class RegistrationForm is a Struts framework ActionForm Bean that will maintain user input data from a registration webpage for an online business site. The user will enter registration data and, through the Struts framework, the RegistrationForm bean will maintain the user data in the form fields using the private member variables. The RegistrationForm class…"
+    ],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-1173"
+      },
+      {
+        "nature": "ChildOf",
+        "id": "CWE-20"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "Validate all form fields. If a field is unused, it is still important to constrain it so that it is empty or undefined.",
+    "mitigations_detailed": [
+      {
+        "phase": [
+          "Implementation"
+        ],
+        "strategy": "",
+        "description": "Validate all form fields. If a field is unused, it is still important to constrain it so that it is empty or undefined.",
+        "effectiveness": "",
+        "effectiveness_notes": ""
+      }
+    ],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1050",
+    "name": "Excessive Platform Resource Consumption within a Loop",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The product has a loop body or loop condition that contains a control element that directly or indirectly consumes platform resources, e.g. messaging, sessions, locks, or file descriptors.",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Availability"
+        ],
+        "impact": [
+          "DoS: Resource Consumption (CPU)",
+          "DoS: Resource Consumption (Memory)",
+          "DoS: Resource Consumption (Other)",
+          "Reduce Performance"
+        ],
+        "note": "This issue can make the product perform more slowly. If an attacker can influence the number of iterations in the loop, then this performance problem might allow a denial of service by consuming more platform resources than intended."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-405"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1051",
+    "name": "Initialization with Hard-Coded Network Resource Configuration Data",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The product initializes data using hard-coded values that act as network resource identifiers.",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Reduce Reliability"
+        ],
+        "note": "This issue can prevent the product from running reliably, e.g. if it runs in an environment does not use the hard-coded network resource identifiers. If the relevant code is reachable by an attacker, then this reliability problem might introduce a vulnerability."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-1419"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1052",
+    "name": "Excessive Use of Hard-Coded Literals in Initialization",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The product initializes a data element using a hard-coded literal that is not a simple integer or static constant element.",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Reduce Maintainability"
+        ],
+        "note": "This issue makes it more difficult to modify or maintain the product, which indirectly affects security by making it more difficult or time-consuming to find and/or fix vulnerabilities. It also might make it easier to introduce vulnerabilities."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-1419"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1053",
+    "name": "Missing Documentation for Design",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The product does not have documentation that represents how it is designed.",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Reduce Maintainability",
+          "Increase Analytical Complexity"
+        ],
+        "note": "This issue can make it more difficult to understand and maintain the product. It can make it more difficult and time-consuming to detect and/or fix vulnerabilities."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Documentation",
+        "note": ""
+      },
+      {
+        "phase": "Architecture and Design",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-1059"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1054",
+    "name": "Invocation of a Control Element at an Unnecessarily Deep Horizontal Layer",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The code at one architectural layer invokes code that resides at a deeper layer than the adjacent layer, i.e., the invocation skips at least one layer, and the invoked code is not part of a vertical utility layer that can be referenced from any horizontal layer.",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Reduce Maintainability"
+        ],
+        "note": "This issue makes it more difficult to understand and maintain the product, which indirectly affects security by making it more difficult or time-consuming to find and/or fix vulnerabilities. It also might make it easier to introduce vulnerabilities."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-1061"
+      }
+    ],
+    "detection_methods": [],
+    "detection_methods_detailed": [],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1055",
+    "name": "Multiple Inheritance from Concrete Classes",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "The product contains a class with inheritance from more than one concrete class.",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Reduce Maintainability"
+        ],
+        "note": "This issue makes it more difficult to maintain the product, which indirectly affects security by making it more difficult or time-consuming to find and/or fix vulnerabilities. It also might make it easier to introduce vulnerabilities."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-1093"
+      }
+    ],
+    "detection_methods": [
+      "automated_static_analysis"
+    ],
+    "detection_methods_detailed": [
+      {
+        "method": "Automated Static Analysis",
+        "description": "Automated static analysis, commonly referred to as Static Application Security Testing (SAST), can find some instances of this weakness by analyzing source code (or binary/compiled code) without having to execute it. Typically, this is done by building a model of data flow and control flow, then searching for potentially-vulnerable patterns that connect \"sources\" (origins of input) with \"sinks\" (destinations where the data interacts with external components, a lower layer such as the OS, etc.)",
+        "effectiveness": ""
+      }
+    ],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  },
+  {
+    "id": "CWE-1056",
+    "name": "Invokable Control Element with Variadic Parameters",
+    "abstraction": "Base",
+    "structure": "Simple",
+    "status": "Incomplete",
+    "category": "base",
+    "description": "A named-callable or method control element has a signature that supports a variable (variadic) number of parameters or arguments.",
+    "extended_description": "",
+    "likelihood_of_exploit": "",
+    "common_consequences": [
+      {
+        "scope": [
+          "Other"
+        ],
+        "impact": [
+          "Reduce Reliability"
+        ],
+        "note": "This issue can prevent the product from running reliably. If the relevant code is reachable by an attacker, then this reliability problem might introduce a vulnerability. With variadic arguments, it can be difficult or inefficient for manual analysis to be certain of which function/method is being invoked."
+      }
+    ],
+    "modes_of_introduction": [
+      {
+        "phase": "Implementation",
+        "note": ""
+      }
+    ],
+    "applicable_platforms": {
+      "languages": [
+        "Not Language-Specific"
+      ],
+      "operating_systems": [],
+      "architectures": [],
+      "technologies": []
+    },
+    "demonstrative_examples": [],
+    "observed_examples": [],
+    "related_cve": [],
+    "related_capec": [],
+    "related_weaknesses": [
+      {
+        "nature": "ChildOf",
+        "id": "CWE-1120"
+      }
+    ],
+    "detection_methods": [
+      "automated_static_analysis"
+    ],
+    "detection_methods_detailed": [
+      {
+        "method": "Automated Static Analysis",
+        "description": "Automated static analysis, commonly referred to as Static Application Security Testing (SAST), can find some instances of this weakness by analyzing source code (or binary/compiled code) without having to execute it. Typically, this is done by building a model of data flow and control flow, then searching for potentially-vulnerable patterns that connect \"sources\" (origins of input) with \"sinks\" (destinations where the data interacts with external components, a lower layer such as the OS, etc.)",
+        "effectiveness": "High"
+      }
+    ],
+    "mitigation": "",
+    "mitigations_detailed": [],
+    "requires_technology": []
+  }
+]

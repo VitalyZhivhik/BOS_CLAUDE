@@ -25,6 +25,18 @@ from server.trivy_scanner import TrivyScanResult, TrivyVulnerability
 logger = get_server_logger()
 
 
+def _join_unique_str_ids(seq) -> str:
+    """Склеивает список CWE/CAPEC из Trivy без дубликатов."""
+    seen = set()
+    out = []
+    for x in seq or []:
+        s = str(x).strip()
+        if s and s not in seen:
+            seen.add(s)
+            out.append(s)
+    return ", ".join(out)
+
+
 @dataclass
 class TrivyCorrelationResult:
     """Результат корреляции Trivy с атаками."""
@@ -293,8 +305,8 @@ class TrivyCorrelator:
             # Создаём усиленный результат с target_software
             enhanced_match = VulnerabilityMatch(
                 cve_id=vuln_id,
-                cwe_id=", ".join(trivy_vuln.cwe_ids) if trivy_vuln.cwe_ids else "N/A",
-                capec_id=", ".join(trivy_vuln.capec_ids) if trivy_vuln.capec_ids else "N/A",
+                cwe_id=_join_unique_str_ids(trivy_vuln.cwe_ids) if trivy_vuln.cwe_ids else "N/A",
+                capec_id=_join_unique_str_ids(trivy_vuln.capec_ids) if trivy_vuln.capec_ids else "N/A",
                 mitre_technique="N/A",
                 attack_vector_id=av.id,
                 attack_name=f"[TRIVY+АТАКА] {av.name}",

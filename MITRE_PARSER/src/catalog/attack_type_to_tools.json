@@ -1,0 +1,40 @@
+{
+  "_comment": "Маппинг типов атак (attack_type) к спискам инструментов (по их id или ключевому слову названия). Используется для расширения applicable_attack_types у автогенерируемых записей и для быстрого подбора инструментов под тип атаки.",
+  "sql_injection": ["SQLmap", "Burp Suite", "OWASP ZAP", "Nuclei"],
+  "cross_site_scripting": ["Burp Suite", "OWASP ZAP", "XSS Hunter", "Nuclei"],
+  "cross_site_request_forgery": ["Burp Suite", "OWASP ZAP"],
+  "server_side_request_forgery": ["Burp Suite", "Nuclei"],
+  "directory_traversal": ["Burp Suite", "OWASP ZAP", "Nikto", "ffuf"],
+  "command_injection": ["Burp Suite", "OWASP ZAP", "Metasploit Framework"],
+  "remote_code_execution": ["Metasploit Framework", "Nuclei", "MSFvenom", "Pwntools"],
+  "privilege_escalation": ["Metasploit Framework", "Mimikatz", "BloodHound", "WinPEAS / LinPEAS"],
+  "buffer_overflow": ["Metasploit Framework", "Pwntools", "MSFvenom"],
+  "denial_of_service": ["Metasploit Framework", "hping3", "slowloris"],
+  "brute_force": ["Hydra (THC-Hydra)", "John the Ripper", "Hashcat", "WPScan", "Medusa"],
+  "credential_access": [
+    "Mimikatz", "Hashcat", "John the Ripper", "Responder", "Impacket",
+    "BloodHound", "Hydra (THC-Hydra)"
+  ],
+  "credential_dumping": ["Mimikatz", "Impacket", "secretsdump"],
+  "credential_cracking": ["Hashcat", "John the Ripper"],
+  "lateral_movement": ["Impacket", "CrackMapExec", "Evil-WinRM", "Mimikatz", "BloodHound"],
+  "command_and_control": ["Empire / Starkiller", "Cobalt Strike", "Sliver", "Metasploit Framework"],
+  "post_exploitation": [
+    "Metasploit Framework", "Mimikatz", "Empire / Starkiller", "Sliver",
+    "CrackMapExec", "Impacket", "Evil-WinRM"
+  ],
+  "reconnaissance": [
+    "Nmap", "theHarvester", "Sherlock", "Amass", "Gobuster", "ffuf",
+    "Nuclei", "Wireshark / tshark"
+  ],
+  "vulnerability_scanning": ["Nmap", "Nikto", "Nuclei", "OpenVAS", "Trivy", "WPScan"],
+  "wireless_attack": ["Aircrack-ng", "Bettercap"],
+  "man_in_the_middle": ["Bettercap", "Responder", "Wireshark / tshark"],
+  "fuzzing": ["ffuf", "Wfuzz", "Pwntools"],
+  "exploit_development": ["Pwntools", "Metasploit Framework"],
+  "deserialization_attack": ["ysoserial", "Burp Suite"],
+  "xxe_injection": ["Burp Suite", "OWASP ZAP"],
+  "phishing": ["Gophish", "King Phisher", "evilginx2"],
+  "kerberoasting": ["Impacket", "Rubeus"],
+  "osint": ["theHarvester", "Sherlock", "Amass", "Maltego"]
+}

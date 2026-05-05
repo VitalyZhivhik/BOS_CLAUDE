@@ -1,0 +1,1693 @@
+[
+  {
+    "id": "DEF-SEED-001",
+    "attack_type": "intrusion_detection",
+    "cve_ids": [],
+    "name": "Suricata IDS/IPS",
+    "description": "Высокопроизводительный движок обнаружения вторжений: правила Snort/ET, разбор протоколов (HTTP, TLS, SMB, DNS), извлечение файлов из сети.",
+    "tools": [
+      {
+        "name": "Suricata",
+        "description": "Запуск в режиме IDS на интерфейсе с правилами Emerging Threats.",
+        "commands": [
+          "# Установка",
+          "sudo apt install suricata",
+          "",
+          "# Обновление правил",
+          "sudo suricata-update",
+          "",
+          "# Запуск IDS",
+          "sudo suricata -c /etc/suricata/suricata.yaml -i eth0",
+          "",
+          "# Просмотр алертов",
+          "tail -f /var/log/suricata/fast.log"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-002",
+    "attack_type": "intrusion_detection",
+    "cve_ids": [],
+    "name": "Snort IDS",
+    "description": "Классический сигнатурный IDS с самым большим набором сообществ-правил.",
+    "tools": [
+      {
+        "name": "Snort 3",
+        "description": "Установка и запуск Snort с базовым набором правил.",
+        "commands": [
+          "sudo apt install snort",
+          "",
+          "# Тестовый прогон с конфигом",
+          "snort -T -c /etc/snort/snort.lua",
+          "",
+          "# Запуск как сервис",
+          "sudo systemctl enable --now snort3"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-003",
+    "attack_type": "host_monitoring",
+    "cve_ids": [],
+    "name": "Sysmon (System Monitor)",
+    "description": "Расширенное логирование Windows: создание процессов, сетевые подключения, изменения реестра, загрузки DLL — основа для SIEM-детектов.",
+    "tools": [
+      {
+        "name": "Sysmon",
+        "description": "Установка с конфигом SwiftOnSecurity для типичных детектов.",
+        "commands": [
+          "# Загрузка и установка с конфигурацией",
+          "Invoke-WebRequest https://download.sysinternals.com/files/Sysmon.zip -OutFile Sysmon.zip",
+          "Expand-Archive Sysmon.zip",
+          "Invoke-WebRequest https://raw.githubusercontent.com/SwiftOnSecurity/sysmon-config/master/sysmonconfig-export.xml -OutFile sysmonconfig.xml",
+          "Sysmon.exe -accepteula -i sysmonconfig.xml",
+          "",
+          "# Просмотр событий",
+          "Get-WinEvent -LogName 'Microsoft-Windows-Sysmon/Operational' -MaxEvents 50"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-004",
+    "attack_type": "host_monitoring",
+    "cve_ids": [],
+    "name": "OSQuery",
+    "description": "SQL-подобный интерфейс для запросов к ОС: процессы, сетевые соединения, файлы, пользователи. Используется для постоянного мониторинга и расследований.",
+    "tools": [
+      {
+        "name": "osquery",
+        "description": "Установка osqueryd и базовые запросы для аудита.",
+        "commands": [
+          "# Установка",
+          "sudo apt install osquery",
+          "",
+          "# Запуск интерактивно",
+          "osqueryi",
+          "",
+          "# Список процессов с подозрительными PPID",
+          "SELECT pid, name, parent, cmdline FROM processes WHERE parent IN (SELECT pid FROM processes WHERE name='winword.exe');",
+          "",
+          "# Регулярный сервис",
+          "sudo systemctl enable --now osqueryd"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-005",
+    "attack_type": "siem",
+    "cve_ids": [],
+    "name": "Wazuh (XDR/SIEM)",
+    "description": "Открытая платформа XDR/SIEM: HIDS-агенты, корреляция событий, FIM, анализ конфигураций (CIS), интеграция со Suricata, ClamAV, Sysmon.",
+    "tools": [
+      {
+        "name": "Wazuh Manager + Agent",
+        "description": "Развёртывание Wazuh All-in-One и установка агента на хост.",
+        "commands": [
+          "# Установка All-in-One сервера",
+          "curl -sO https://packages.wazuh.com/4.7/wazuh-install.sh && sudo bash ./wazuh-install.sh -a",
+          "",
+          "# Установка агента (Linux)",
+          "WAZUH_MANAGER='<MANAGER_IP>' apt install wazuh-agent",
+          "sudo systemctl enable --now wazuh-agent",
+          "",
+          "# UI: https://<MANAGER_IP>:443"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "High",
+    "effectiveness": "Very High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-006",
+    "attack_type": "antivirus",
+    "cve_ids": [],
+    "name": "ClamAV",
+    "description": "Открытый антивирус для серверов и почтовых шлюзов: сигнатурное и YARA-сканирование файлов, on-access и on-demand режимы.",
+    "tools": [
+      {
+        "name": "ClamAV / clamscan / clamd",
+        "description": "Базовое сканирование и автозащита.",
+        "commands": [
+          "sudo apt install clamav clamav-daemon",
+          "sudo freshclam",
+          "",
+          "# Полное сканирование",
+          "clamscan -r --infected /var/www",
+          "",
+          "# On-access (Linux)",
+          "sudo systemctl enable --now clamav-daemon clamav-freshclam"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Low",
+    "effectiveness": "Medium",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-007",
+    "attack_type": "web_application_protection",
+    "cve_ids": [],
+    "name": "ModSecurity (WAF)",
+    "description": "Открытый WAF, интегрируется с Apache/Nginx/IIS. С набором правил OWASP CRS блокирует SQLi, XSS, LFI, SSRF, brute force.",
+    "tools": [
+      {
+        "name": "ModSecurity + OWASP CRS",
+        "description": "Включение WAF в Nginx с правилами CRS.",
+        "commands": [
+          "# Установка модуля для Nginx",
+          "sudo apt install libnginx-mod-modsecurity modsecurity-crs",
+          "",
+          "# Включение в /etc/nginx/nginx.conf",
+          "load_module modules/ngx_http_modsecurity_module.so;",
+          "modsecurity on;",
+          "modsecurity_rules_file /etc/nginx/modsec/main.conf;",
+          "",
+          "# /etc/nginx/modsec/main.conf:",
+          "Include /etc/modsecurity/modsecurity.conf",
+          "Include /usr/share/modsecurity-crs/*.conf",
+          "",
+          "sudo systemctl reload nginx"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-008",
+    "attack_type": "endpoint_detection",
+    "cve_ids": [],
+    "name": "EDR (CrowdStrike Falcon / Microsoft Defender for Endpoint)",
+    "description": "Поведенческий анализ конечных точек, блокировка эксплойтов, изоляция хоста при инциденте.",
+    "tools": [
+      {
+        "name": "Microsoft Defender for Endpoint",
+        "description": "Включение в корпоративных Windows-средах и базовые проверки.",
+        "commands": [
+          "# Проверка статуса",
+          "Get-MpComputerStatus",
+          "",
+          "# Включение защиты в реальном времени",
+          "Set-MpPreference -DisableRealtimeMonitoring $false",
+          "",
+          "# Включение Attack Surface Reduction (block Office child process)",
+          "Add-MpPreference -AttackSurfaceReductionRules_Ids D4F940AB-401B-4EFC-AADC-AD5F3C50688A -AttackSurfaceReductionRules_Actions Enabled"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "Medium",
+    "effectiveness": "Very High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-009",
+    "attack_type": "audit_logging",
+    "cve_ids": [],
+    "name": "Auditd (Linux Audit)",
+    "description": "Стандартная подсистема аудита ядра Linux: события на syscall, файловой системе, процессах. Источник для SIEM.",
+    "tools": [
+      {
+        "name": "auditd",
+        "description": "Базовые правила аудита для критичных файлов и команд.",
+        "commands": [
+          "sudo apt install auditd",
+          "sudo systemctl enable --now auditd",
+          "",
+          "# Аудит изменений /etc/passwd",
+          "sudo auditctl -w /etc/passwd -p wa -k passwd_changes",
+          "",
+          "# Постоянные правила",
+          "echo '-w /etc/sudoers -p wa -k sudoers_changes' | sudo tee -a /etc/audit/rules.d/audit.rules",
+          "",
+          "# Поиск событий по ключу",
+          "ausearch -k passwd_changes"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-010",
+    "attack_type": "configuration_audit",
+    "cve_ids": [],
+    "name": "Lynis",
+    "description": "Аудит безопасности Unix-систем: конфигурация ядра, ssh, web-серверов, баз данных, проверка соответствия CIS/PCI.",
+    "tools": [
+      {
+        "name": "Lynis",
+        "description": "Запуск полного системного аудита.",
+        "commands": [
+          "sudo apt install lynis",
+          "",
+          "sudo lynis audit system",
+          "",
+          "# Краткий отчёт",
+          "less /var/log/lynis-report.dat"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Low",
+    "effectiveness": "Medium",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-011",
+    "attack_type": "configuration_audit",
+    "cve_ids": [],
+    "name": "OpenSCAP",
+    "description": "Соответствие стандартам безопасности (CIS, STIG, PCI) на Linux: автоматическая проверка и автоматическое исправление.",
+    "tools": [
+      {
+        "name": "oscap",
+        "description": "Сканирование на CIS-профиль и генерация отчёта.",
+        "commands": [
+          "sudo apt install libopenscap8 ssg-debian",
+          "",
+          "# Аудит по CIS",
+          "sudo oscap xccdf eval --profile xccdf_org.ssgproject.content_profile_cis --results scan-results.xml --report scan-results.html /usr/share/xml/scap/ssg/content/ssg-debian10-ds.xml"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-012",
+    "attack_type": "incident_response",
+    "cve_ids": [],
+    "name": "Velociraptor (DFIR)",
+    "description": "Платформа реагирования на инциденты и форензики: удалённый сбор артефактов, hunting через VQL, мониторинг ОС.",
+    "tools": [
+      {
+        "name": "Velociraptor",
+        "description": "Развёртывание сервера и сбор стандартных артефактов.",
+        "commands": [
+          "# Загрузка бинарника",
+          "wget https://github.com/Velocidex/velociraptor/releases/latest/download/velociraptor-linux-amd64",
+          "chmod +x velociraptor-linux-amd64",
+          "",
+          "# Запуск GUI (для теста)",
+          "./velociraptor-linux-amd64 gui",
+          "",
+          "# В UI: Hunt -> Notebook -> Запустить артефакт Windows.System.Pslist"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "High",
+    "effectiveness": "Very High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-013",
+    "attack_type": "vulnerability_management",
+    "cve_ids": [],
+    "name": "OpenVAS / Greenbone",
+    "description": "Открытый сканер сетевых уязвимостей с собственным feed-ом NVT и интеграцией с CVE/CVSS.",
+    "tools": [
+      {
+        "name": "Greenbone Vulnerability Manager",
+        "description": "Установка через Docker и базовое сканирование.",
+        "commands": [
+          "# Запуск в Docker",
+          "docker run -d -p 9392:9392 --name gvm immauss/openvas",
+          "",
+          "# UI: https://localhost:9392 (admin/admin)",
+          "",
+          "# Создать таргет, выбрать Full and Fast scan, запустить"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-014",
+    "attack_type": "container_security",
+    "cve_ids": [],
+    "name": "Trivy",
+    "description": "Сканер уязвимостей контейнерных образов, файловых систем и Git-репозиториев; быстрый и хорошо интегрируется в CI/CD.",
+    "tools": [
+      {
+        "name": "Trivy",
+        "description": "Сканирование образа Docker и файловой системы.",
+        "commands": [
+          "# Установка",
+          "sudo apt install trivy",
+          "",
+          "# Скан образа",
+          "trivy image nginx:latest",
+          "",
+          "# Скан файловой системы",
+          "trivy fs /var/www",
+          "",
+          "# В CI: blocking pipeline по HIGH/CRITICAL",
+          "trivy image --severity HIGH,CRITICAL --exit-code 1 myapp:latest"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-015",
+    "attack_type": "file_integrity_monitoring",
+    "cve_ids": [],
+    "name": "AIDE / Tripwire",
+    "description": "Мониторинг целостности файлов: фиксация эталонного состояния и обнаружение изменений важных бинарников/конфигураций.",
+    "tools": [
+      {
+        "name": "AIDE",
+        "description": "Инициализация базы и регулярные проверки.",
+        "commands": [
+          "sudo apt install aide",
+          "sudo aideinit",
+          "sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db",
+          "",
+          "# Регулярная проверка (cron)",
+          "sudo aide --check",
+          "",
+          "# Cron-задача:",
+          "echo '0 4 * * * root /usr/sbin/aide --check | mail -s AIDE root' | sudo tee /etc/cron.d/aide"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Low",
+    "effectiveness": "Medium",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-016",
+    "attack_type": "dns_security",
+    "cve_ids": [],
+    "name": "Pi-hole / Blocky",
+    "description": "DNS-фильтр для блокировки вредоносных доменов, фишинга и C2-инфраструктуры.",
+    "tools": [
+      {
+        "name": "Pi-hole",
+        "description": "Установка и подключение списков блокировки угроз.",
+        "commands": [
+          "curl -sSL https://install.pi-hole.net | bash",
+          "",
+          "# Добавление malware blocklist",
+          "pihole -a adlist add https://urlhaus.abuse.ch/downloads/hostfile/",
+          "pihole -g"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Low",
+    "effectiveness": "Medium",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-017",
+    "attack_type": "secrets_management",
+    "cve_ids": [],
+    "name": "HashiCorp Vault",
+    "description": "Централизованное хранение секретов и шифрование данных приложений; динамические креды для БД/облаков.",
+    "tools": [
+      {
+        "name": "Vault",
+        "description": "Запуск dev-сервера и хранение секрета.",
+        "commands": [
+          "vault server -dev",
+          "export VAULT_ADDR=http://127.0.0.1:8200",
+          "vault kv put secret/db username=admin password='<STRONG>'",
+          "vault kv get secret/db"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "High",
+    "effectiveness": "Very High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-018",
+    "attack_type": "network_segmentation",
+    "cve_ids": [],
+    "name": "iptables / nftables",
+    "description": "Базовый межсетевой экран Linux: фильтрация трафика, ограничение источников, защита от сетевых сканов.",
+    "tools": [
+      {
+        "name": "nftables",
+        "description": "Минимальный набор правил для серверного хоста.",
+        "commands": [
+          "# Базовый профиль: разрешаем 22, 80, 443, остальное — drop",
+          "sudo nft add table inet filter",
+          "sudo nft add chain inet filter input '{ type filter hook input priority 0 ; policy drop ; }'",
+          "sudo nft add rule inet filter input ct state established,related accept",
+          "sudo nft add rule inet filter input iifname lo accept",
+          "sudo nft add rule inet filter input tcp dport {22, 80, 443} accept",
+          "sudo nft list ruleset > /etc/nftables.conf"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-019",
+    "attack_type": "log_aggregation",
+    "cve_ids": [],
+    "name": "Graylog / ELK Stack",
+    "description": "Централизованный сбор и анализ журналов: Elasticsearch + Logstash + Kibana или Graylog с MongoDB.",
+    "tools": [
+      {
+        "name": "ELK через Docker Compose",
+        "description": "Базовый стек логирования.",
+        "commands": [
+          "git clone https://github.com/deviantony/docker-elk.git",
+          "cd docker-elk && docker-compose up -d",
+          "# Kibana: http://localhost:5601",
+          "# Logstash: входной TCP/UDP 5044 (Beats)"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "High",
+    "effectiveness": "Very High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-020",
+    "attack_type": "phishing_protection",
+    "cve_ids": [],
+    "name": "Ограничение макросов и DMARC/SPF/DKIM",
+    "description": "Технические меры против фишинга: жёсткая политика почтовой аутентификации и блокировка макросов в Office.",
+    "tools": [
+      {
+        "name": "DMARC + GPO для Office",
+        "description": "DNS-записи и групповая политика блокировки макросов из интернета.",
+        "commands": [
+          "# DMARC reject (DNS TXT _dmarc.example.com)",
+          "v=DMARC1; p=reject; rua=mailto:dmarc@example.com",
+          "",
+          "# SPF",
+          "v=spf1 mx -all",
+          "",
+          "# GPO: User Configuration -> Administrative Templates -> MS Office -> Security",
+          "# 'Block macros from running in Office files from the Internet' = Enabled"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-021",
+    "attack_type": "ssh_hardening",
+    "cve_ids": [],
+    "name": "SSH hardening + fail2ban",
+    "description": "Жёсткая настройка SSH (только ключи, отключён root-логин) и автоматическая блокировка перебора через fail2ban.",
+    "tools": [
+      {
+        "name": "OpenSSH + fail2ban",
+        "description": "Конфигурация sshd_config и базовый jail.",
+        "commands": [
+          "# /etc/ssh/sshd_config",
+          "PermitRootLogin no",
+          "PasswordAuthentication no",
+          "MaxAuthTries 3",
+          "AllowUsers ops",
+          "sudo systemctl reload ssh",
+          "",
+          "# fail2ban",
+          "sudo apt install fail2ban",
+          "sudo tee /etc/fail2ban/jail.local <<'EOF'",
+          "[sshd]",
+          "enabled = true",
+          "maxretry = 3",
+          "findtime = 600",
+          "bantime  = 86400",
+          "EOF",
+          "sudo systemctl enable --now fail2ban"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-022",
+    "attack_type": "windows_hardening",
+    "cve_ids": [],
+    "name": "Windows Hardening (LAPS + AppLocker + Credential Guard)",
+    "description": "Комплекс мер: уникальные локальные пароли (LAPS), белый список приложений (AppLocker), защита учётных данных в виртуализации (Credential Guard).",
+    "tools": [
+      {
+        "name": "LAPS / AppLocker / Credential Guard",
+        "description": "Включение через GPO и PowerShell.",
+        "commands": [
+          "# LAPS",
+          "Install-WindowsFeature -Name AdmPwd.E -IncludeManagementTools",
+          "Update-AdmPwdADSchema",
+          "",
+          "# AppLocker (только подписанные исполняемые)",
+          "New-AppLockerPolicy -RuleType Publisher -User Everyone -RuleNamePrefix 'Signed' | Set-AppLockerPolicy",
+          "",
+          "# Credential Guard (через GPO)",
+          "# Computer Config -> Admin Templates -> System -> Device Guard -> Turn On Virtualization Based Security = Enabled"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "High",
+    "effectiveness": "Very High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-023",
+    "attack_type": "data_loss_prevention",
+    "cve_ids": [],
+    "name": "DLP (Microsoft Purview / OpenDLP)",
+    "description": "Контроль утечки конфиденциальных данных: классификация, мониторинг и блокировка передачи данных по правилам.",
+    "tools": [
+      {
+        "name": "Microsoft Purview DLP",
+        "description": "Создание политики классификации и блокировки передачи PII.",
+        "commands": [
+          "# Через Purview admin center -> Information Protection -> Policies",
+          "# Action: Block sharing if document contains 5+ Credit Card Numbers"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "High",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-024",
+    "attack_type": "secure_backup",
+    "cve_ids": [],
+    "name": "Резервное копирование (Veeam / restic / borg)",
+    "description": "Регулярные бэкапы по правилу 3-2-1 с офлайн/неизменяемой копией для защиты от программ-вымогателей.",
+    "tools": [
+      {
+        "name": "restic",
+        "description": "Шифрованный инкрементальный бэкап.",
+        "commands": [
+          "sudo apt install restic",
+          "export RESTIC_REPOSITORY=/mnt/backup/repo",
+          "export RESTIC_PASSWORD='<STRONG>'",
+          "restic init",
+          "restic backup /etc /var/www",
+          "",
+          "# Снимки",
+          "restic snapshots",
+          "",
+          "# Восстановление",
+          "restic restore latest --target /tmp/restore"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "Medium",
+    "effectiveness": "Very High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-025",
+    "attack_type": "kubernetes_security",
+    "cve_ids": [],
+    "name": "Falco (Cloud-Native Runtime Security)",
+    "description": "Поведенческий мониторинг контейнеров и Kubernetes: ловит подозрительные syscall-ы, спавн оболочек, attach к контейнерам.",
+    "tools": [
+      {
+        "name": "Falco",
+        "description": "Установка через Helm в Kubernetes.",
+        "commands": [
+          "helm repo add falcosecurity https://falcosecurity.github.io/charts",
+          "helm install falco falcosecurity/falco --namespace falco --create-namespace",
+          "",
+          "# Просмотр алертов",
+          "kubectl logs -n falco -l app.kubernetes.io/name=falco -f"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-026",
+    "attack_type": "patch_management",
+    "cve_ids": [],
+    "name": "Управление обновлениями Linux (unattended-upgrades)",
+    "description": "Автоматическое применение security-обновлений на серверах Debian/Ubuntu.",
+    "tools": [
+      {
+        "name": "unattended-upgrades",
+        "description": "Включение автоматических security-апдейтов.",
+        "commands": [
+          "sudo apt install unattended-upgrades apt-listchanges",
+          "sudo dpkg-reconfigure -plow unattended-upgrades",
+          "",
+          "# Тестовый dry-run",
+          "sudo unattended-upgrades --dry-run -d",
+          "",
+          "# /etc/apt/apt.conf.d/50unattended-upgrades:",
+          "# Unattended-Upgrade::Allowed-Origins { '${distro_id}:${distro_codename}-security'; };"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "Low",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-027",
+    "attack_type": "tls_security",
+    "cve_ids": [],
+    "name": "Усиление TLS (Mozilla Modern)",
+    "description": "Сильные шифры, TLS 1.2/1.3 only, HSTS, OCSP stapling — защита транспорта от MITM, downgrade и BEAST/POODLE.",
+    "tools": [
+      {
+        "name": "Nginx TLS hardening",
+        "description": "Современная конфигурация Nginx по Mozilla SSL Configurator.",
+        "commands": [
+          "# /etc/nginx/conf.d/tls.conf",
+          "ssl_protocols TLSv1.2 TLSv1.3;",
+          "ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;",
+          "ssl_prefer_server_ciphers off;",
+          "ssl_session_cache shared:MozSSL:10m;",
+          "ssl_stapling on;",
+          "ssl_stapling_verify on;",
+          "add_header Strict-Transport-Security 'max-age=63072000' always;",
+          "",
+          "sudo nginx -t && sudo systemctl reload nginx"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-028",
+    "attack_type": "least_privilege",
+    "cve_ids": [],
+    "name": "sudo с журналированием и без NOPASSWD",
+    "description": "Принцип наименьших привилегий: sudo по конкретным командам, журнал ввода/вывода, отказ от NOPASSWD.",
+    "tools": [
+      {
+        "name": "sudoers + I/O logging",
+        "description": "Минимальные правила и логирование всей сессии.",
+        "commands": [
+          "# /etc/sudoers.d/secure",
+          "Defaults log_input,log_output,iolog_dir=/var/log/sudo-io",
+          "%admin ALL=(root) PASSWD: /usr/bin/systemctl restart nginx",
+          "%admin ALL=(root) PASSWD: /usr/bin/apt update",
+          "",
+          "sudo visudo -c -f /etc/sudoers.d/secure"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-029",
+    "attack_type": "honeypot",
+    "cve_ids": [],
+    "name": "Honeypot (T-Pot / Cowrie)",
+    "description": "Привлечение и регистрация атакующих в контролируемых ловушках; источник раннего обнаружения и threat intelligence.",
+    "tools": [
+      {
+        "name": "Cowrie SSH honeypot",
+        "description": "Эмуляция SSH/Telnet с записью сессий.",
+        "commands": [
+          "git clone https://github.com/cowrie/cowrie.git",
+          "cd cowrie && python3 -m venv venv && source venv/bin/activate",
+          "pip install -r requirements.txt",
+          "cp etc/cowrie.cfg.dist etc/cowrie.cfg",
+          "bin/cowrie start",
+          "",
+          "# Логи",
+          "tail -f var/log/cowrie/cowrie.json"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "Medium",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-SEED-030",
+    "attack_type": "deception_detection",
+    "cve_ids": [],
+    "name": "Canary tokens",
+    "description": "Файлы/учётки/URL-приманки с уникальным токеном: при доступе к ним отправляется алерт, что среда скомпрометирована.",
+    "tools": [
+      {
+        "name": "Canarytokens",
+        "description": "Создание токена и его использование.",
+        "commands": [
+          "# Сгенерировать через https://canarytokens.org (DNS, web bug, AWS keys, Word/Excel)",
+          "# Разложить файлы/ярлыки в чувствительных каталогах:",
+          "#   C:\\Backup\\admin_passwords.docx (canary)",
+          "#   /home/ops/.ssh/known_hosts_old (canary file)",
+          "",
+          "# При доступе придёт письмо/webhook"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Low",
+    "effectiveness": "High",
+    "language": "ru"
+  },
+  {
+    "id": "DEF-MITRE-M1013",
+    "mitre_mitigation_id": "M1013",
+    "attack_type": "general_security",
+    "cve_ids": [],
+    "name": "Application Developer Guidance",
+    "description": "Application Developer Guidance focuses on providing developers with the knowledge, tools, and best practices needed to write secure code, reduce vulnerabilities, and implement secure design principles. By integrating security throughout the software development lifecycle (SDLC), this mitigation aims to prevent the introduction of exploitable weaknesses in applications, systems, and APIs. This mitigation can be implemented through the following measures: Preventing SQL Injection (Secure Coding Practice): - Implementation: Train developers to use parameterized queries or prepared statements instead of directly embedding user input into SQL queries. - Use Case: A web application accepts user input to search a database. By sanitizing and validating user inputs, developers can prevent attackers from injecting malicious SQL commands. Cross-Site Scripting (XSS) Mitigation: - Implementation: Require developers to implement output encoding for all user-generated content displayed on a web page. - Use Case: An e-commerce site allows users to leave product reviews. Properly encoding and escaping user inputs prevents malicious scripts from being executed in other users’ browsers. Secure API Design: - Implementation: Train developers to authenticate all API endpoints and avoid exposing sensitive information in API responses. - Use Case: A mobile banking application uses APIs for account management. By enforcing token-based authentication for every API call, developers reduce the risk of unauthorized access. Static Code Analysis in the Build Pipeline: - Implementation: Incorporate tools into CI/CD pipelines to automatically scan for vulnerabilities during the build process. - Use Case: A fintech company integrates static analysis tools to detect hardcoded credentials in their source code before deployment. Threat Modeling in the Design Phase: - Implementation: Use frameworks like STRIDE (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege) to assess threats during application design. - Use Case: Before launching a customer portal, a SaaS company identifies potential abuse cases, such as session hijacking, and designs mitigations like secure session management. **Tools for Implementation**: - Static Code Analysis Tools: Use tools that can scan for known vulnerabilities in source code. - Dynamic Application Security Testing (DAST): Use tools like Burp Suite or OWASP ZAP to simulate runtime attacks and identify vulnerabilities. - Secure Frameworks: Recommend secure-by-default frameworks (e.g., Django for Python, Spring Security for Java) that enforce security best practices.",
+    "tools": [
+      {
+        "name": "Рекомендуемая практика безопасности (MITRE M-код)",
+        "description": "Application Developer Guidance",
+        "commands": [
+          "# Рекомендация MITRE ATT&CK: Application Developer Guidance",
+          "# Подробнее: https://attack.mitre.org/mitigations/M1013",
+          "",
+          "# Применимые техники атак (Txxxx):",
+          "T1078, T1195, T1195.001, T1212, T1496.003, T1550, T1550.001, T1559, T1559.003, T1564, T1564.009, T1564.012, T1574, T1574.001, T1593",
+          "",
+          "# Ниже — текст рекомендации (на русском, после автоматического перевода):",
+          "Application Developer Guidance focuses on providing developers with the knowledge, tools, and best practices needed to write secure code, reduce vulnerabilities, and implement secure design principles. By integrating security throughout the software development lifecycle (SDLC), this mitigation aims to prevent the introduction of exploitable weaknesses in applications, systems, and APIs. This mitigation can be implemented through the following measures: Preventing SQL Injection (Secure Coding Practice): - Implementation: Train developers to use parameterized queries or prepared statements instead of directly embedding user input into SQL queries. - Use Case: A web application accepts user input to search a database. By sanitizing and validating user inputs, developers can prevent attackers from injecting malicious SQL commands. Cross-Site Scripting (XSS) Mitigation: - Implementation: Require developers to implement output encoding for all user-generated content displayed on a web page. - Use Case: An e-commerce site allows users to leave product reviews. Properly encoding and escaping user inputs prevents malicious scripts from being executed in other users’ browsers. Secure API Design: - Implementation: Train developers to authenticate all API endpoints and avoid exposing sensitive information in API responses. - Use Case: A mobile banking application uses APIs for account management. By enforcing token-based authentication for every API call, developers reduce the risk of unauthorized access. Static Code Analysis in the Build Pipeline: - Implementation: Incorporate tools into CI/CD pipelines to automatically scan for vulnerabilities during the build process. - Use Case: A fintech company integrates static analysis tools to detect hardcoded credentials in their source code before deployment. Threat Modeling in the Design Phase: - Implementation: Use frameworks like STRIDE (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege) to assess threats during application design. - Use Case: Before launching a customer portal, a SaaS company identifies potential abuse cases, such as session hijacking, and designs mitigations like secure session management. **Tools for Implementation**: - Static Code Analysis Tools: Use tools that can scan for known vulnerabilities in source code. - Dynamic Application Security Testing (DAST): Use tools like Burp Suite or OWASP ZAP to simulate runtime attacks and identify vulnerabilities. - Secure Frameworks: Recommend secure-by-default frameworks (e.g., Django for Python, Spring Security for Java) that enforce security best practices."
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "related_techniques": [
+      "T1078",
+      "T1195",
+      "T1195.001",
+      "T1212",
+      "T1496.003",
+      "T1550",
+      "T1550.001",
+      "T1559",
+      "T1559.003",
+      "T1564",
+      "T1564.009",
+      "T1564.012",
+      "T1574",
+      "T1574.001",
+      "T1593",
+      "T1593.003",
+      "T1647"
+    ],
+    "references": [
+      "https://attack.mitre.org/mitigations/M1013"
+    ],
+    "language": "ru",
+    "source": "MITRE ATT&CK"
+  },
+  {
+    "id": "DEF-MITRE-M1016",
+    "mitre_mitigation_id": "M1016",
+    "attack_type": "general_security",
+    "cve_ids": [],
+    "name": "Vulnerability Scanning",
+    "description": "Vulnerability scanning involves the automated or manual assessment of systems, applications, and networks to identify misconfigurations, unpatched software, or other security weaknesses. The process helps prioritize remediation efforts by classifying vulnerabilities based on risk and impact, reducing the likelihood of exploitation by adversaries. This mitigation can be implemented through the following measures: Proactive Identification of Vulnerabilities - Implementation: Use tools like Nessus or OpenVAS to scan endpoints, servers, and applications for missing patches and configuration issues. Schedule regular scans to ensure timely identification of vulnerabilities introduced by new deployments or updates. - Use Case: A scan identifies unpatched software, such as outdated Apache servers, which could be exploited via CVE-XXXX-XXXX. The server is promptly patched, mitigating the risk. Cloud Environment Scanning - Implementation: Use cloud-specific vulnerability management tools like AWS Inspector, Azure Security Center, or GCP Security Command Center to identify issues like open S3 buckets or overly permissive IAM roles. - Use Case: The scan detects a misconfigured S3 bucket with public read access, which is remediated to prevent potential data leakage. Network Device Scanning - Implementation: Use tools to scan network devices for vulnerabilities, such as weak SNMP strings or outdated firmware. Correlate scan results with vendor advisories to prioritize updates. - Use Case: Scanning detects a router running outdated firmware vulnerable to CVE-XXXX-YYYY. The firmware is updated to a secure version. Web Application Scanning - Implementation: Use dynamic application security testing (DAST) tools such as OWASP ZAP or Burp Suite to scan for common vulnerabilities like SQL injection or cross-site scripting (XSS). Perform regular scans post-deployment to identify newly introduced vulnerabilities. - Use Case: A scan identifies a cross-site scripting vulnerability in a form input field, which is promptly remediated by developers. Prioritizing Vulnerabilities - Implementation: Use vulnerability scoring frameworks like CVSS to assess severity. Integrate vulnerability scanning tools with ticketing systems to assign remediation tasks based on criticality. - Use Case: A critical vulnerability with a CVSS score of 9.8 affecting remote access servers is prioritized and patched first. *Tools for Implementation* Open Source Tools: - OpenVAS: Comprehensive network and system vulnerability scanning. - OWASP ZAP: Dynamic scanning of web applications for vulnerabilities. - Nmap with NSE Scripts: Network scanning with scripts to detect vulnerabilities.",
+    "tools": [
+      {
+        "name": "Рекомендуемая практика безопасности (MITRE M-код)",
+        "description": "Vulnerability Scanning",
+        "commands": [
+          "# Рекомендация MITRE ATT&CK: Vulnerability Scanning",
+          "# Подробнее: https://attack.mitre.org/mitigations/M1016",
+          "",
+          "# Применимые техники атак (Txxxx):",
+          "T1190, T1195, T1195.001, T1195.002, T1210",
+          "",
+          "# Ниже — текст рекомендации (на русском, после автоматического перевода):",
+          "Vulnerability scanning involves the automated or manual assessment of systems, applications, and networks to identify misconfigurations, unpatched software, or other security weaknesses. The process helps prioritize remediation efforts by classifying vulnerabilities based on risk and impact, reducing the likelihood of exploitation by adversaries. This mitigation can be implemented through the following measures: Proactive Identification of Vulnerabilities - Implementation: Use tools like Nessus or OpenVAS to scan endpoints, servers, and applications for missing patches and configuration issues. Schedule regular scans to ensure timely identification of vulnerabilities introduced by new deployments or updates. - Use Case: A scan identifies unpatched software, such as outdated Apache servers, which could be exploited via CVE-XXXX-XXXX. The server is promptly patched, mitigating the risk. Cloud Environment Scanning - Implementation: Use cloud-specific vulnerability management tools like AWS Inspector, Azure Security Center, or GCP Security Command Center to identify issues like open S3 buckets or overly permissive IAM roles. - Use Case: The scan detects a misconfigured S3 bucket with public read access, which is remediated to prevent potential data leakage. Network Device Scanning - Implementation: Use tools to scan network devices for vulnerabilities, such as weak SNMP strings or outdated firmware. Correlate scan results with vendor advisories to prioritize updates. - Use Case: Scanning detects a router running outdated firmware vulnerable to CVE-XXXX-YYYY. The firmware is updated to a secure version. Web Application Scanning - Implementation: Use dynamic application security testing (DAST) tools such as OWASP ZAP or Burp Suite to scan for common vulnerabilities like SQL injection or cross-site scripting (XSS). Perform regular scans post-deployment to identify newly introduced vulnerabilities. - Use Case: A scan identifies a cross-site scripting vulnerability in a form input field, which is promptly remediated by developers. Prioritizing Vulnerabilities - Implementation: Use vulnerability scoring frameworks like CVSS to assess severity. Integrate vulnerability scanning tools with ticketing systems to assign remediation tasks based on criticality. - Use Case: A critical vulnerability with a CVSS score of 9.8 affecting remote access servers is prioritized and patched first. *Tools for Implementation* Open Source Tools: - OpenVAS: Comprehensive network and system vulnerability scanning. - OWASP ZAP: Dynamic scanning of web applications for vulnerabilities. - Nmap with NSE Scripts: Network scanning with scripts to detect vulnerabilities."
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "related_techniques": [
+      "T1190",
+      "T1195",
+      "T1195.001",
+      "T1195.002",
+      "T1210"
+    ],
+    "references": [
+      "https://attack.mitre.org/mitigations/M1016"
+    ],
+    "language": "ru",
+    "source": "MITRE ATT&CK"
+  },
+  {
+    "id": "DEF-MITRE-M1017",
+    "mitre_mitigation_id": "M1017",
+    "attack_type": "credential_access",
+    "cve_ids": [],
+    "name": "User Training",
+    "description": "User Training involves educating employees and contractors on recognizing, reporting, and preventing cyber threats that rely on human interaction, such as phishing, social engineering, and other manipulative techniques. Comprehensive training programs create a human firewall by empowering users to be an active component of the organization's cybersecurity defenses. This mitigation can be implemented through the following measures: Create Comprehensive Training Programs: - Design training modules tailored to the organization's risk profile, covering topics such as phishing, password management, and incident reporting. - Provide role-specific training for high-risk employees, such as helpdesk staff or executives. Use Simulated Exercises: - Conduct phishing simulations to measure user susceptibility and provide targeted follow-up training. - Run social engineering drills to evaluate employee responses and reinforce protocols. Leverage Gamification and Engagement: - Introduce interactive learning methods such as quizzes, gamified challenges, and rewards for successful detection and reporting of threats. Incorporate Security Policies into Onboarding: - Include cybersecurity training as part of the onboarding process for new employees. - Provide easy-to-understand materials outlining acceptable use policies and reporting procedures. Regular Refresher Courses: - Update training materials to include emerging threats and techniques used by adversaries. - Ensure all employees complete periodic refresher courses to stay informed. Emphasize Real-World Scenarios: - Use case studies of recent attacks to demonstrate the consequences of successful phishing or social engineering. - Discuss how specific employee actions can prevent or mitigate such attacks.",
+    "tools": [
+      {
+        "name": "Рекомендуемая практика безопасности (MITRE M-код)",
+        "description": "User Training",
+        "commands": [
+          "# Рекомендация MITRE ATT&CK: User Training",
+          "# Подробнее: https://attack.mitre.org/mitigations/M1017",
+          "",
+          "# Применимые техники атак (Txxxx):",
+          "T1003, T1003.001, T1003.002, T1003.003, T1003.004, T1003.005, T1027, T1036, T1036.007, T1056.002, T1072, T1078, T1078.002, T1078.004, T1111",
+          "",
+          "# Ниже — текст рекомендации (на русском, после автоматического перевода):",
+          "User Training involves educating employees and contractors on recognizing, reporting, and preventing cyber threats that rely on human interaction, such as phishing, social engineering, and other manipulative techniques. Comprehensive training programs create a human firewall by empowering users to be an active component of the organization's cybersecurity defenses. This mitigation can be implemented through the following measures: Create Comprehensive Training Programs: - Design training modules tailored to the organization's risk profile, covering topics such as phishing, password management, and incident reporting. - Provide role-specific training for high-risk employees, such as helpdesk staff or executives. Use Simulated Exercises: - Conduct phishing simulations to measure user susceptibility and provide targeted follow-up training. - Run social engineering drills to evaluate employee responses and reinforce protocols. Leverage Gamification and Engagement: - Introduce interactive learning methods such as quizzes, gamified challenges, and rewards for successful detection and reporting of threats. Incorporate Security Policies into Onboarding: - Include cybersecurity training as part of the onboarding process for new employees. - Provide easy-to-understand materials outlining acceptable use policies and reporting procedures. Regular Refresher Courses: - Update training materials to include emerging threats and techniques used by adversaries. - Ensure all employees complete periodic refresher courses to stay informed. Emphasize Real-World Scenarios: - Use case studies of recent attacks to demonstrate the consequences of successful phishing or social engineering. - Discuss how specific employee actions can prevent or mitigate such attacks."
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "related_techniques": [
+      "T1003",
+      "T1003.001",
+      "T1003.002",
+      "T1003.003",
+      "T1003.004",
+      "T1003.005",
+      "T1027",
+      "T1036",
+      "T1036.007",
+      "T1056.002",
+      "T1072",
+      "T1078",
+      "T1078.002",
+      "T1078.004",
+      "T1111",
+      "T1176",
+      "T1176.001",
+      "T1176.002",
+      "T1185",
+      "T1189",
+      "T1204",
+      "T1204.001",
+      "T1204.002",
+      "T1204.003",
+      "T1204.005",
+      "T1213",
+      "T1213.001",
+      "T1213.002",
+      "T1213.003",
+      "T1213.004",
+      "T1213.005",
+      "T1213.006",
+      "T1221",
+      "T1528",
+      "T1539",
+      "T1547.007",
+      "T1552",
+      "T1552.001",
+      "T1552.008",
+      "T1555.003",
+      "T1555.005",
+      "T1556.001",
+      "T1557",
+      "T1557.002",
+      "T1557.004",
+      "T1566",
+      "T1566.001",
+      "T1566.002",
+      "T1566.003",
+      "T1566.004"
+    ],
+    "references": [
+      "https://attack.mitre.org/mitigations/M1017"
+    ],
+    "language": "ru",
+    "source": "MITRE ATT&CK"
+  },
+  {
+    "id": "DEF-MITRE-M1021",
+    "mitre_mitigation_id": "M1021",
+    "attack_type": "general_security",
+    "cve_ids": [],
+    "name": "Restrict Web-Based Content",
+    "description": "Restricting web-based content involves enforcing policies and technologies that limit access to potentially malicious websites, unsafe downloads, and unauthorized browser behaviors. This can include URL filtering, download restrictions, script blocking, and extension control to protect against exploitation, phishing, and malware delivery. This mitigation can be implemented through the following measures: Deploy Web Proxy Filtering: - Use solutions to filter web traffic based on categories, reputation, and content types. - Enforce policies that block unsafe websites or file types at the gateway level. Enable DNS-Based Filtering: - Implement tools to restrict access to domains associated with malware or phishing campaigns. - Use public DNS filtering services to enhance protection. Enforce Content Security Policies (CSP): - Configure CSP headers on internal and external web applications to restrict script execution, iframe embedding, and cross-origin requests. Control Browser Features: - Disable unapproved browser features like automatic downloads, developer tools, or unsafe scripting. - Enforce policies through tools like Group Policy Management to control browser settings. Monitor and Alert on Web-Based Threats: - Use SIEM tools to collect and analyze web proxy logs for signs of anomalous or malicious activity. - Configure alerts for access attempts to blocked domains or repeated file download failures.",
+    "tools": [
+      {
+        "name": "Рекомендуемая практика безопасности (MITRE M-код)",
+        "description": "Restrict Web-Based Content",
+        "commands": [
+          "# Рекомендация MITRE ATT&CK: Restrict Web-Based Content",
+          "# Подробнее: https://attack.mitre.org/mitigations/M1021",
+          "",
+          "# Применимые техники атак (Txxxx):",
+          "T1059, T1059.005, T1059.007, T1102, T1102.001, T1102.002, T1102.003, T1127, T1127.002, T1133, T1189, T1204, T1204.001, T1204.004, T1218",
+          "",
+          "# Ниже — текст рекомендации (на русском, после автоматического перевода):",
+          "Restricting web-based content involves enforcing policies and technologies that limit access to potentially malicious websites, unsafe downloads, and unauthorized browser behaviors. This can include URL filtering, download restrictions, script blocking, and extension control to protect against exploitation, phishing, and malware delivery. This mitigation can be implemented through the following measures: Deploy Web Proxy Filtering: - Use solutions to filter web traffic based on categories, reputation, and content types. - Enforce policies that block unsafe websites or file types at the gateway level. Enable DNS-Based Filtering: - Implement tools to restrict access to domains associated with malware or phishing campaigns. - Use public DNS filtering services to enhance protection. Enforce Content Security Policies (CSP): - Configure CSP headers on internal and external web applications to restrict script execution, iframe embedding, and cross-origin requests. Control Browser Features: - Disable unapproved browser features like automatic downloads, developer tools, or unsafe scripting. - Enforce policies through tools like Group Policy Management to control browser settings. Monitor and Alert on Web-Based Threats: - Use SIEM tools to collect and analyze web proxy logs for signs of anomalous or malicious activity. - Configure alerts for access attempts to blocked domains or repeated file download failures."
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "related_techniques": [
+      "T1059",
+      "T1059.005",
+      "T1059.007",
+      "T1102",
+      "T1102.001",
+      "T1102.002",
+      "T1102.003",
+      "T1127",
+      "T1127.002",
+      "T1133",
+      "T1189",
+      "T1204",
+      "T1204.001",
+      "T1204.004",
+      "T1218",
+      "T1218.001",
+      "T1528",
+      "T1539",
+      "T1550.001",
+      "T1555.003",
+      "T1566",
+      "T1566.001",
+      "T1566.002",
+      "T1566.003",
+      "T1567",
+      "T1567.001",
+      "T1567.002",
+      "T1567.003",
+      "T1568",
+      "T1568.002",
+      "T1659"
+    ],
+    "references": [
+      "https://attack.mitre.org/mitigations/M1021"
+    ],
+    "language": "ru",
+    "source": "MITRE ATT&CK"
+  },
+  {
+    "id": "DEF-MITRE-M1028",
+    "mitre_mitigation_id": "M1028",
+    "attack_type": "credential_access",
+    "cve_ids": [],
+    "name": "Operating System Configuration",
+    "description": "Operating System Configuration involves adjusting system settings and hardening the default configurations of an operating system (OS) to mitigate adversary exploitation and prevent abuse of system functionality. Proper OS configurations address security vulnerabilities, limit attack surfaces, and ensure robust defense against a wide range of techniques. This mitigation can be implemented through the following measures: Disable Unused Features: - Turn off SMBv1, LLMNR, and NetBIOS where not needed. - Disable remote registry and unnecessary services. Enforce OS-level Protections: - Enable Data Execution Prevention (DEP), Address Space Layout Randomization (ASLR), and Control Flow Guard (CFG) on Windows. - Use AppArmor or SELinux on Linux for mandatory access controls. Secure Access Settings: - Enable User Account Control (UAC) for Windows. - Restrict root/sudo access on Linux/macOS and enforce strong permissions using sudoers files. File System Hardening: - Implement least-privilege access for critical files and system directories. - Audit permissions regularly using tools like icacls (Windows) or getfacl/chmod (Linux/macOS). Secure Remote Access: - Restrict RDP, SSH, and VNC to authorized IPs using firewall rules. - Enable NLA for RDP and enforce strong password/lockout policies. Harden Boot Configurations: - Enable Secure Boot and enforce UEFI/BIOS password protection. - Use BitLocker or LUKS to encrypt boot drives. Regular Audits: - Periodically audit OS configurations using tools like CIS Benchmarks or SCAP tools. *Tools for Implementation* Windows: - Microsoft Group Policy Objects (GPO): Centrally enforce OS security settings. - Windows Defender Exploit Guard: Built-in OS protection against exploits. - CIS-CAT Pro: Audit Windows security configurations based on CIS Benchmarks. Linux/macOS: - AppArmor/SELinux: Enforce mandatory access controls. - Lynis: Perform comprehensive security audits. - SCAP Security Guide: Automate configuration hardening using Security Content Automation Protocol. Cross-Platform: - Ansible or Chef/Puppet: Automate configuration hardening at scale. - OpenSCAP: Perform compliance and configuration checks.",
+    "tools": [
+      {
+        "name": "Рекомендуемая практика безопасности (MITRE M-код)",
+        "description": "Operating System Configuration",
+        "commands": [
+          "# Рекомендация MITRE ATT&CK: Operating System Configuration",
+          "# Подробнее: https://attack.mitre.org/mitigations/M1028",
+          "",
+          "# Применимые техники атак (Txxxx):",
+          "T1003, T1003.001, T1003.002, T1003.005, T1011, T1011.001, T1021.001, T1036.007, T1053, T1053.002, T1053.005, T1087, T1087.001, T1087.002, T1092",
+          "",
+          "# Ниже — текст рекомендации (на русском, после автоматического перевода):",
+          "Operating System Configuration involves adjusting system settings and hardening the default configurations of an operating system (OS) to mitigate adversary exploitation and prevent abuse of system functionality. Proper OS configurations address security vulnerabilities, limit attack surfaces, and ensure robust defense against a wide range of techniques. This mitigation can be implemented through the following measures: Disable Unused Features: - Turn off SMBv1, LLMNR, and NetBIOS where not needed. - Disable remote registry and unnecessary services. Enforce OS-level Protections: - Enable Data Execution Prevention (DEP), Address Space Layout Randomization (ASLR), and Control Flow Guard (CFG) on Windows. - Use AppArmor or SELinux on Linux for mandatory access controls. Secure Access Settings: - Enable User Account Control (UAC) for Windows. - Restrict root/sudo access on Linux/macOS and enforce strong permissions using sudoers files. File System Hardening: - Implement least-privilege access for critical files and system directories. - Audit permissions regularly using tools like icacls (Windows) or getfacl/chmod (Linux/macOS). Secure Remote Access: - Restrict RDP, SSH, and VNC to authorized IPs using firewall rules. - Enable NLA for RDP and enforce strong password/lockout policies. Harden Boot Configurations: - Enable Secure Boot and enforce UEFI/BIOS password protection. - Use BitLocker or LUKS to encrypt boot drives. Regular Audits: - Periodically audit OS configurations using tools like CIS Benchmarks or SCAP tools. *Tools for Implementation* Windows: - Microsoft Group Policy Objects (GPO): Centrally enforce OS security settings. - Windows Defender Exploit Guard: Built-in OS protection against exploits. - CIS-CAT Pro: Audit Windows security configurations based on CIS Benchmarks. Linux/macOS: - AppArmor/SELinux: Enforce mandatory access controls. - Lynis: Perform comprehensive security audits. - SCAP Security Guide: Automate configuration hardening using Security Content Automation Protocol. Cross-Platform: - Ansible or Chef/Puppet: Automate configuration hardening at scale. - OpenSCAP: Perform compliance and configuration checks."
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "related_techniques": [
+      "T1003",
+      "T1003.001",
+      "T1003.002",
+      "T1003.005",
+      "T1011",
+      "T1011.001",
+      "T1021.001",
+      "T1036.007",
+      "T1053",
+      "T1053.002",
+      "T1053.005",
+      "T1087",
+      "T1087.001",
+      "T1087.002",
+      "T1092",
+      "T1098",
+      "T1135",
+      "T1136",
+      "T1136.002",
+      "T1197",
+      "T1490",
+      "T1542.005",
+      "T1543",
+      "T1543.003",
+      "T1546.008",
+      "T1548",
+      "T1548.001",
+      "T1548.003",
+      "T1552",
+      "T1552.003",
+      "T1553",
+      "T1553.004",
+      "T1556",
+      "T1556.002",
+      "T1556.008",
+      "T1563.002",
+      "T1564.002",
+      "T1574.006",
+      "T1690"
+    ],
+    "references": [
+      "https://attack.mitre.org/mitigations/M1028"
+    ],
+    "language": "ru",
+    "source": "MITRE ATT&CK"
+  },
+  {
+    "id": "DEF-MITRE-M1029",
+    "mitre_mitigation_id": "M1029",
+    "attack_type": "general_security",
+    "cve_ids": [],
+    "name": "Remote Data Storage",
+    "description": "Remote Data Storage focuses on moving critical data, such as security logs and sensitive files, to secure, off-host locations to minimize unauthorized access, tampering, or destruction by adversaries. By leveraging remote storage solutions, organizations enhance the protection of forensic evidence, sensitive information, and monitoring data. This mitigation can be implemented through the following measures: Centralized Log Management: - Configure endpoints to forward security logs to a centralized log collector or SIEM. - Use tools like Splunk Graylog, or Security Onion to aggregate and store logs. - Example command (Linux): `sudo auditd | tee /var/log/audit/audit.log | nc 514` Remote File Storage Solutions: - Utilize cloud storage solutions like AWS S3, Google Cloud Storage, or Azure Blob Storage for sensitive data. - Ensure proper encryption at rest and access control policies (IAM roles, ACLs). Intrusion Detection Log Forwarding: - Forward logs from IDS/IPS systems (e.g., Zeek/Suricata) to a remote security information system. - Example for Suricata log forwarding: `outputs: - type: syslog protocol: tls address: ` Immutable Backup Configurations: - Enable immutable storage settings for backups to prevent adversaries from modifying or deleting data. - Example: AWS S3 Object Lock. Data Encryption: - Ensure encryption for sensitive data using AES-256 at rest and TLS 1.2+ for data in transit. Tools: OpenSSL, BitLocker, LUKS for Linux.",
+    "tools": [
+      {
+        "name": "Рекомендуемая практика безопасности (MITRE M-код)",
+        "description": "Remote Data Storage",
+        "commands": [
+          "# Рекомендация MITRE ATT&CK: Remote Data Storage",
+          "# Подробнее: https://attack.mitre.org/mitigations/M1029",
+          "",
+          "# Применимые техники атак (Txxxx):",
+          "T1070, T1070.003, T1070.007, T1070.008, T1070.009, T1072, T1119, T1565, T1565.001, T1685.005, T1685.006",
+          "",
+          "# Ниже — текст рекомендации (на русском, после автоматического перевода):",
+          "Remote Data Storage focuses on moving critical data, such as security logs and sensitive files, to secure, off-host locations to minimize unauthorized access, tampering, or destruction by adversaries. By leveraging remote storage solutions, organizations enhance the protection of forensic evidence, sensitive information, and monitoring data. This mitigation can be implemented through the following measures: Centralized Log Management: - Configure endpoints to forward security logs to a centralized log collector or SIEM. - Use tools like Splunk Graylog, or Security Onion to aggregate and store logs. - Example command (Linux): `sudo auditd | tee /var/log/audit/audit.log | nc 514` Remote File Storage Solutions: - Utilize cloud storage solutions like AWS S3, Google Cloud Storage, or Azure Blob Storage for sensitive data. - Ensure proper encryption at rest and access control policies (IAM roles, ACLs). Intrusion Detection Log Forwarding: - Forward logs from IDS/IPS systems (e.g., Zeek/Suricata) to a remote security information system. - Example for Suricata log forwarding: `outputs: - type: syslog protocol: tls address: ` Immutable Backup Configurations: - Enable immutable storage settings for backups to prevent adversaries from modifying or deleting data. - Example: AWS S3 Object Lock. Data Encryption: - Ensure encryption for sensitive data using AES-256 at rest and TLS 1.2+ for data in transit. Tools: OpenSSL, BitLocker, LUKS for Linux."
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "related_techniques": [
+      "T1070",
+      "T1070.003",
+      "T1070.007",
+      "T1070.008",
+      "T1070.009",
+      "T1072",
+      "T1119",
+      "T1565",
+      "T1565.001",
+      "T1685.005",
+      "T1685.006"
+    ],
+    "references": [
+      "https://attack.mitre.org/mitigations/M1029"
+    ],
+    "language": "ru",
+    "source": "MITRE ATT&CK"
+  },
+  {
+    "id": "DEF-MITRE-M1031",
+    "mitre_mitigation_id": "M1031",
+    "attack_type": "data_collection",
+    "cve_ids": [],
+    "name": "Network Intrusion Prevention",
+    "description": "Use intrusion detection signatures to block traffic at network boundaries.",
+    "tools": [
+      {
+        "name": "Рекомендуемая практика безопасности (MITRE M-код)",
+        "description": "Network Intrusion Prevention",
+        "commands": [
+          "# Рекомендация MITRE ATT&CK: Network Intrusion Prevention",
+          "# Подробнее: https://attack.mitre.org/mitigations/M1031",
+          "",
+          "# Применимые техники атак (Txxxx):",
+          "T1001, T1001.001, T1001.002, T1001.003, T1008, T1029, T1030, T1041, T1046, T1048, T1048.001, T1048.002, T1048.003, T1071, T1071.001",
+          "",
+          "# Ниже — текст рекомендации (на русском, после автоматического перевода):",
+          "Use intrusion detection signatures to block traffic at network boundaries."
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "related_techniques": [
+      "T1001",
+      "T1001.001",
+      "T1001.002",
+      "T1001.003",
+      "T1008",
+      "T1029",
+      "T1030",
+      "T1041",
+      "T1046",
+      "T1048",
+      "T1048.001",
+      "T1048.002",
+      "T1048.003",
+      "T1071",
+      "T1071.001",
+      "T1071.002",
+      "T1071.003",
+      "T1071.004",
+      "T1071.005",
+      "T1090",
+      "T1090.001",
+      "T1090.002",
+      "T1095",
+      "T1102",
+      "T1102.001",
+      "T1102.002",
+      "T1102.003",
+      "T1104",
+      "T1105",
+      "T1132",
+      "T1132.001",
+      "T1132.002",
+      "T1204",
+      "T1204.001",
+      "T1204.003",
+      "T1204.004",
+      "T1204.005",
+      "T1219",
+      "T1221",
+      "T1542.004",
+      "T1542.005",
+      "T1557",
+      "T1557.001",
+      "T1557.002",
+      "T1557.003",
+      "T1557.004",
+      "T1566",
+      "T1566.001",
+      "T1568",
+      "T1568.002"
+    ],
+    "references": [
+      "https://attack.mitre.org/mitigations/M1031"
+    ],
+    "language": "ru",
+    "source": "MITRE ATT&CK"
+  },
+  {
+    "id": "DEF-MITRE-M1033",
+    "mitre_mitigation_id": "M1033",
+    "attack_type": "lateral_movement",
+    "cve_ids": [],
+    "name": "Limit Software Installation",
+    "description": "Prevent users or groups from installing unauthorized or unapproved software to reduce the risk of introducing malicious or vulnerable applications. This can be achieved through allowlists, software restriction policies, endpoint management tools, and least privilege access principles. This mitigation can be implemented through the following measures: Application Whitelisting - Implement Microsoft AppLocker or Windows Defender Application Control (WDAC) to create and enforce allowlists for approved software. - Whitelist applications based on file hash, path, or digital signatures. Restrict User Permissions - Remove local administrator rights for all non-IT users. - Use Role-Based Access Control (RBAC) to restrict installation permissions to privileged accounts only. Software Restriction Policies (SRP) - Use GPO to configure SRP to deny execution of binaries from directories such as `%AppData%`, `%Temp%`, and external drives. - Restrict specific file types (`.exe`, `.bat`, `.msi`, `.js`, `.vbs`) to trusted directories only. Endpoint Management Solutions - Deploy tools like Microsoft Intune, SCCM, or Jamf for centralized software management. - Maintain a list of approved software, versions, and updates across the enterprise. Monitor Software Installation Events - Enable logging of software installation events and monitor Windows Event ID 4688 and Event ID 11707 for software installs. - Use SIEM or EDR tools to alert on attempts to install unapproved software. Implement Software Inventory Management - Use tools like OSQuery or Wazuh to scan for unauthorized software on endpoints and servers. - Conduct regular audits to detect and remove unapproved software. *Tools for Implementation* Application Whitelisting: - Microsoft AppLocker - Windows Defender Application Control (WDAC) Endpoint Management: - Microsoft Intune - SCCM (System Center Configuration Manager) - Jamf Pro (macOS) - Puppet or Ansible for automation Software Restriction Policies: - Group Policy Object (GPO) - Microsoft Software Restriction Policies (SRP) Monitoring and Logging: - Splunk - OSQuery - Wazuh (open-source SIEM and XDR) - EDRs Inventory Management and Auditing: - OSQuery - Wazuh",
+    "tools": [
+      {
+        "name": "Рекомендуемая практика безопасности (MITRE M-код)",
+        "description": "Limit Software Installation",
+        "commands": [
+          "# Рекомендация MITRE ATT&CK: Limit Software Installation",
+          "# Подробнее: https://attack.mitre.org/mitigations/M1033",
+          "",
+          "# Применимые техники атак (Txxxx):",
+          "T1021.005, T1059, T1059.006, T1059.011, T1072, T1176, T1176.001, T1176.002, T1195, T1195.001, T1204, T1204.005, T1543, T1543.002, T1547.013",
+          "",
+          "# Ниже — текст рекомендации (на русском, после автоматического перевода):",
+          "Prevent users or groups from installing unauthorized or unapproved software to reduce the risk of introducing malicious or vulnerable applications. This can be achieved through allowlists, software restriction policies, endpoint management tools, and least privilege access principles. This mitigation can be implemented through the following measures: Application Whitelisting - Implement Microsoft AppLocker or Windows Defender Application Control (WDAC) to create and enforce allowlists for approved software. - Whitelist applications based on file hash, path, or digital signatures. Restrict User Permissions - Remove local administrator rights for all non-IT users. - Use Role-Based Access Control (RBAC) to restrict installation permissions to privileged accounts only. Software Restriction Policies (SRP) - Use GPO to configure SRP to deny execution of binaries from directories such as `%AppData%`, `%Temp%`, and external drives. - Restrict specific file types (`.exe`, `.bat`, `.msi`, `.js`, `.vbs`) to trusted directories only. Endpoint Management Solutions - Deploy tools like Microsoft Intune, SCCM, or Jamf for centralized software management. - Maintain a list of approved software, versions, and updates across the enterprise. Monitor Software Installation Events - Enable logging of software installation events and monitor Windows Event ID 4688 and Event ID 11707 for software installs. - Use SIEM or EDR tools to alert on attempts to install unapproved software. Implement Software Inventory Management - Use tools like OSQuery or Wazuh to scan for unauthorized software on endpoints and servers. - Conduct regular audits to detect and remove unapproved software. *Tools for Implementation* Application Whitelisting: - Microsoft AppLocker - Windows Defender Application Control (WDAC) Endpoint Management: - Microsoft Intune - SCCM (System Center Configuration Manager) - Jamf Pro (macOS) - Puppet or Ansible for automation Software Restriction Policies: - Group Policy Object (GPO) - Microsoft Software Restriction Policies (SRP) Monitoring and Logging: - Splunk - OSQuery - Wazuh (open-source SIEM and XDR) - EDRs Inventory Management and Auditing: - OSQuery - Wazuh"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "related_techniques": [
+      "T1021.005",
+      "T1059",
+      "T1059.006",
+      "T1059.011",
+      "T1072",
+      "T1176",
+      "T1176.001",
+      "T1176.002",
+      "T1195",
+      "T1195.001",
+      "T1204",
+      "T1204.005",
+      "T1543",
+      "T1543.002",
+      "T1547.013",
+      "T1564",
+      "T1564.003"
+    ],
+    "references": [
+      "https://attack.mitre.org/mitigations/M1033"
+    ],
+    "language": "ru",
+    "source": "MITRE ATT&CK"
+  },
+  {
+    "id": "DEF-MITRE-M1034",
+    "mitre_mitigation_id": "M1034",
+    "attack_type": "general_security",
+    "cve_ids": [],
+    "name": "Limit Hardware Installation",
+    "description": "Prevent unauthorized users or groups from installing or using hardware, such as external drives, peripheral devices, or unapproved internal hardware components, by enforcing hardware usage policies and technical controls. This includes disabling USB ports, restricting driver installation, and implementing endpoint security tools to monitor and block unapproved devices. This mitigation can be implemented through the following measures: Disable USB Ports and Hardware Installation Policies: - Use Group Policy Objects (GPO) to disable USB mass storage devices: - Navigate to Computer Configuration > Administrative Templates > System > Removable Storage Access. - Deny write and read access to USB devices. - Whitelist approved devices using unique serial numbers via Windows Device Installation Policies. Deploy Endpoint Protection and Device Control Solutions: - Use tools like Microsoft Defender for Endpoint, Symantec Endpoint Protection, or Tanium to monitor and block unauthorized hardware. - Implement device control policies to allow specific hardware types (e.g., keyboards, mice) and block others. Harden BIOS/UEFI and System Firmware: - Set strong passwords for BIOS/UEFI access. - Enable Secure Boot to prevent rogue hardware components from loading unauthorized firmware. Restrict Peripheral Devices and Drivers: - Use Windows Device Manager Policies to block installation of unapproved drivers. - Monitor hardware installation attempts through endpoint monitoring tools. Disable Bluetooth and Wireless Hardware: - Use GPO or MDM tools to disable Bluetooth and Wi-Fi interfaces across systems. - Restrict hardware pairing to approved devices only. Logging and Monitoring: - Enable logging for hardware installation events in Windows Event Logs (Event ID 20001 for Device Setup Manager). - Use SIEM solutions (e.g., Splunk, Elastic Stack) to detect unauthorized hardware installation activities. *Tools for Implementation* USB and Device Control: - Microsoft Group Policy Objects (GPO) - Microsoft Defender for Endpoint - Symantec Endpoint Protection - McAfee Device Control Endpoint Monitoring: - EDRs - OSSEC (open-source host-based IDS) Hardware Whitelisting: - BitLocker for external drives (Windows) - Windows Device Installation Policies - Device Control BIOS/UEFI Security: - Secure Boot (Windows/Linux) Firmware management tools like Dell Command Update or HP Sure Start",
+    "tools": [
+      {
+        "name": "Рекомендуемая практика безопасности (MITRE M-код)",
+        "description": "Limit Hardware Installation",
+        "commands": [
+          "# Рекомендация MITRE ATT&CK: Limit Hardware Installation",
+          "# Подробнее: https://attack.mitre.org/mitigations/M1034",
+          "",
+          "# Применимые техники атак (Txxxx):",
+          "T1052, T1052.001, T1091, T1200, T1219, T1219.003, T1674",
+          "",
+          "# Ниже — текст рекомендации (на русском, после автоматического перевода):",
+          "Prevent unauthorized users or groups from installing or using hardware, such as external drives, peripheral devices, or unapproved internal hardware components, by enforcing hardware usage policies and technical controls. This includes disabling USB ports, restricting driver installation, and implementing endpoint security tools to monitor and block unapproved devices. This mitigation can be implemented through the following measures: Disable USB Ports and Hardware Installation Policies: - Use Group Policy Objects (GPO) to disable USB mass storage devices: - Navigate to Computer Configuration > Administrative Templates > System > Removable Storage Access. - Deny write and read access to USB devices. - Whitelist approved devices using unique serial numbers via Windows Device Installation Policies. Deploy Endpoint Protection and Device Control Solutions: - Use tools like Microsoft Defender for Endpoint, Symantec Endpoint Protection, or Tanium to monitor and block unauthorized hardware. - Implement device control policies to allow specific hardware types (e.g., keyboards, mice) and block others. Harden BIOS/UEFI and System Firmware: - Set strong passwords for BIOS/UEFI access. - Enable Secure Boot to prevent rogue hardware components from loading unauthorized firmware. Restrict Peripheral Devices and Drivers: - Use Windows Device Manager Policies to block installation of unapproved drivers. - Monitor hardware installation attempts through endpoint monitoring tools. Disable Bluetooth and Wireless Hardware: - Use GPO or MDM tools to disable Bluetooth and Wi-Fi interfaces across systems. - Restrict hardware pairing to approved devices only. Logging and Monitoring: - Enable logging for hardware installation events in Windows Event Logs (Event ID 20001 for Device Setup Manager). - Use SIEM solutions (e.g., Splunk, Elastic Stack) to detect unauthorized hardware installation activities. *Tools for Implementation* USB and Device Control: - Microsoft Group Policy Objects (GPO) - Microsoft Defender for Endpoint - Symantec Endpoint Protection - McAfee Device Control Endpoint Monitoring: - EDRs - OSSEC (open-source host-based IDS) Hardware Whitelisting: - BitLocker for external drives (Windows) - Windows Device Installation Policies - Device Control BIOS/UEFI Security: - Secure Boot (Windows/Linux) Firmware management tools like Dell Command Update or HP Sure Start"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "related_techniques": [
+      "T1052",
+      "T1052.001",
+      "T1091",
+      "T1200",
+      "T1219",
+      "T1219.003",
+      "T1674"
+    ],
+    "references": [
+      "https://attack.mitre.org/mitigations/M1034"
+    ],
+    "language": "ru",
+    "source": "MITRE ATT&CK"
+  },
+  {
+    "id": "DEF-MITRE-M1035",
+    "mitre_mitigation_id": "M1035",
+    "attack_type": "credential_access",
+    "cve_ids": [],
+    "name": "Limit Access to Resource Over Network",
+    "description": "Restrict access to network resources, such as file shares, remote systems, and services, to only those users, accounts, or systems with a legitimate business requirement. This can include employing technologies like network concentrators, RDP gateways, and zero-trust network access (ZTNA) models, alongside hardening services and protocols. This mitigation can be implemented through the following measures: Audit and Restrict Access: - Regularly audit permissions for file shares, network services, and remote access tools. - Remove unnecessary access and enforce least privilege principles for users and services. - Use Active Directory and IAM tools to restrict access based on roles and attributes. Deploy Secure Remote Access Solutions: - Use RDP gateways, VPN concentrators, and ZTNA solutions to aggregate and secure remote access connections. - Configure access controls to restrict connections based on time, device, and user identity. - Enforce MFA for all remote access mechanisms. Disable Unnecessary Services: - Identify running services using tools like netstat (Windows/Linux) or Nmap. - Disable unused services, such as Telnet, FTP, and legacy SMB, to reduce the attack surface. - Use firewall rules to block traffic on unused ports and protocols. Network Segmentation and Isolation: - Use VLANs, firewalls, or micro-segmentation to isolate critical network resources from general access. - Restrict communication between subnets to prevent lateral movement. Monitor and Log Access: - Monitor access attempts to file shares, RDP, and remote network resources using SIEM tools. - Enable auditing and logging for successful and failed attempts to access restricted resources. *Tools for Implementation* File Share Management: - Microsoft Active Directory Group Policies - Samba (Linux/Unix file share management) - AccessEnum (Windows access auditing tool) Secure Remote Access: - Microsoft Remote Desktop Gateway - Apache Guacamole (open-source RDP/VNC gateway) - Zero Trust solutions: Tailscale, Cloudflare Zero Trust Service and Protocol Hardening: - Nmap or Nessus for network service discovery - Windows Group Policy Editor for disabling SMBv1, Telnet, and legacy protocols - iptables or firewalld (Linux) for blocking unnecessary traffic Network Segmentation: - pfSense for open-source network isolation",
+    "tools": [
+      {
+        "name": "Рекомендуемая практика безопасности (MITRE M-код)",
+        "description": "Limit Access to Resource Over Network",
+        "commands": [
+          "# Рекомендация MITRE ATT&CK: Limit Access to Resource Over Network",
+          "# Подробнее: https://attack.mitre.org/mitigations/M1035",
+          "",
+          "# Применимые техники атак (Txxxx):",
+          "T1021, T1021.001, T1021.002, T1133, T1190, T1200, T1542, T1542.005, T1546.008, T1552, T1552.005, T1552.007, T1557, T1557.002, T1563.002",
+          "",
+          "# Ниже — текст рекомендации (на русском, после автоматического перевода):",
+          "Restrict access to network resources, such as file shares, remote systems, and services, to only those users, accounts, or systems with a legitimate business requirement. This can include employing technologies like network concentrators, RDP gateways, and zero-trust network access (ZTNA) models, alongside hardening services and protocols. This mitigation can be implemented through the following measures: Audit and Restrict Access: - Regularly audit permissions for file shares, network services, and remote access tools. - Remove unnecessary access and enforce least privilege principles for users and services. - Use Active Directory and IAM tools to restrict access based on roles and attributes. Deploy Secure Remote Access Solutions: - Use RDP gateways, VPN concentrators, and ZTNA solutions to aggregate and secure remote access connections. - Configure access controls to restrict connections based on time, device, and user identity. - Enforce MFA for all remote access mechanisms. Disable Unnecessary Services: - Identify running services using tools like netstat (Windows/Linux) or Nmap. - Disable unused services, such as Telnet, FTP, and legacy SMB, to reduce the attack surface. - Use firewall rules to block traffic on unused ports and protocols. Network Segmentation and Isolation: - Use VLANs, firewalls, or micro-segmentation to isolate critical network resources from general access. - Restrict communication between subnets to prevent lateral movement. Monitor and Log Access: - Monitor access attempts to file shares, RDP, and remote network resources using SIEM tools. - Enable auditing and logging for successful and failed attempts to access restricted resources. *Tools for Implementation* File Share Management: - Microsoft Active Directory Group Policies - Samba (Linux/Unix file share management) - AccessEnum (Windows access auditing tool) Secure Remote Access: - Microsoft Remote Desktop Gateway - Apache Guacamole (open-source RDP/VNC gateway) - Zero Trust solutions: Tailscale, Cloudflare Zero Trust Service and Protocol Hardening: - Nmap or Nessus for network service discovery - Windows Group Policy Editor for disabling SMBv1, Telnet, and legacy protocols - iptables or firewalld (Linux) for blocking unnecessary traffic Network Segmentation: - pfSense for open-source network isolation"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "related_techniques": [
+      "T1021",
+      "T1021.001",
+      "T1021.002",
+      "T1133",
+      "T1190",
+      "T1200",
+      "T1542",
+      "T1542.005",
+      "T1546.008",
+      "T1552",
+      "T1552.005",
+      "T1552.007",
+      "T1557",
+      "T1557.002",
+      "T1563.002",
+      "T1609",
+      "T1610",
+      "T1612",
+      "T1613"
+    ],
+    "references": [
+      "https://attack.mitre.org/mitigations/M1035"
+    ],
+    "language": "ru",
+    "source": "MITRE ATT&CK"
+  },
+  {
+    "id": "DEF-MITRE-M1037",
+    "mitre_mitigation_id": "M1037",
+    "attack_type": "data_collection",
+    "cve_ids": [],
+    "name": "Filter Network Traffic",
+    "description": "Employ network appliances and endpoint software to filter ingress, egress, and lateral network traffic. This includes protocol-based filtering, enforcing firewall rules, and blocking or restricting traffic based on predefined conditions to limit adversary movement and data exfiltration. This mitigation can be implemented through the following measures: Ingress Traffic Filtering: - Use Case: Configure network firewalls to allow traffic only from authorized IP addresses to public-facing servers. - Implementation: Limit SSH (port 22) and RDP (port 3389) traffic to specific IP ranges. Egress Traffic Filtering: - Use Case: Use firewalls or endpoint security software to block unauthorized outbound traffic to prevent data exfiltration and command-and-control (C2) communications. - Implementation: Block outbound traffic to known malicious IPs or regions where communication is unexpected. Protocol-Based Filtering: - Use Case: Restrict the use of specific protocols that are commonly abused by adversaries, such as SMB, RPC, or Telnet, based on business needs. - Implementation: Disable SMBv1 on endpoints to prevent exploits like EternalBlue. Network Segmentation: - Use Case: Create network segments for critical systems and restrict communication between segments unless explicitly authorized. - Implementation: Implement VLANs to isolate IoT devices or guest networks from core business systems. Application Layer Filtering: - Use Case: Use proxy servers or Web Application Firewalls (WAFs) to inspect and block malicious HTTP/S traffic. - Implementation: Configure a WAF to block SQL injection attempts or other web application exploitation techniques.",
+    "tools": [
+      {
+        "name": "Рекомендуемая практика безопасности (MITRE M-код)",
+        "description": "Filter Network Traffic",
+        "commands": [
+          "# Рекомендация MITRE ATT&CK: Filter Network Traffic",
+          "# Подробнее: https://attack.mitre.org/mitigations/M1037",
+          "",
+          "# Применимые техники атак (Txxxx):",
+          "T1021.002, T1021.005, T1048, T1048.001, T1048.002, T1048.003, T1071, T1071.001, T1071.002, T1071.003, T1071.004, T1071.005, T1090, T1090.003, T1095",
+          "",
+          "# Ниже — текст рекомендации (на русском, после автоматического перевода):",
+          "Employ network appliances and endpoint software to filter ingress, egress, and lateral network traffic. This includes protocol-based filtering, enforcing firewall rules, and blocking or restricting traffic based on predefined conditions to limit adversary movement and data exfiltration. This mitigation can be implemented through the following measures: Ingress Traffic Filtering: - Use Case: Configure network firewalls to allow traffic only from authorized IP addresses to public-facing servers. - Implementation: Limit SSH (port 22) and RDP (port 3389) traffic to specific IP ranges. Egress Traffic Filtering: - Use Case: Use firewalls or endpoint security software to block unauthorized outbound traffic to prevent data exfiltration and command-and-control (C2) communications. - Implementation: Block outbound traffic to known malicious IPs or regions where communication is unexpected. Protocol-Based Filtering: - Use Case: Restrict the use of specific protocols that are commonly abused by adversaries, such as SMB, RPC, or Telnet, based on business needs. - Implementation: Disable SMBv1 on endpoints to prevent exploits like EternalBlue. Network Segmentation: - Use Case: Create network segments for critical systems and restrict communication between segments unless explicitly authorized. - Implementation: Implement VLANs to isolate IoT devices or guest networks from core business systems. Application Layer Filtering: - Use Case: Use proxy servers or Web Application Firewalls (WAFs) to inspect and block malicious HTTP/S traffic. - Implementation: Configure a WAF to block SQL injection attempts or other web application exploitation techniques."
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "related_techniques": [
+      "T1021.002",
+      "T1021.005",
+      "T1048",
+      "T1048.001",
+      "T1048.002",
+      "T1048.003",
+      "T1071",
+      "T1071.001",
+      "T1071.002",
+      "T1071.003",
+      "T1071.004",
+      "T1071.005",
+      "T1090",
+      "T1090.003",
+      "T1095",
+      "T1105",
+      "T1187",
+      "T1190",
+      "T1197",
+      "T1205",
+      "T1205.001",
+      "T1205.002",
+      "T1218",
+      "T1218.012",
+      "T1219",
+      "T1219.002",
+      "T1498",
+      "T1498.001",
+      "T1498.002",
+      "T1499",
+      "T1499.001",
+      "T1499.002",
+      "T1499.003",
+      "T1499.004",
+      "T1530",
+      "T1537",
+      "T1552",
+      "T1552.005",
+      "T1557",
+      "T1557.001",
+      "T1557.002",
+      "T1557.003",
+      "T1570",
+      "T1572",
+      "T1599",
+      "T1599.001",
+      "T1602",
+      "T1602.001",
+      "T1602.002"
+    ],
+    "references": [
+      "https://attack.mitre.org/mitigations/M1037"
+    ],
+    "language": "ru",
+    "source": "MITRE ATT&CK"
+  },
+  {
+    "id": "DEF-MITRE-M1038",
+    "mitre_mitigation_id": "M1038",
+    "attack_type": "execution",
+    "cve_ids": [],
+    "name": "Execution Prevention",
+    "description": "Prevent the execution of unauthorized or malicious code on systems by implementing application control, script blocking, and other execution prevention mechanisms. This ensures that only trusted and authorized code is executed, reducing the risk of malware and unauthorized actions. This mitigation can be implemented through the following measures: Application Control: - Use Case: Use tools like AppLocker or Windows Defender Application Control (WDAC) to create whitelists of authorized applications and block unauthorized ones. On Linux, use tools like SELinux or AppArmor to define mandatory access control policies for application execution. - Implementation: Allow only digitally signed or pre-approved applications to execute on servers and endpoints. (e.g., `New-AppLockerPolicy -PolicyType Enforced -FilePath \"C:\\Policies\\AppLocker.xml\"`) Script Blocking: - Use Case: Use script control mechanisms to block unauthorized execution of scripts, such as PowerShell or JavaScript. Web Browsers: Use browser extensions or settings to block JavaScript execution from untrusted sources. - Implementation: Configure PowerShell to enforce Constrained Language Mode for non-administrator users. (e.g., `Set-ExecutionPolicy AllSigned`) Executable Blocking: - Use Case: Prevent execution of binaries from suspicious locations, such as `%TEMP%` or `%APPDATA%` directories. - Implementation: Block execution of `.exe`, `.bat`, or `.ps1` files from user-writable directories. Dynamic Analysis Prevention: - Use Case: Use behavior-based execution prevention tools to identify and block malicious activity in real time. - Implemenation: Employ EDR solutions that analyze runtime behavior and block suspicious code execution.",
+    "tools": [
+      {
+        "name": "Рекомендуемая практика безопасности (MITRE M-код)",
+        "description": "Execution Prevention",
+        "commands": [
+          "# Рекомендация MITRE ATT&CK: Execution Prevention",
+          "# Подробнее: https://attack.mitre.org/mitigations/M1038",
+          "",
+          "# Применимые техники атак (Txxxx):",
+          "T1036, T1036.005, T1036.008, T1047, T1059, T1059.001, T1059.002, T1059.003, T1059.004, T1059.005, T1059.006, T1059.007, T1059.008, T1059.009, T1059.010",
+          "",
+          "# Ниже — текст рекомендации (на русском, после автоматического перевода):",
+          "Prevent the execution of unauthorized or malicious code on systems by implementing application control, script blocking, and other execution prevention mechanisms. This ensures that only trusted and authorized code is executed, reducing the risk of malware and unauthorized actions. This mitigation can be implemented through the following measures: Application Control: - Use Case: Use tools like AppLocker or Windows Defender Application Control (WDAC) to create whitelists of authorized applications and block unauthorized ones. On Linux, use tools like SELinux or AppArmor to define mandatory access control policies for application execution. - Implementation: Allow only digitally signed or pre-approved applications to execute on servers and endpoints. (e.g., `New-AppLockerPolicy -PolicyType Enforced -FilePath \"C:\\Policies\\AppLocker.xml\"`) Script Blocking: - Use Case: Use script control mechanisms to block unauthorized execution of scripts, such as PowerShell or JavaScript. Web Browsers: Use browser extensions or settings to block JavaScript execution from untrusted sources. - Implementation: Configure PowerShell to enforce Constrained Language Mode for non-administrator users. (e.g., `Set-ExecutionPolicy AllSigned`) Executable Blocking: - Use Case: Prevent execution of binaries from suspicious locations, such as `%TEMP%` or `%APPDATA%` directories. - Implementation: Block execution of `.exe`, `.bat`, or `.ps1` files from user-writable directories. Dynamic Analysis Prevention: - Use Case: Use behavior-based execution prevention tools to identify and block malicious activity in real time. - Implemenation: Employ EDR solutions that analyze runtime behavior and block suspicious code execution."
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "related_techniques": [
+      "T1036",
+      "T1036.005",
+      "T1036.008",
+      "T1047",
+      "T1059",
+      "T1059.001",
+      "T1059.002",
+      "T1059.003",
+      "T1059.004",
+      "T1059.005",
+      "T1059.006",
+      "T1059.007",
+      "T1059.008",
+      "T1059.009",
+      "T1059.010",
+      "T1059.011",
+      "T1059.013",
+      "T1068",
+      "T1080",
+      "T1106",
+      "T1127",
+      "T1127.001",
+      "T1127.003",
+      "T1129",
+      "T1176",
+      "T1176.001",
+      "T1176.002",
+      "T1204",
+      "T1204.002",
+      "T1204.004",
+      "T1216",
+      "T1216.001",
+      "T1216.002",
+      "T1218",
+      "T1218.001",
+      "T1218.002",
+      "T1218.003",
+      "T1218.004",
+      "T1218.005",
+      "T1218.008",
+      "T1218.009",
+      "T1218.012",
+      "T1218.013",
+      "T1218.014",
+      "T1218.015",
+      "T1219",
+      "T1219.001",
+      "T1219.002",
+      "T1220",
+      "T1490"
+    ],
+    "references": [
+      "https://attack.mitre.org/mitigations/M1038"
+    ],
+    "language": "ru",
+    "source": "MITRE ATT&CK"
+  },
+  {
+    "id": "DEF-MITRE-M1043",
+    "mitre_mitigation_id": "M1043",
+    "attack_type": "credential_access",
+    "cve_ids": [],
+    "name": "Credential Access Protection",
+    "description": "Credential Access Protection focuses on implementing measures to prevent adversaries from obtaining credentials, such as passwords, hashes, tokens, or keys, that could be used for unauthorized access. This involves restricting access to credential storage mechanisms, hardening configurations to block credential dumping methods, and using monitoring tools to detect suspicious credential-related activity. This mitigation can be implemented through the following measures: Restrict Access to Credential Storage: - Use Case: Prevent adversaries from accessing the SAM (Security Account Manager) database on Windows systems. - Implementation: Enforce least privilege principles and restrict administrative access to credential stores such as `C:\\Windows\\System32\\config\\SAM`. Use Credential Guard: - Use Case: Isolate LSASS (Local Security Authority Subsystem Service) memory to prevent credential dumping. - Implementation: Enable Windows Defender Credential Guard on enterprise endpoints to isolate secrets and protect them from unauthorized access. Monitor for Credential Dumping Tools: - Use Case: Detect and block known tools like Mimikatz or Windows Credential Editor. - Implementation: Flag suspicious process behavior related to credential dumping. Disable Cached Credentials: - Use Case: Prevent adversaries from exploiting cached credentials on endpoints. - Implementation: Configure group policy to reduce or eliminate the use of cached credentials (e.g., set Interactive logon: Number of previous logons to cache to 0). Enable Secure Boot and Memory Protections: - Use Case: Prevent memory-based attacks used to extract credentials. - Implementation: Configure Secure Boot and enforce hardware-based security features like DEP (Data Execution Prevention) and ASLR (Address Space Layout Randomization).",
+    "tools": [
+      {
+        "name": "Рекомендуемая практика безопасности (MITRE M-код)",
+        "description": "Credential Access Protection",
+        "commands": [
+          "# Рекомендация MITRE ATT&CK: Credential Access Protection",
+          "# Подробнее: https://attack.mitre.org/mitigations/M1043",
+          "",
+          "# Применимые техники атак (Txxxx):",
+          "T1003, T1003.001, T1547.008, T1558, T1558.005, T1599, T1599.001, T1601, T1601.001, T1601.002",
+          "",
+          "# Ниже — текст рекомендации (на русском, после автоматического перевода):",
+          "Credential Access Protection focuses on implementing measures to prevent adversaries from obtaining credentials, such as passwords, hashes, tokens, or keys, that could be used for unauthorized access. This involves restricting access to credential storage mechanisms, hardening configurations to block credential dumping methods, and using monitoring tools to detect suspicious credential-related activity. This mitigation can be implemented through the following measures: Restrict Access to Credential Storage: - Use Case: Prevent adversaries from accessing the SAM (Security Account Manager) database on Windows systems. - Implementation: Enforce least privilege principles and restrict administrative access to credential stores such as `C:\\Windows\\System32\\config\\SAM`. Use Credential Guard: - Use Case: Isolate LSASS (Local Security Authority Subsystem Service) memory to prevent credential dumping. - Implementation: Enable Windows Defender Credential Guard on enterprise endpoints to isolate secrets and protect them from unauthorized access. Monitor for Credential Dumping Tools: - Use Case: Detect and block known tools like Mimikatz or Windows Credential Editor. - Implementation: Flag suspicious process behavior related to credential dumping. Disable Cached Credentials: - Use Case: Prevent adversaries from exploiting cached credentials on endpoints. - Implementation: Configure group policy to reduce or eliminate the use of cached credentials (e.g., set Interactive logon: Number of previous logons to cache to 0). Enable Secure Boot and Memory Protections: - Use Case: Prevent memory-based attacks used to extract credentials. - Implementation: Configure Secure Boot and enforce hardware-based security features like DEP (Data Execution Prevention) and ASLR (Address Space Layout Randomization)."
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "related_techniques": [
+      "T1003",
+      "T1003.001",
+      "T1547.008",
+      "T1558",
+      "T1558.005",
+      "T1599",
+      "T1599.001",
+      "T1601",
+      "T1601.001",
+      "T1601.002"
+    ],
+    "references": [
+      "https://attack.mitre.org/mitigations/M1043"
+    ],
+    "language": "ru",
+    "source": "MITRE ATT&CK"
+  },
+  {
+    "id": "DEF-MITRE-M1052",
+    "mitre_mitigation_id": "M1052",
+    "attack_type": "general_security",
+    "cve_ids": [],
+    "name": "User Account Control",
+    "description": "User Account Control (UAC) is a security feature in Microsoft Windows that prevents unauthorized changes to the operating system. UAC prompts users to confirm or provide administrator credentials when an action requires elevated privileges. Proper configuration of UAC reduces the risk of privilege escalation attacks. This mitigation can be implemented through the following measures: Enable UAC Globally: - Ensure UAC is enabled through Group Policy by setting `User Account Control: Run all administrators in Admin Approval Mode` to `Enabled`. Require Credential Prompt: - Use Group Policy to configure UAC to prompt for administrative credentials instead of just confirmation (`User Account Control: Behavior of the elevation prompt`). Restrict Built-in Administrator Account: Set `Admin Approval Mode` for the built-in Administrator account to `Enabled` in Group Policy. Secure the UAC Prompt: - Configure UAC prompts to display on the secure desktop (`User Account Control: Switch to the secure desktop when prompting for elevation`). Prevent UAC Bypass: - Block untrusted applications from triggering UAC prompts by configuring `User Account Control: Only elevate executables that are signed and validated`. - Use EDR tools to detect and block known UAC bypass techniques. Monitor UAC-Related Events: - Use Windows Event Viewer to monitor for event ID 4688 (process creation) and look for suspicious processes attempting to invoke UAC elevation. *Tools for Implementation* Built-in Windows Tools: - Group Policy Editor: Configure UAC settings centrally for enterprise environments. - Registry Editor: Modify UAC-related settings directly, such as `EnableLUA` and `ConsentPromptBehaviorAdmin`. Endpoint Security Solutions: - Microsoft Defender for Endpoint: Detects and blocks UAC bypass techniques. - Sysmon: Logs process creations and monitors UAC elevation attempts for suspicious activity. Third-Party Security Tools: - Process Monitor (Sysinternals): Tracks real-time processes interacting with UAC. - EventSentry: Monitors Windows Event Logs for UAC-related alerts.",
+    "tools": [
+      {
+        "name": "Рекомендуемая практика безопасности (MITRE M-код)",
+        "description": "User Account Control",
+        "commands": [
+          "# Рекомендация MITRE ATT&CK: User Account Control",
+          "# Подробнее: https://attack.mitre.org/mitigations/M1052",
+          "",
+          "# Применимые техники атак (Txxxx):",
+          "T1546.011, T1548, T1548.002, T1550.002, T1574, T1574.005, T1574.010",
+          "",
+          "# Ниже — текст рекомендации (на русском, после автоматического перевода):",
+          "User Account Control (UAC) is a security feature in Microsoft Windows that prevents unauthorized changes to the operating system. UAC prompts users to confirm or provide administrator credentials when an action requires elevated privileges. Proper configuration of UAC reduces the risk of privilege escalation attacks. This mitigation can be implemented through the following measures: Enable UAC Globally: - Ensure UAC is enabled through Group Policy by setting `User Account Control: Run all administrators in Admin Approval Mode` to `Enabled`. Require Credential Prompt: - Use Group Policy to configure UAC to prompt for administrative credentials instead of just confirmation (`User Account Control: Behavior of the elevation prompt`). Restrict Built-in Administrator Account: Set `Admin Approval Mode` for the built-in Administrator account to `Enabled` in Group Policy. Secure the UAC Prompt: - Configure UAC prompts to display on the secure desktop (`User Account Control: Switch to the secure desktop when prompting for elevation`). Prevent UAC Bypass: - Block untrusted applications from triggering UAC prompts by configuring `User Account Control: Only elevate executables that are signed and validated`. - Use EDR tools to detect and block known UAC bypass techniques. Monitor UAC-Related Events: - Use Windows Event Viewer to monitor for event ID 4688 (process creation) and look for suspicious processes attempting to invoke UAC elevation. *Tools for Implementation* Built-in Windows Tools: - Group Policy Editor: Configure UAC settings centrally for enterprise environments. - Registry Editor: Modify UAC-related settings directly, such as `EnableLUA` and `ConsentPromptBehaviorAdmin`. Endpoint Security Solutions: - Microsoft Defender for Endpoint: Detects and blocks UAC bypass techniques. - Sysmon: Logs process creations and monitors UAC elevation attempts for suspicious activity. Third-Party Security Tools: - Process Monitor (Sysinternals): Tracks real-time processes interacting with UAC. - EventSentry: Monitors Windows Event Logs for UAC-related alerts."
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "related_techniques": [
+      "T1546.011",
+      "T1548",
+      "T1548.002",
+      "T1550.002",
+      "T1574",
+      "T1574.005",
+      "T1574.010"
+    ],
+    "references": [
+      "https://attack.mitre.org/mitigations/M1052"
+    ],
+    "language": "ru",
+    "source": "MITRE ATT&CK"
+  },
+  {
+    "id": "DEF-MITRE-M1053",
+    "mitre_mitigation_id": "M1053",
+    "attack_type": "denial_of_service",
+    "cve_ids": [],
+    "name": "Data Backup",
+    "description": "Data Backup involves taking and securely storing backups of data from end-user systems and critical servers. It ensures that data remains available in the event of system compromise, ransomware attacks, or other disruptions. Backup processes should include hardening backup systems, implementing secure storage solutions, and keeping backups isolated from the corporate network to prevent compromise during active incidents. This mitigation can be implemented through the following measures: Regular Backup Scheduling: - Use Case: Ensure timely and consistent backups of critical data. - Implementation: Schedule daily incremental backups and weekly full backups for all critical servers and systems. Immutable Backups: - Use Case: Protect backups from modification or deletion, even by attackers. - Implementation: Use write-once-read-many (WORM) storage for backups, preventing ransomware from encrypting or deleting backup files. Backup Encryption: - Use Case: Protect data integrity and confidentiality during transit and storage. - Implementation: Encrypt backups using strong encryption protocols (e.g., AES-256) before storing them in local, cloud, or remote locations. Offsite Backup Storage: - Use Case: Ensure data availability during physical disasters or onsite breaches. - Implementation: Use cloud-based solutions like AWS S3, Azure Backup, or physical offsite storage to maintain a copy of critical data. Backup Testing: - Use Case: Validate backup integrity and ensure recoverability. - Implementation: Regularly test data restoration processes to ensure that backups are not corrupted and can be recovered quickly.",
+    "tools": [
+      {
+        "name": "Рекомендуемая практика безопасности (MITRE M-код)",
+        "description": "Data Backup",
+        "commands": [
+          "# Рекомендация MITRE ATT&CK: Data Backup",
+          "# Подробнее: https://attack.mitre.org/mitigations/M1053",
+          "",
+          "# Применимые техники атак (Txxxx):",
+          "T1485, T1485.001, T1486, T1490, T1491, T1491.001, T1491.002, T1561, T1561.001, T1561.002",
+          "",
+          "# Ниже — текст рекомендации (на русском, после автоматического перевода):",
+          "Data Backup involves taking and securely storing backups of data from end-user systems and critical servers. It ensures that data remains available in the event of system compromise, ransomware attacks, or other disruptions. Backup processes should include hardening backup systems, implementing secure storage solutions, and keeping backups isolated from the corporate network to prevent compromise during active incidents. This mitigation can be implemented through the following measures: Regular Backup Scheduling: - Use Case: Ensure timely and consistent backups of critical data. - Implementation: Schedule daily incremental backups and weekly full backups for all critical servers and systems. Immutable Backups: - Use Case: Protect backups from modification or deletion, even by attackers. - Implementation: Use write-once-read-many (WORM) storage for backups, preventing ransomware from encrypting or deleting backup files. Backup Encryption: - Use Case: Protect data integrity and confidentiality during transit and storage. - Implementation: Encrypt backups using strong encryption protocols (e.g., AES-256) before storing them in local, cloud, or remote locations. Offsite Backup Storage: - Use Case: Ensure data availability during physical disasters or onsite breaches. - Implementation: Use cloud-based solutions like AWS S3, Azure Backup, or physical offsite storage to maintain a copy of critical data. Backup Testing: - Use Case: Validate backup integrity and ensure recoverability. - Implementation: Regularly test data restoration processes to ensure that backups are not corrupted and can be recovered quickly."
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High",
+    "related_techniques": [
+      "T1485",
+      "T1485.001",
+      "T1486",
+      "T1490",
+      "T1491",
+      "T1491.001",
+      "T1491.002",
+      "T1561",
+      "T1561.001",
+      "T1561.002"
+    ],
+    "references": [
+      "https://attack.mitre.org/mitigations/M1053"
+    ],
+    "language": "ru",
+    "source": "MITRE ATT&CK"
+  }
+]

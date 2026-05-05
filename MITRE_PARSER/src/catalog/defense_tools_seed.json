@@ -1,0 +1,781 @@
+[
+  {
+    "id": "DEF-SEED-001",
+    "attack_type": "intrusion_detection",
+    "cve_ids": [],
+    "name": "Suricata IDS/IPS",
+    "description": "Высокопроизводительный движок обнаружения вторжений: правила Snort/ET, разбор протоколов (HTTP, TLS, SMB, DNS), извлечение файлов из сети.",
+    "tools": [
+      {
+        "name": "Suricata",
+        "description": "Запуск в режиме IDS на интерфейсе с правилами Emerging Threats.",
+        "commands": [
+          "# Установка",
+          "sudo apt install suricata",
+          "",
+          "# Обновление правил",
+          "sudo suricata-update",
+          "",
+          "# Запуск IDS",
+          "sudo suricata -c /etc/suricata/suricata.yaml -i eth0",
+          "",
+          "# Просмотр алертов",
+          "tail -f /var/log/suricata/fast.log"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-002",
+    "attack_type": "intrusion_detection",
+    "cve_ids": [],
+    "name": "Snort IDS",
+    "description": "Классический сигнатурный IDS с самым большим набором сообществ-правил.",
+    "tools": [
+      {
+        "name": "Snort 3",
+        "description": "Установка и запуск Snort с базовым набором правил.",
+        "commands": [
+          "sudo apt install snort",
+          "",
+          "# Тестовый прогон с конфигом",
+          "snort -T -c /etc/snort/snort.lua",
+          "",
+          "# Запуск как сервис",
+          "sudo systemctl enable --now snort3"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-003",
+    "attack_type": "host_monitoring",
+    "cve_ids": [],
+    "name": "Sysmon (System Monitor)",
+    "description": "Расширенное логирование Windows: создание процессов, сетевые подключения, изменения реестра, загрузки DLL — основа для SIEM-детектов.",
+    "tools": [
+      {
+        "name": "Sysmon",
+        "description": "Установка с конфигом SwiftOnSecurity для типичных детектов.",
+        "commands": [
+          "# Загрузка и установка с конфигурацией",
+          "Invoke-WebRequest https://download.sysinternals.com/files/Sysmon.zip -OutFile Sysmon.zip",
+          "Expand-Archive Sysmon.zip",
+          "Invoke-WebRequest https://raw.githubusercontent.com/SwiftOnSecurity/sysmon-config/master/sysmonconfig-export.xml -OutFile sysmonconfig.xml",
+          "Sysmon.exe -accepteula -i sysmonconfig.xml",
+          "",
+          "# Просмотр событий",
+          "Get-WinEvent -LogName 'Microsoft-Windows-Sysmon/Operational' -MaxEvents 50"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-004",
+    "attack_type": "host_monitoring",
+    "cve_ids": [],
+    "name": "OSQuery",
+    "description": "SQL-подобный интерфейс для запросов к ОС: процессы, сетевые соединения, файлы, пользователи. Используется для постоянного мониторинга и расследований.",
+    "tools": [
+      {
+        "name": "osquery",
+        "description": "Установка osqueryd и базовые запросы для аудита.",
+        "commands": [
+          "# Установка",
+          "sudo apt install osquery",
+          "",
+          "# Запуск интерактивно",
+          "osqueryi",
+          "",
+          "# Список процессов с подозрительными PPID",
+          "SELECT pid, name, parent, cmdline FROM processes WHERE parent IN (SELECT pid FROM processes WHERE name='winword.exe');",
+          "",
+          "# Регулярный сервис",
+          "sudo systemctl enable --now osqueryd"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-005",
+    "attack_type": "siem",
+    "cve_ids": [],
+    "name": "Wazuh (XDR/SIEM)",
+    "description": "Открытая платформа XDR/SIEM: HIDS-агенты, корреляция событий, FIM, анализ конфигураций (CIS), интеграция со Suricata, ClamAV, Sysmon.",
+    "tools": [
+      {
+        "name": "Wazuh Manager + Agent",
+        "description": "Развёртывание Wazuh All-in-One и установка агента на хост.",
+        "commands": [
+          "# Установка All-in-One сервера",
+          "curl -sO https://packages.wazuh.com/4.7/wazuh-install.sh && sudo bash ./wazuh-install.sh -a",
+          "",
+          "# Установка агента (Linux)",
+          "WAZUH_MANAGER='<MANAGER_IP>' apt install wazuh-agent",
+          "sudo systemctl enable --now wazuh-agent",
+          "",
+          "# UI: https://<MANAGER_IP>:443"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "High",
+    "effectiveness": "Very High"
+  },
+  {
+    "id": "DEF-SEED-006",
+    "attack_type": "antivirus",
+    "cve_ids": [],
+    "name": "ClamAV",
+    "description": "Открытый антивирус для серверов и почтовых шлюзов: сигнатурное и YARA-сканирование файлов, on-access и on-demand режимы.",
+    "tools": [
+      {
+        "name": "ClamAV / clamscan / clamd",
+        "description": "Базовое сканирование и автозащита.",
+        "commands": [
+          "sudo apt install clamav clamav-daemon",
+          "sudo freshclam",
+          "",
+          "# Полное сканирование",
+          "clamscan -r --infected /var/www",
+          "",
+          "# On-access (Linux)",
+          "sudo systemctl enable --now clamav-daemon clamav-freshclam"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Low",
+    "effectiveness": "Medium"
+  },
+  {
+    "id": "DEF-SEED-007",
+    "attack_type": "web_application_protection",
+    "cve_ids": [],
+    "name": "ModSecurity (WAF)",
+    "description": "Открытый WAF, интегрируется с Apache/Nginx/IIS. С набором правил OWASP CRS блокирует SQLi, XSS, LFI, SSRF, brute force.",
+    "tools": [
+      {
+        "name": "ModSecurity + OWASP CRS",
+        "description": "Включение WAF в Nginx с правилами CRS.",
+        "commands": [
+          "# Установка модуля для Nginx",
+          "sudo apt install libnginx-mod-modsecurity modsecurity-crs",
+          "",
+          "# Включение в /etc/nginx/nginx.conf",
+          "load_module modules/ngx_http_modsecurity_module.so;",
+          "modsecurity on;",
+          "modsecurity_rules_file /etc/nginx/modsec/main.conf;",
+          "",
+          "# /etc/nginx/modsec/main.conf:",
+          "Include /etc/modsecurity/modsecurity.conf",
+          "Include /usr/share/modsecurity-crs/*.conf",
+          "",
+          "sudo systemctl reload nginx"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-008",
+    "attack_type": "endpoint_detection",
+    "cve_ids": [],
+    "name": "EDR (CrowdStrike Falcon / Microsoft Defender for Endpoint)",
+    "description": "Поведенческий анализ конечных точек, блокировка эксплойтов, изоляция хоста при инциденте.",
+    "tools": [
+      {
+        "name": "Microsoft Defender for Endpoint",
+        "description": "Включение в корпоративных Windows-средах и базовые проверки.",
+        "commands": [
+          "# Проверка статуса",
+          "Get-MpComputerStatus",
+          "",
+          "# Включение защиты в реальном времени",
+          "Set-MpPreference -DisableRealtimeMonitoring $false",
+          "",
+          "# Включение Attack Surface Reduction (block Office child process)",
+          "Add-MpPreference -AttackSurfaceReductionRules_Ids D4F940AB-401B-4EFC-AADC-AD5F3C50688A -AttackSurfaceReductionRules_Actions Enabled"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "Medium",
+    "effectiveness": "Very High"
+  },
+  {
+    "id": "DEF-SEED-009",
+    "attack_type": "audit_logging",
+    "cve_ids": [],
+    "name": "Auditd (Linux Audit)",
+    "description": "Стандартная подсистема аудита ядра Linux: события на syscall, файловой системе, процессах. Источник для SIEM.",
+    "tools": [
+      {
+        "name": "auditd",
+        "description": "Базовые правила аудита для критичных файлов и команд.",
+        "commands": [
+          "sudo apt install auditd",
+          "sudo systemctl enable --now auditd",
+          "",
+          "# Аудит изменений /etc/passwd",
+          "sudo auditctl -w /etc/passwd -p wa -k passwd_changes",
+          "",
+          "# Постоянные правила",
+          "echo '-w /etc/sudoers -p wa -k sudoers_changes' | sudo tee -a /etc/audit/rules.d/audit.rules",
+          "",
+          "# Поиск событий по ключу",
+          "ausearch -k passwd_changes"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-010",
+    "attack_type": "configuration_audit",
+    "cve_ids": [],
+    "name": "Lynis",
+    "description": "Аудит безопасности Unix-систем: конфигурация ядра, ssh, web-серверов, баз данных, проверка соответствия CIS/PCI.",
+    "tools": [
+      {
+        "name": "Lynis",
+        "description": "Запуск полного системного аудита.",
+        "commands": [
+          "sudo apt install lynis",
+          "",
+          "sudo lynis audit system",
+          "",
+          "# Краткий отчёт",
+          "less /var/log/lynis-report.dat"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Low",
+    "effectiveness": "Medium"
+  },
+  {
+    "id": "DEF-SEED-011",
+    "attack_type": "configuration_audit",
+    "cve_ids": [],
+    "name": "OpenSCAP",
+    "description": "Соответствие стандартам безопасности (CIS, STIG, PCI) на Linux: автоматическая проверка и автоматическое исправление.",
+    "tools": [
+      {
+        "name": "oscap",
+        "description": "Сканирование на CIS-профиль и генерация отчёта.",
+        "commands": [
+          "sudo apt install libopenscap8 ssg-debian",
+          "",
+          "# Аудит по CIS",
+          "sudo oscap xccdf eval --profile xccdf_org.ssgproject.content_profile_cis --results scan-results.xml --report scan-results.html /usr/share/xml/scap/ssg/content/ssg-debian10-ds.xml"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-012",
+    "attack_type": "incident_response",
+    "cve_ids": [],
+    "name": "Velociraptor (DFIR)",
+    "description": "Платформа реагирования на инциденты и форензики: удалённый сбор артефактов, hunting через VQL, мониторинг ОС.",
+    "tools": [
+      {
+        "name": "Velociraptor",
+        "description": "Развёртывание сервера и сбор стандартных артефактов.",
+        "commands": [
+          "# Загрузка бинарника",
+          "wget https://github.com/Velocidex/velociraptor/releases/latest/download/velociraptor-linux-amd64",
+          "chmod +x velociraptor-linux-amd64",
+          "",
+          "# Запуск GUI (для теста)",
+          "./velociraptor-linux-amd64 gui",
+          "",
+          "# В UI: Hunt -> Notebook -> Запустить артефакт Windows.System.Pslist"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "High",
+    "effectiveness": "Very High"
+  },
+  {
+    "id": "DEF-SEED-013",
+    "attack_type": "vulnerability_management",
+    "cve_ids": [],
+    "name": "OpenVAS / Greenbone",
+    "description": "Открытый сканер сетевых уязвимостей с собственным feed-ом NVT и интеграцией с CVE/CVSS.",
+    "tools": [
+      {
+        "name": "Greenbone Vulnerability Manager",
+        "description": "Установка через Docker и базовое сканирование.",
+        "commands": [
+          "# Запуск в Docker",
+          "docker run -d -p 9392:9392 --name gvm immauss/openvas",
+          "",
+          "# UI: https://localhost:9392 (admin/admin)",
+          "",
+          "# Создать таргет, выбрать Full and Fast scan, запустить"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-014",
+    "attack_type": "container_security",
+    "cve_ids": [],
+    "name": "Trivy",
+    "description": "Сканер уязвимостей контейнерных образов, файловых систем и Git-репозиториев; быстрый и хорошо интегрируется в CI/CD.",
+    "tools": [
+      {
+        "name": "Trivy",
+        "description": "Сканирование образа Docker и файловой системы.",
+        "commands": [
+          "# Установка",
+          "sudo apt install trivy",
+          "",
+          "# Скан образа",
+          "trivy image nginx:latest",
+          "",
+          "# Скан файловой системы",
+          "trivy fs /var/www",
+          "",
+          "# В CI: blocking pipeline по HIGH/CRITICAL",
+          "trivy image --severity HIGH,CRITICAL --exit-code 1 myapp:latest"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-015",
+    "attack_type": "file_integrity_monitoring",
+    "cve_ids": [],
+    "name": "AIDE / Tripwire",
+    "description": "Мониторинг целостности файлов: фиксация эталонного состояния и обнаружение изменений важных бинарников/конфигураций.",
+    "tools": [
+      {
+        "name": "AIDE",
+        "description": "Инициализация базы и регулярные проверки.",
+        "commands": [
+          "sudo apt install aide",
+          "sudo aideinit",
+          "sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db",
+          "",
+          "# Регулярная проверка (cron)",
+          "sudo aide --check",
+          "",
+          "# Cron-задача:",
+          "echo '0 4 * * * root /usr/sbin/aide --check | mail -s AIDE root' | sudo tee /etc/cron.d/aide"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Low",
+    "effectiveness": "Medium"
+  },
+  {
+    "id": "DEF-SEED-016",
+    "attack_type": "dns_security",
+    "cve_ids": [],
+    "name": "Pi-hole / Blocky",
+    "description": "DNS-фильтр для блокировки вредоносных доменов, фишинга и C2-инфраструктуры.",
+    "tools": [
+      {
+        "name": "Pi-hole",
+        "description": "Установка и подключение списков блокировки угроз.",
+        "commands": [
+          "curl -sSL https://install.pi-hole.net | bash",
+          "",
+          "# Добавление malware blocklist",
+          "pihole -a adlist add https://urlhaus.abuse.ch/downloads/hostfile/",
+          "pihole -g"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Low",
+    "effectiveness": "Medium"
+  },
+  {
+    "id": "DEF-SEED-017",
+    "attack_type": "secrets_management",
+    "cve_ids": [],
+    "name": "HashiCorp Vault",
+    "description": "Централизованное хранение секретов и шифрование данных приложений; динамические креды для БД/облаков.",
+    "tools": [
+      {
+        "name": "Vault",
+        "description": "Запуск dev-сервера и хранение секрета.",
+        "commands": [
+          "vault server -dev",
+          "export VAULT_ADDR=http://127.0.0.1:8200",
+          "vault kv put secret/db username=admin password='<STRONG>'",
+          "vault kv get secret/db"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "High",
+    "effectiveness": "Very High"
+  },
+  {
+    "id": "DEF-SEED-018",
+    "attack_type": "network_segmentation",
+    "cve_ids": [],
+    "name": "iptables / nftables",
+    "description": "Базовый межсетевой экран Linux: фильтрация трафика, ограничение источников, защита от сетевых сканов.",
+    "tools": [
+      {
+        "name": "nftables",
+        "description": "Минимальный набор правил для серверного хоста.",
+        "commands": [
+          "# Базовый профиль: разрешаем 22, 80, 443, остальное — drop",
+          "sudo nft add table inet filter",
+          "sudo nft add chain inet filter input '{ type filter hook input priority 0 ; policy drop ; }'",
+          "sudo nft add rule inet filter input ct state established,related accept",
+          "sudo nft add rule inet filter input iifname lo accept",
+          "sudo nft add rule inet filter input tcp dport {22, 80, 443} accept",
+          "sudo nft list ruleset > /etc/nftables.conf"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-019",
+    "attack_type": "log_aggregation",
+    "cve_ids": [],
+    "name": "Graylog / ELK Stack",
+    "description": "Централизованный сбор и анализ журналов: Elasticsearch + Logstash + Kibana или Graylog с MongoDB.",
+    "tools": [
+      {
+        "name": "ELK через Docker Compose",
+        "description": "Базовый стек логирования.",
+        "commands": [
+          "git clone https://github.com/deviantony/docker-elk.git",
+          "cd docker-elk && docker-compose up -d",
+          "# Kibana: http://localhost:5601",
+          "# Logstash: входной TCP/UDP 5044 (Beats)"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "High",
+    "effectiveness": "Very High"
+  },
+  {
+    "id": "DEF-SEED-020",
+    "attack_type": "phishing_protection",
+    "cve_ids": [],
+    "name": "Ограничение макросов и DMARC/SPF/DKIM",
+    "description": "Технические меры против фишинга: жёсткая политика почтовой аутентификации и блокировка макросов в Office.",
+    "tools": [
+      {
+        "name": "DMARC + GPO для Office",
+        "description": "DNS-записи и групповая политика блокировки макросов из интернета.",
+        "commands": [
+          "# DMARC reject (DNS TXT _dmarc.example.com)",
+          "v=DMARC1; p=reject; rua=mailto:dmarc@example.com",
+          "",
+          "# SPF",
+          "v=spf1 mx -all",
+          "",
+          "# GPO: User Configuration -> Administrative Templates -> MS Office -> Security",
+          "# 'Block macros from running in Office files from the Internet' = Enabled"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-021",
+    "attack_type": "ssh_hardening",
+    "cve_ids": [],
+    "name": "SSH hardening + fail2ban",
+    "description": "Жёсткая настройка SSH (только ключи, отключён root-логин) и автоматическая блокировка перебора через fail2ban.",
+    "tools": [
+      {
+        "name": "OpenSSH + fail2ban",
+        "description": "Конфигурация sshd_config и базовый jail.",
+        "commands": [
+          "# /etc/ssh/sshd_config",
+          "PermitRootLogin no",
+          "PasswordAuthentication no",
+          "MaxAuthTries 3",
+          "AllowUsers ops",
+          "sudo systemctl reload ssh",
+          "",
+          "# fail2ban",
+          "sudo apt install fail2ban",
+          "sudo tee /etc/fail2ban/jail.local <<'EOF'",
+          "[sshd]",
+          "enabled = true",
+          "maxretry = 3",
+          "findtime = 600",
+          "bantime  = 86400",
+          "EOF",
+          "sudo systemctl enable --now fail2ban"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-022",
+    "attack_type": "windows_hardening",
+    "cve_ids": [],
+    "name": "Windows Hardening (LAPS + AppLocker + Credential Guard)",
+    "description": "Комплекс мер: уникальные локальные пароли (LAPS), белый список приложений (AppLocker), защита учётных данных в виртуализации (Credential Guard).",
+    "tools": [
+      {
+        "name": "LAPS / AppLocker / Credential Guard",
+        "description": "Включение через GPO и PowerShell.",
+        "commands": [
+          "# LAPS",
+          "Install-WindowsFeature -Name AdmPwd.E -IncludeManagementTools",
+          "Update-AdmPwdADSchema",
+          "",
+          "# AppLocker (только подписанные исполняемые)",
+          "New-AppLockerPolicy -RuleType Publisher -User Everyone -RuleNamePrefix 'Signed' | Set-AppLockerPolicy",
+          "",
+          "# Credential Guard (через GPO)",
+          "# Computer Config -> Admin Templates -> System -> Device Guard -> Turn On Virtualization Based Security = Enabled"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "High",
+    "effectiveness": "Very High"
+  },
+  {
+    "id": "DEF-SEED-023",
+    "attack_type": "data_loss_prevention",
+    "cve_ids": [],
+    "name": "DLP (Microsoft Purview / OpenDLP)",
+    "description": "Контроль утечки конфиденциальных данных: классификация, мониторинг и блокировка передачи данных по правилам.",
+    "tools": [
+      {
+        "name": "Microsoft Purview DLP",
+        "description": "Создание политики классификации и блокировки передачи PII.",
+        "commands": [
+          "# Через Purview admin center -> Information Protection -> Policies",
+          "# Action: Block sharing if document contains 5+ Credit Card Numbers"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "High",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-024",
+    "attack_type": "secure_backup",
+    "cve_ids": [],
+    "name": "Резервное копирование (Veeam / restic / borg)",
+    "description": "Регулярные бэкапы по правилу 3-2-1 с офлайн/неизменяемой копией для защиты от программ-вымогателей.",
+    "tools": [
+      {
+        "name": "restic",
+        "description": "Шифрованный инкрементальный бэкап.",
+        "commands": [
+          "sudo apt install restic",
+          "export RESTIC_REPOSITORY=/mnt/backup/repo",
+          "export RESTIC_PASSWORD='<STRONG>'",
+          "restic init",
+          "restic backup /etc /var/www",
+          "",
+          "# Снимки",
+          "restic snapshots",
+          "",
+          "# Восстановление",
+          "restic restore latest --target /tmp/restore"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "Medium",
+    "effectiveness": "Very High"
+  },
+  {
+    "id": "DEF-SEED-025",
+    "attack_type": "kubernetes_security",
+    "cve_ids": [],
+    "name": "Falco (Cloud-Native Runtime Security)",
+    "description": "Поведенческий мониторинг контейнеров и Kubernetes: ловит подозрительные syscall-ы, спавн оболочек, attach к контейнерам.",
+    "tools": [
+      {
+        "name": "Falco",
+        "description": "Установка через Helm в Kubernetes.",
+        "commands": [
+          "helm repo add falcosecurity https://falcosecurity.github.io/charts",
+          "helm install falco falcosecurity/falco --namespace falco --create-namespace",
+          "",
+          "# Просмотр алертов",
+          "kubectl logs -n falco -l app.kubernetes.io/name=falco -f"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Medium",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-026",
+    "attack_type": "patch_management",
+    "cve_ids": [],
+    "name": "Управление обновлениями Linux (unattended-upgrades)",
+    "description": "Автоматическое применение security-обновлений на серверах Debian/Ubuntu.",
+    "tools": [
+      {
+        "name": "unattended-upgrades",
+        "description": "Включение автоматических security-апдейтов.",
+        "commands": [
+          "sudo apt install unattended-upgrades apt-listchanges",
+          "sudo dpkg-reconfigure -plow unattended-upgrades",
+          "",
+          "# Тестовый dry-run",
+          "sudo unattended-upgrades --dry-run -d",
+          "",
+          "# /etc/apt/apt.conf.d/50unattended-upgrades:",
+          "# Unattended-Upgrade::Allowed-Origins { '${distro_id}:${distro_codename}-security'; };"
+        ]
+      }
+    ],
+    "priority": "CRITICAL",
+    "effort": "Low",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-027",
+    "attack_type": "tls_security",
+    "cve_ids": [],
+    "name": "Усиление TLS (Mozilla Modern)",
+    "description": "Сильные шифры, TLS 1.2/1.3 only, HSTS, OCSP stapling — защита транспорта от MITM, downgrade и BEAST/POODLE.",
+    "tools": [
+      {
+        "name": "Nginx TLS hardening",
+        "description": "Современная конфигурация Nginx по Mozilla SSL Configurator.",
+        "commands": [
+          "# /etc/nginx/conf.d/tls.conf",
+          "ssl_protocols TLSv1.2 TLSv1.3;",
+          "ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;",
+          "ssl_prefer_server_ciphers off;",
+          "ssl_session_cache shared:MozSSL:10m;",
+          "ssl_stapling on;",
+          "ssl_stapling_verify on;",
+          "add_header Strict-Transport-Security 'max-age=63072000' always;",
+          "",
+          "sudo nginx -t && sudo systemctl reload nginx"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-028",
+    "attack_type": "least_privilege",
+    "cve_ids": [],
+    "name": "sudo с журналированием и без NOPASSWD",
+    "description": "Принцип наименьших привилегий: sudo по конкретным командам, журнал ввода/вывода, отказ от NOPASSWD.",
+    "tools": [
+      {
+        "name": "sudoers + I/O logging",
+        "description": "Минимальные правила и логирование всей сессии.",
+        "commands": [
+          "# /etc/sudoers.d/secure",
+          "Defaults log_input,log_output,iolog_dir=/var/log/sudo-io",
+          "%admin ALL=(root) PASSWD: /usr/bin/systemctl restart nginx",
+          "%admin ALL=(root) PASSWD: /usr/bin/apt update",
+          "",
+          "sudo visudo -c -f /etc/sudoers.d/secure"
+        ]
+      }
+    ],
+    "priority": "HIGH",
+    "effort": "Low",
+    "effectiveness": "High"
+  },
+  {
+    "id": "DEF-SEED-029",
+    "attack_type": "honeypot",
+    "cve_ids": [],
+    "name": "Honeypot (T-Pot / Cowrie)",
+    "description": "Привлечение и регистрация атакующих в контролируемых ловушках; источник раннего обнаружения и threat intelligence.",
+    "tools": [
+      {
+        "name": "Cowrie SSH honeypot",
+        "description": "Эмуляция SSH/Telnet с записью сессий.",
+        "commands": [
+          "git clone https://github.com/cowrie/cowrie.git",
+          "cd cowrie && python3 -m venv venv && source venv/bin/activate",
+          "pip install -r requirements.txt",
+          "cp etc/cowrie.cfg.dist etc/cowrie.cfg",
+          "bin/cowrie start",
+          "",
+          "# Логи",
+          "tail -f var/log/cowrie/cowrie.json"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Medium",
+    "effectiveness": "Medium"
+  },
+  {
+    "id": "DEF-SEED-030",
+    "attack_type": "deception_detection",
+    "cve_ids": [],
+    "name": "Canary tokens",
+    "description": "Файлы/учётки/URL-приманки с уникальным токеном: при доступе к ним отправляется алерт, что среда скомпрометирована.",
+    "tools": [
+      {
+        "name": "Canarytokens",
+        "description": "Создание токена и его использование.",
+        "commands": [
+          "# Сгенерировать через https://canarytokens.org (DNS, web bug, AWS keys, Word/Excel)",
+          "# Разложить файлы/ярлыки в чувствительных каталогах:",
+          "#   C:\\Backup\\admin_passwords.docx (canary)",
+          "#   /home/ops/.ssh/known_hosts_old (canary file)",
+          "",
+          "# При доступе придёт письмо/webhook"
+        ]
+      }
+    ],
+    "priority": "MEDIUM",
+    "effort": "Low",
+    "effectiveness": "High"
+  }
+]

@@ -273,11 +273,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <div class="map-selector">
                     <label>🔍 ВЫБОР ТОПОЛОГИИ КАРТЫ:</label>
                     <select id="map-view-select" onchange="applyFilters()">
-                        <option value="1">🗺️ КАРТА 1: Инфраструктура (Сервер ➔ Реальное ПО ➔ Уязвимость)</option>
-                        <option value="2">🗺️ КАРТА 2: Логика Атаки (CAPEC ➔ ПО ➔ CWE ➔ Вердикт)</option>
-                        <option value="3">🗺️ КАРТА 3: Источник Обнаружения (Кто нашел ➔ Реальное ПО ➔ Уязвимость)</option>
-                        <option value="4">🗺️ КАРТА 4: План Устранения (Уязвимость ➔ Статус ➔ Решение)</option>
-                        <option value="5">🗺️ КАРТА 5: Полигон и Инструменты (CAPEC ➔ ПО для атаки ➔ Шаги)</option>
+                        <option value="1">🗺️ КАРТА 1: Полная цепочка (CVE ➔ CWE ➔ CAPEC ➔ ПО ➔ MITRE ATT&amp;CK ➔ Реализуемость)</option>
+                        <option value="2">🗺️ КАРТА 2: Инфраструктура (Сервер ➔ Реальное ПО ➔ Уязвимость)</option>
+                        <option value="3">🗺️ КАРТА 3: Логика Атаки (CAPEC ➔ ПО ➔ CWE ➔ Вердикт)</option>
+                        <option value="4">🗺️ КАРТА 4: Источник Обнаружения (Кто нашел ➔ Реальное ПО ➔ Уязвимость)</option>
+                        <option value="5">🗺️ КАРТА 5: План Устранения (Уязвимость ➔ Статус ➔ Решение)</option>
+                        <option value="6">🗺️ КАРТА 6: Полигон и Инструменты (CAPEC ➔ ПО для атаки ➔ Шаги)</option>
                     </select>
                 </div>
 
@@ -1365,8 +1366,47 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if(!addedNodes.has(n.id)) { addedNodes.add(n.id); nodes.push(n); }
             };
 
-            // ---- КАРТА 1: Инфраструктурная ----
+            // ---- КАРТА 1: Полная цепочка CVE → CWE → CAPEC → ПО → MITRE ATT&CK → реализуемость ----
             if (viewId === "1") {
+                data.forEach(r => {
+                    let cveRaw = String(r.cve || "N/A");
+                    let cveShort = cveRaw.length > 72 ? cveRaw.substring(0, 72) + "…" : cveRaw;
+                    let mitreRaw = String(r.name || "Атака");
+                    let mitreShort = mitreRaw.length > 56 ? mitreRaw.substring(0, 56) + "…" : mitreRaw;
+
+                    let cveId = "fc_cve_" + r.id;
+                    addNode({ id: cveId, label: "📌 CVE:\\n" + cveShort, level: 0, shape: "box", color: {background: getSevColor(r.sev)} });
+                    detailsMap[cveId] = { type: 'aggr', data: r };
+
+                    let cweId = "fc_cwe_" + r.id;
+                    addNode({ id: cweId, label: "🐛 CWE:\\n" + r.cwe, level: 1, shape: "box", color: {background: "#484f58"} });
+                    detailsMap[cweId] = { type: 'cwe', data: r };
+
+                    let capecId = "fc_capec_" + r.id;
+                    addNode({ id: capecId, label: "🥷 CAPEC:\\n" + r.capec, level: 2, shape: "box", color: {background: "#58a6ff"} });
+                    detailsMap[capecId] = { type: 'aggr', data: r };
+
+                    let swId = "fc_sw_" + r.id;
+                    addNode({ id: swId, label: "🎯 ПО:\\n" + r.sw + "\\nПорт: " + r.port, level: 3, shape: "box", color: {background: "#1f77b4"} });
+                    detailsMap[swId] = { type: 'sw', data: r };
+
+                    let mitreId = "fc_mitre_" + r.id;
+                    addNode({ id: mitreId, label: "🎯 MITRE ATT&CK:\\n" + mitreShort, level: 4, shape: "box", color: {background: "#a371f7"} });
+                    detailsMap[mitreId] = { type: 'aggr', data: r };
+
+                    let feasId = "fc_feas_" + r.id;
+                    addNode({ id: feasId, label: "⚖️ Реализуемость:\\n" + r.feas, level: 5, shape: "box", color: {background: getFeasColor(r.feas)} });
+                    detailsMap[feasId] = { type: 'aggr', data: r };
+
+                    addEdge(cveId, cweId, "#8b949e");
+                    addEdge(cweId, capecId, "#8b949e");
+                    addEdge(capecId, swId, "#8b949e");
+                    addEdge(swId, mitreId, "#8b949e");
+                    addEdge(mitreId, feasId, getFeasColor(r.feas), r.feas === "РЕАЛИЗУЕМА" ? 3 : 2, r.feas === "НЕ РЕАЛИЗУЕМА");
+                });
+            }
+            // ---- КАРТА 2: Инфраструктурная ----
+            else if (viewId === "2") {
                 let srvId = "srv_1";
                 addNode({ id: srvId, label: "🖥️ " + sysData.hostname + "\\n(" + sysData.os + ")", shape: "box", level: 0, color: {background: "#1f77b4", border: "#ffffff"}, font: {color: "#ffffff", size: 18} });
                 
@@ -1388,8 +1428,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     detailsMap[cveId] = { type: 'aggr', data: r };
                 });
             } 
-            // ---- КАРТА 2: Логическая (С УЗЛОМ ПО) ----
-            else if (viewId === "2") {
+            // ---- КАРТА 3: Логическая (С УЗЛОМ ПО) ----
+            else if (viewId === "3") {
                 data.forEach(r => {
                     let capecId = "l_capec_" + r.capec;
                     addNode({ id: capecId, label: "🥷 Вектор: " + r.capec, level: 0, shape: "box", color: {background: "#58a6ff"} });
@@ -1413,8 +1453,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     detailsMap[verdId] = { type: 'aggr', data: r };
                 });
             }
-            // ---- КАРТА 3: Источник Обнаружения ----
-            else if (viewId === "3") {
+            // ---- КАРТА 4: Источник Обнаружения ----
+            else if (viewId === "4") {
                 data.forEach(r => {
                     let sources = r.found_by.split(' & ');
                     let vulnId = "v_" + r.id;
@@ -1437,8 +1477,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     detailsMap[vulnId] = { type: 'aggr', data: r };
                 });
             }
-            // ---- КАРТА 4: План Устранения ----
-            else if (viewId === "4") {
+            // ---- КАРТА 5: План Устранения ----
+            else if (viewId === "5") {
                 data.forEach(r => {
                     let vulnId = "uv_" + r.id;
                     addNode({ id: vulnId, label: "🛡️ Уязвимость:\\n" + r.capec + "\\n(ПО: " + r.sw + ")", level: 0, shape: "box", color: {background: getSevColor(r.sev)} });
@@ -1459,8 +1499,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     detailsMap[recId] = { type: 'aggr', data: r };
                 });
             }
-            // ---- КАРТА 5: Полигон ----
-            else if (viewId === "5") {
+            // ---- КАРТА 6: Полигон ----
+            else if (viewId === "6") {
                 data.forEach(r => {
                     let capecId = "pc_" + r.capec;
                     addNode({ id: capecId, label: "🥷 Вектор:\\n" + r.capec, level: 0, shape: "box", color: {background: "#da3633"} });
@@ -1485,14 +1525,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             var container = document.getElementById('network-map');
             var visData = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
             
-            // Динамическое расстояние узлов (Для Карты 4 делаем узлы сильно дальше друг от друга)
-            var nodeSpc = viewId === "4" ? 650 : 400;
-            var levelSep = viewId === "4" ? 350 : 250;
-            
+            // Динамическое расстояние узлов (Карта 5 «План устранения» — шире; Карта 1 — 6 уровней + treeSpacing между параллельными цепочками)
+            var nodeSpc = (viewId === "5") ? 650 : (viewId === "1" ? 950 : 400);
+            var levelSep = (viewId === "5") ? 350 : (viewId === "1" ? 420 : 250);
+            var hier = { direction: 'UD', sortMethod: 'directed', nodeSpacing: nodeSpc, levelSeparation: levelSep };
+            if (viewId === "1") {
+                hier.treeSpacing = 560;
+            }
             var options = {
-                layout: { hierarchical: { direction: 'UD', sortMethod: 'directed', nodeSpacing: nodeSpc, levelSeparation: levelSep } },
+                layout: { hierarchical: hier },
                 physics: false,
-                nodes: { borderWidth: 2, shadow: true, margin: 15, font: { face: "Segoe UI" } },
+                nodes: { borderWidth: 2, shadow: true, margin: (viewId === "1" ? 22 : 15), font: { face: "Segoe UI" } },
                 edges: { shadow: true, arrows: { to: { enabled: true, scaleFactor: 0.8 } }, smooth: { type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.15 } },
                 interaction: { hover: true, navigationButtons: true, keyboard: true }
             };
@@ -2060,20 +2103,84 @@ class ReportGenerator:
             pass
         return {}
 
-    def _get_cwe_description(self, cwe_id):
-        """Достает подробное описание слабости из БД"""
-        if not cwe_id or cwe_id == 'Нет CWE': 
-            return "Описание отсутствует."
+    def _canonical_cwe_list(self, raw) -> list:
+        """
+        Разбирает поле cwe_id: в данных CVE и Trivy часто приходит 'CWE-352, CWE-352'
+        или несколько разных CWE через запятую. Возвращает уникальные идентификаторы CWE-NNN.
+        """
+        if raw is None:
+            return []
+        s = str(raw).strip()
+        if not s or s.upper() in ("N/A", "НЕТ CWE") or s == "CWE-Неизвестно":
+            return []
+        out = []
+        seen = set()
+        for part in re.split(r"[,;|/]+", s):
+            t = part.strip()
+            if not t:
+                continue
+            up = re.sub(r"\s+", "", t.upper())
+            m = re.fullmatch(r"CWE-(\d+)", up)
+            if m:
+                cid = f"CWE-{m.group(1)}"
+            elif re.fullmatch(r"\d+", t.strip()):
+                cid = f"CWE-{t.strip()}"
+            else:
+                continue
+            if cid not in seen:
+                seen.add(cid)
+                out.append(cid)
+        return out
+
+    def _lookup_single_cwe_description(self, cwe_id: str):
+        """Описание одного CWE из локальной JSON-базы или None."""
+        if not cwe_id:
+            return None
         db = self.cwe_db
+        item = None
+        uid = cwe_id.strip().upper()
         if isinstance(db, dict):
-            if cwe_id in db: return db[cwe_id].get('description', 'Описание не найдено.')
-            num = cwe_id.replace("CWE-", "")
-            if num in db: return db[num].get('description', 'Описание не найдено.')
+            if cwe_id in db:
+                item = db[cwe_id]
+            elif uid in db:
+                item = db[uid]
+            else:
+                m = re.search(r"(\d+)$", uid)
+                if m:
+                    cid = f"CWE-{m.group(1)}"
+                    if cid in db:
+                        item = db[cid]
+                    elif m.group(1) in db:
+                        item = db[m.group(1)]
         elif isinstance(db, list):
-            for item in db:
-                if item.get('id') == cwe_id or item.get('cwe_id') == cwe_id:
-                    return item.get('description', 'Описание не найдено.')
-        return "Детальное описание для данного CWE не найдено в локальной базе."
+            for row in db:
+                rid = str(row.get("id") or row.get("cwe_id") or "").strip()
+                if rid.upper() == uid:
+                    item = row
+                    break
+        if not item:
+            return None
+        text = (item.get("description_ru") or item.get("description") or "").strip()
+        return text or None
+
+    def _get_cwe_description(self, cwe_id):
+        """Подробное описание(я) CWE: поддерживает строку с несколькими CWE и дубликатами."""
+        missing = "Детальное описание для данного CWE не найдено в локальной базе."
+        ids = self._canonical_cwe_list(cwe_id)
+        if not ids:
+            s = str(cwe_id or "").strip()
+            if not s or s == "Нет CWE":
+                return "Описание отсутствует."
+            return missing
+        parts = []
+        for cid in ids:
+            txt = self._lookup_single_cwe_description(cid)
+            if len(ids) == 1:
+                parts.append(txt if txt else missing)
+            else:
+                block = (txt or missing)
+                parts.append(f"【{cid}】\n{block}")
+        return "\n\n".join(parts)
 
     def _calculate_contextual_cvss(self, base_cvss: float, feasibility: str, has_protection: bool) -> float:
         """
@@ -2534,14 +2641,25 @@ class ReportGenerator:
             else:
                 port = str(port_raw)
 
-            cwe_id = getattr(representative_r, 'cwe_id', '') or getattr(base_r, 'cwe_id', '')
-            cwe_desc = self._get_cwe_description(cwe_id) # Подтягиваем описание CWE
-            
+            cwe_raw = getattr(representative_r, 'cwe_id', '') or getattr(base_r, 'cwe_id', '')
+            cwe_tokens = self._canonical_cwe_list(cwe_raw)
+            cwe_id = ", ".join(cwe_tokens) if cwe_tokens else (str(cwe_raw).strip() or "")
+            if not cwe_id or cwe_id.upper() == "N/A":
+                cwe_id = "CWE-Неизвестно"
+            cwe_desc = self._get_cwe_description(cwe_raw)
+
             tools = getattr(representative_r, 'attack_software', None) or getattr(base_r, 'attack_software', None)
             steps = getattr(representative_r, 'attack_steps', None) or getattr(base_r, 'attack_steps', None)
 
-            if not tools and self.tools_db and cwe_id in self.tools_db:
-                db_info = self.tools_db[cwe_id]
+            if not tools and self.tools_db and cwe_tokens:
+                db_info = None
+                for tok in cwe_tokens:
+                    if tok in self.tools_db:
+                        db_info = self.tools_db[tok]
+                        break
+            else:
+                db_info = None
+            if not tools and db_info:
                 tools_list = db_info.get('tools', [])
                 tools = ", ".join(tools_list) if tools_list else "Nmap, Metasploit"
                 steps = db_info.get('exploitation_steps', "1. Сканирование сети.\\n2. Выбор эксплоита.\\n3. Запуск.")
@@ -2601,15 +2719,19 @@ class ReportGenerator:
 
             # ИСПОЛЬЗУЕМ НОВЫЙ АЛГОРИТМ ДЛЯ СЫРЫХ ДАННЫХ
             real_sw = self.sw_enricher.identify_real_software(r, port)
+            cwe_raw_row = getattr(r, "cwe_id", "") or ""
+            cwe_tokens_row = self._canonical_cwe_list(cwe_raw_row)
+            cwe_display_row = ", ".join(cwe_tokens_row) if cwe_tokens_row else (str(cwe_raw_row).strip() or "CWE-Неизвестно")
+            if not cwe_tokens_row and cwe_display_row.upper() == "N/A":
+                cwe_display_row = "CWE-Неизвестно"
             sw_ctx_raw = self._build_software_context(
                 real_sw,
                 port,
                 getattr(r, 'capec_id', ''),
-                getattr(r, 'cwe_id', ''),
+                cwe_display_row,
                 getattr(r, 'description', '')
             )
-            cwe_id_raw = getattr(r, 'cwe_id', '') or 'CWE-Неизвестно'
-            cwe_desc_raw = self._get_cwe_description(cwe_id_raw)
+            cwe_desc_raw = self._get_cwe_description(cwe_raw_row)
             found_by_raw = getattr(r, 'found_by', 'Сервер') if hasattr(r, 'found_by') else 'Сервер'
             _trace = getattr(r, "feasibility_trace", None) or {}
             if not isinstance(_trace, dict):
@@ -2617,7 +2739,7 @@ class ReportGenerator:
             raw_findings_data.append({
                 "raw_id": idx,
                 "cve": cve_str if cve_str else "N/A",
-                "cwe": cwe_id_raw,
+                "cwe": cwe_display_row,
                 "cwe_desc": cwe_desc_raw,
                 "capec": getattr(r, 'capec_id', None) or 'CAPEC-Неизвестно',
                 "name": getattr(r, 'attack_name', None) or 'Атака',

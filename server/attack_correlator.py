@@ -28,6 +28,21 @@ from common.logger import get_server_logger
 logger = get_server_logger()
 
 
+def _join_unique_ids(items) -> str:
+    """Склеивает CWE/CAPEC/MITRE без повторов (в сыром CVE часто дублируют один и тот же CWE)."""
+    if not items:
+        return ""
+    seen = set()
+    out = []
+    for x in items:
+        s = str(x).strip() if x is not None else ""
+        if not s or s.upper() == "N/A" or s in seen:
+            continue
+        seen.add(s)
+        out.append(s)
+    return ", ".join(out)
+
+
 class AttackCorrelator:
     """Движок корреляции атак с конфигурацией сервера."""
 
@@ -255,9 +270,9 @@ class AttackCorrelator:
             chain = self.vuln_db.get_full_chain(cve)
             mitigations = self.vuln_db.get_all_mitigations(cve)
 
-            cwe_ids = ", ".join(cve.get("related_cwe", []))
-            capec_ids = ", ".join(cve.get("related_capec", []))
-            mitre_ids = ", ".join(cve.get("related_mitre", []))
+            cwe_ids = _join_unique_ids(cve.get("related_cwe", []))
+            capec_ids = _join_unique_ids(cve.get("related_capec", []))
+            mitre_ids = _join_unique_ids(cve.get("related_mitre", []))
 
             recommendation = self._generate_recommendation(cve, feasibility, mitigations)
 
@@ -782,9 +797,9 @@ class AttackCorrelator:
 
                 match = VulnerabilityMatch(
                     cve_id=cve["id"],
-                    cwe_id=", ".join(cve.get("related_cwe", [])),
-                    capec_id=", ".join(cve.get("related_capec", [])),
-                    mitre_technique=", ".join(cve.get("related_mitre", [])),
+                    cwe_id=_join_unique_ids(cve.get("related_cwe", [])),
+                    capec_id=_join_unique_ids(cve.get("related_capec", [])),
+                    mitre_technique=_join_unique_ids(cve.get("related_mitre", [])),
                     attack_vector_id=dummy_av.id,
                     attack_name=dummy_av.name,
                     description=cve["description"],
@@ -825,9 +840,9 @@ class AttackCorrelator:
 
                 match = VulnerabilityMatch(
                     cve_id=cve["id"],
-                    cwe_id=", ".join(cve.get("related_cwe", [])),
-                    capec_id=", ".join(cve.get("related_capec", [])),
-                    mitre_technique=", ".join(cve.get("related_mitre", [])),
+                    cwe_id=_join_unique_ids(cve.get("related_cwe", [])),
+                    capec_id=_join_unique_ids(cve.get("related_capec", [])),
+                    mitre_technique=_join_unique_ids(cve.get("related_mitre", [])),
                     attack_vector_id=dummy_av.id,
                     attack_name=dummy_av.name,
                     description=cve["description"],

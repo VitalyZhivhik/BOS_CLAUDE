@@ -1,0 +1,26 @@
+[
+  {
+    "type": "google",
+    "label": "",
+    "api_key": "",
+    "model": ""
+  },
+  {
+    "type": "groq",
+    "label": "ключ 1",
+    "api_key": "",
+    "model": ""
+  },
+  {
+    "type": "groq",
+    "label": "ключ 2",
+    "api_key": "",
+    "model": ""
+  },
+  {
+    "type": "mistral",
+    "label": "",
+    "api_key": "",
+    "model": ""
+  }
+]

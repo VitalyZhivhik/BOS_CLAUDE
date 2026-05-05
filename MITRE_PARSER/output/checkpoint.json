@@ -1,0 +1,27 @@
+{
+  "run_id": "20260505_231337",
+  "stage": "translate",
+  "sub_stage": "capec",
+  "progress": 120,
+  "total": 546,
+  "completed_stages": [
+    "fetch",
+    "parse",
+    "link"
+  ],
+  "partial_files": {
+    "capec": "C:\\BOS\\MITRE_PARSER\\output\\_partial\\capec_partial.json"
+  },
+  "settings": {
+    "limits": {
+      "capec": 600,
+      "cwe": 1500,
+      "cve": 800,
+      "attack": 600
+    },
+    "append_mode": false,
+    "skip_translate": false
+  },
+  "started_at": "2026-05-05T23:13:37.013570",
+  "updated_at": "2026-05-05T23:26:42.173736"
+}
