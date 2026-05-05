@@ -14,9 +14,9 @@ from translator import Translator
 # Поля, которые нужно перевести в каждом типе файла
 FIELDS_TO_TRANSLATE = {
     "capec_database.json": ["name", "description", "prerequisites", "mitigations"],
-    "cwe_database.json": ["name", "description", "mitigation"],
-    "cve_database.json": ["description", "mitigations"],
-    "mitre_attack.json": ["name", "description", "mitigations", "detection"]
+    "cwe_database.json": ["name", "description", "mitigation", "category", "detection_methods"],
+    "cve_database.json": ["description", "mitigations", "mitigation", "affected_software", "attack_type", "requires_service"],
+    "mitre_attack.json": ["name", "description", "mitigations", "detection", "tactic"]
 }
 
 def translate_field(value, translator: Translator):

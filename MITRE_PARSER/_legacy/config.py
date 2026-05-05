@@ -1,16 +1,15 @@
 from pathlib import Path
 
 class Config:
-    # Пути
     BASE_DIR = Path(__file__).parent.parent
     OUTPUT_DIR = BASE_DIR / "output"
     
     # 🔹 НАСТРОЙКА ПЕРЕВОДА 🔹
-    ENABLE_TRANSLATION = False  # ← Поставьте False для быстрого запуска, True — для перевода
+    ENABLE_TRANSLATION = False
     TRANSLATE_TO = "ru" # <- Код языка для Русского
-    TRANSLATION_DELAY = 1.0     # Задержка между запросами к переводчику (сек)
-    TRANSLATION_BATCH_SIZE = 50 # Сколько строк отправлять за раз (Google позволяет до ~100)
-    TRANSLATION_MAX_RETRIES = 3     # Число повторных попыток при ошибке
+    TRANSLATION_DELAY = 1.5     # Задержка между запросами к переводчику (сек)
+    TRANSLATION_BATCH_SIZE = 20 # Сколько строк отправлять за раз (Google позволяет до ~100)
+    TRANSLATION_MAX_RETRIES = 4     # Число повторных попыток при ошибке
     
     # Настройки загрузки
     REQUEST_TIMEOUT = 30
@@ -18,10 +17,10 @@ class Config:
     RETRY_DELAY = 5
 
     # 🔹 Ограничение записей (0 или None = все) 🔹
-    MAX_CAPEC_RECORDS = 330   # 0 или None = все записи
-    MAX_CWE_RECORDS = 400     # 0 или None = все записи
-    MAX_CVE_RECORDS = 250     # 0 или None = все записи
-    MAX_ATTACK_RECORDS = 240  # 0 или None = все записи
+    MAX_CAPEC_RECORDS = 330
+    MAX_CWE_RECORDS = 500
+    MAX_CVE_RECORDS = 2000
+    MAX_ATTACK_RECORDS = 300
     
     # Источники данных
     SOURCES = {
@@ -37,4 +36,4 @@ class Config:
         "cve": {"id": "id", "description": "description", "severity": "severity", "cvss_score": "cvss_score", "affected_software": "affected_software", "attack_type": "attack_type", "related_cwe": "related_cwe", "related_capec": "related_capec", "related_mitre": "related_mitre", "requires_service": "requires_service", "requires_port": "requires_port", "prerequisites": "prerequisites"},
         "mitre_attack": {"id": "id", "name": "name", "tactic": "tactic", "description": "description", "platforms": "platforms", "related_cwe": "related_cwe", "related_capec": "related_capec", "requires_service": "requires_service", "detection": "detection", "mitigations": "mitigations"},
         "cwe": {"id": "id", "name": "name", "description": "description", "category": "category", "related_capec": "related_capec", "mitigation": "mitigation", "requires_technology": "requires_technology", "detection_methods": "detection_methods"}
-    }
+        }
