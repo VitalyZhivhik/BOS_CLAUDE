@@ -21,6 +21,50 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .btn-danger { background: #da3633; }
         .btn-danger:hover { background: #b32a28; }
 
+        /* Улучшенные рекомендации и карточки защиты */
+        .rec-structured { background: #0d1117; border-radius: 6px; padding: 15px; margin-top: 15px; border: 1px solid #30363d; border-left: 4px solid #238636; }
+        .rec-alert { background: rgba(218,54,51,0.1); border-left: 4px solid #da3633; padding: 12px; border-radius: 4px; margin-bottom: 15px; }
+        .rec-monitor { background: rgba(88,166,255,0.1); border-left: 4px solid #58a6ff; padding: 12px; border-radius: 4px; margin-bottom: 15px; }
+        .rec-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+        .rec-item { background: #161b22; padding: 10px 15px; border-radius: 6px; border: 1px solid #21262d; font-size: 13px; color: #c9d1d9; line-height: 1.5; cursor: pointer; transition: 0.2s;}
+        .rec-item:hover { background: #1f2428; border-color: #3fb950; }
+        .rec-item-num { font-weight: bold; color: #3fb950; margin-right: 8px; }
+        
+        .tool-link { color: #58a6ff; text-decoration: none; font-size: 12px; display: inline-block; margin-left: 10px; }
+        .tool-link:hover { text-decoration: underline; }
+        .cmd-explain { background: #010409; border-left: 3px solid #d29922; padding: 8px 12px; margin-top: -10px; margin-bottom: 10px; font-size: 12px; color: #8b949e; border-radius: 0 0 6px 6px; font-family: monospace;}
+
+        /* Раздел атак и защиты */
+        .atk-def-item { margin-bottom: 15px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+        .atk-def-header { padding: 12px 15px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.15s; }
+        .atk-def-header:hover { background: #1f2428; }
+        .atk-def-body { display: none; padding: 15px; border-top: 1px solid var(--border); background: #0d1117; }
+        .atk-section { border-left: 4px solid #da3633; padding: 15px; margin: 8px 0; background: rgba(218,54,51,0.03); border-radius: 0 6px 6px 0; }
+        .def-section { border-left: 4px solid #238636; padding: 15px; margin: 8px 0; background: rgba(35,134,54,0.03); border-radius: 0 6px 6px 0; }
+        
+        /* Пошаговые карточки атаки */
+        .step-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .step-header { font-size: 15px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+        .step-num { background: #da3633; color: #fff; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 12px; }
+        .step-title { color: #58a6ff; font-weight: 600; }
+        
+        .cmd-block { background: #010409; color: #00dd00; padding: 12px; border-radius: 6px; font-family: "Consolas", monospace; font-size: 13px; overflow-x: auto; white-space: pre-wrap; margin: 10px 0; border: 1px solid #21262d; line-height: 1.6; }
+        .cmd-comment { color: #8b949e; }
+        .cmd-highlight { color: #00dd00; }
+        
+        /* Обратная связь (комментарии) */
+        .step-feedback { margin-top: 12px; display: flex; gap: 10px; align-items: center; background: #0d1117; padding: 10px; border-radius: 6px; border: 1px dashed #30363d; }
+        .step-feedback input { flex: 1; background: #161b22; border: 1px solid #484f58; color: #c9d1d9; padding: 8px 12px; border-radius: 4px; font-size: 13px; outline: none; transition: 0.2s; }
+        .step-feedback input:focus { border-color: #da3633; box-shadow: 0 0 5px rgba(218,54,51,0.3); }
+        .step-feedback label { font-size: 12px; color: #8b949e; font-weight: bold; cursor: help; }
+        
+        /* Кнопка генерации отчета */
+        .btn-report-bugs { background: #5a2a2a; color: #fff; border: 1px solid #791a1e; padding: 12px 20px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; transition: 0.2s; display: block; margin: 0 0 20px 0; width: 100%; text-align: center; }
+        .btn-report-bugs:hover { background: #791a1e; box-shadow: 0 2px 8px rgba(218,54,51,0.4); }
+
+        .tool-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-right: 6px; }
+        .tool-def { background: rgba(35,134,54,0.15); color: #3fb950; border: 1px solid #238636; }
+
         /* Фильтры и селектор карт */
         .controls-bar { display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px; background: #010409; padding: 15px; border-radius: 8px; border: 1px solid var(--border); }
         .aggregation-bar { display: flex; flex-direction: column; gap: 10px; background: #161b22; padding: 12px; border-radius: 6px; border: 1px solid #30363d; }
@@ -335,6 +379,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <button class="btn-toggle btn-orange" onclick="toggleAtkDef()">⚔️ Развернуть раздел</button>
             </div>
             <div id="atk-def-container" style="display:none;">
+                <button class="btn-report-bugs" onclick="generateBugReport()">🐞 Сгенерировать отчёт об ошибках в сценариях (Markdown)</button>
                 <div id="atk-def-list"></div>
             </div>
         </div>
@@ -870,77 +915,193 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 html += '<span class="badge ' + feasClass + '" style="margin-right:8px;">' + escapeHtml(item.feas) + '</span>';
                 html += '<strong style="color:#fff;">' + escapeHtml(item.sw) + '</strong>';
                 html += ' <span style="color:#8b949e;"> — ' + escapeHtml(item.capec) + ' (' + escapeHtml(item.cve_short) + ')</span></div>';
-                html += '<span style="color:#58a6ff;font-size:12px;">▼ Раскрыть</span>';
+                html += '<span style="color:#58a6ff;font-size:12px;">▼ Раскрыть сценарий</span>';
                 html += '</div>';
                 html += '<div class="atk-def-body" id="atk-def-body-' + idx + '">';
 
-                // Атака
+                // --- RED TEAM (Атака) ---
                 html += '<div class="atk-section">';
-                html += '<h4 style="color:#e3b341;margin:0 0 10px 0;">🥷 Red Team: Как атаковать</h4>';
+                html += '<h4 style="color:#da3633;margin:0 0 15px 0;font-size:16px;">🥷 Пошаговый сценарий эксплуатации (Red Team)</h4>';
+                
                 if (item.attack_tools && item.attack_tools.length > 0) {
+                    let stepNum = 1;
                     item.attack_tools.forEach(function(tool) {
-                        html += '<div style="margin-bottom:12px;">';
-                        html += '<span class="tool-badge tool-atk">' + escapeHtml(tool.name) + '</span>';
-                        if (tool.skill) html += '<span style="color:#8b949e;font-size:11px;"> Уровень: ' + escapeHtml(tool.skill) + '</span>';
-                        if (tool.desc) html += '<p style="font-size:12px;color:#8b949e;margin:6px 0;">' + escapeHtml(tool.desc) + '</p>';
+                        let feedbackId = `fb_red_${idx}_${stepNum}`;
+                        html += '<div class="step-card">';
+                        
+                        html += '<div class="step-header">';
+                        html += '<span class="step-num">Шаг ' + stepNum + '</span>';
+                        html += '<span class="step-title">' + escapeHtml(tool.name) + '</span>';
+                        if (tool.url) html += `<a href="${tool.url}" target="_blank" class="tool-link">🔗 Официальный сайт/Документация</a>`;
+                        if (tool.skill) html += '<span style="color:#8b949e;font-size:11px;margin-left:auto;">Уровень: ' + escapeHtml(tool.skill) + '</span>';
+                        html += '</div>';
+                        
+                        if (tool.desc) html += '<p style="font-size:13px;color:#c9d1d9;margin:8px 0;line-height:1.5;">' + escapeHtml(tool.desc) + '</p>';
+                        
                         if (tool.commands && tool.commands.length > 0) {
-                            html += '<div class="cmd-block">';
+                            html += '<div class="cmd-block" id="cmd_' + feedbackId + '">';
                             tool.commands.forEach(function(cmd) {
                                 if (cmd.startsWith("#") || cmd.startsWith("//")) {
                                     html += '<span class="cmd-comment">' + escapeHtml(cmd) + '</span>\\n';
-                                } else if (cmd.trim() === "") {
-                                    html += '\\n';
-                                } else {
+                                } else if (cmd.trim() !== "") {
                                     html += '<span class="cmd-highlight">' + escapeHtml(cmd) + '</span>\\n';
+                                    // Если есть пояснение к команде (имитация из БД)
+                                    if (tool.cmd_explanations && tool.cmd_explanations[cmd]) {
+                                        html += `</div><div class="cmd-explain">ℹ️ <b>Пояснение:</b> ${escapeHtml(tool.cmd_explanations[cmd])}</div><div class="cmd-block">`;
+                                    }
                                 }
                             });
                             html += '</div>';
                         }
+                        
+                        // Обратная связь Red Team
+                        html += '<div class="step-feedback">';
+                        html += '<label>📝 Ошибка в шаге атаки?</label>';
+                        html += `<input type="text" id="${feedbackId}" class="bug-feedback-input" data-team="Red" data-cve="${escapeHtml(item.cve_short)}" data-sw="${escapeHtml(item.sw)}" data-step="${stepNum}" data-tool="${escapeHtml(tool.name)}" placeholder="Напишите, что не так (неверный флаг, нет доступа)...">`;
                         html += '</div>';
+                        html += '</div>';
+                        stepNum++;
                     });
                 } else {
-                    html += '<p style="color:#484f58;font-size:12px;">Инструменты атаки не найдены в базе данных.</p>';
+                    html += '<p style="color:#484f58;font-size:13px;">Инструменты атаки не найдены в базе данных.</p>';
                 }
                 html += '</div>';
 
-                // Защита
+                // --- BLUE TEAM (Защита) ---
                 html += '<div class="def-section">';
-                html += '<h4 style="color:#3fb950;margin:0 0 10px 0;">🛡️ Blue Team: Как защититься</h4>';
+                html += '<h4 style="color:#3fb950;margin:0 0 15px 0;font-size:16px;">🛡️ Меры противодействия (Blue Team)</h4>';
+                
                 if (item.defense_tools && item.defense_tools.length > 0) {
+                    let defStepNum = 1;
                     item.defense_tools.forEach(function(tool) {
-                        html += '<div style="margin-bottom:12px;">';
-                        html += '<span class="tool-badge tool-def">' + escapeHtml(tool.name) + '</span>';
-                        if (tool.priority) html += '<span style="color:#8b949e;font-size:11px;"> Приоритет: ' + escapeHtml(tool.priority) + '</span>';
-                        if (tool.desc) html += '<p style="font-size:12px;color:#8b949e;margin:6px 0;">' + escapeHtml(tool.desc) + '</p>';
+                        let feedbackId = `fb_blue_${idx}_${defStepNum}`;
+                        html += '<div class="step-card" style="border-left: 3px solid #238636;">';
+                        
+                        html += '<div class="step-header">';
+                        html += '<span class="step-title" style="color:#3fb950;">' + escapeHtml(tool.name) + '</span>';
+                        if (tool.priority) html += '<span style="color:#8b949e;font-size:11px;margin-left:auto;"> Приоритет: ' + escapeHtml(tool.priority) + '</span>';
+                        html += '</div>';
+                        
+                        if (tool.desc) html += '<p style="font-size:13px;color:#c9d1d9;margin:8px 0;">' + escapeHtml(tool.desc) + '</p>';
+                        
                         if (tool.commands && tool.commands.length > 0) {
-                            html += '<div class="cmd-block">';
+                            html += '<div class="cmd-block" id="cmd_' + feedbackId + '" style="color:#e6edf3; border-color:#238636;">';
                             tool.commands.forEach(function(cmd) {
-                                if (cmd.startsWith("#") || cmd.startsWith("//")) {
-                                    html += '<span class="cmd-comment">' + escapeHtml(cmd) + '</span>\\n';
-                                } else if (cmd.trim() === "") {
-                                    html += '\\n';
-                                } else {
-                                    html += escapeHtml(cmd) + '\\n';
-                                }
+                                html += escapeHtml(cmd) + '\\n';
                             });
                             html += '</div>';
                         }
+                        
+                        // Обратная связь Blue Team
+                        html += '<div class="step-feedback" style="border-color:#238636;">';
+                        html += '<label>📝 Ошибка в конфигурации/команде защиты?</label>';
+                        html += `<input type="text" id="${feedbackId}" class="bug-feedback-input" data-team="Blue" data-cve="${escapeHtml(item.cve_short)}" data-sw="${escapeHtml(item.sw)}" data-step="${defStepNum}" data-tool="${escapeHtml(tool.name)}" placeholder="Например: эта команда ломает прод, нужен другой синтаксис...">`;
                         html += '</div>';
+                        html += '</div>';
+                        defStepNum++;
                     });
-                } else {
-                    html += '<p style="color:#484f58;font-size:12px;">Меры защиты не найдены в базе данных.</p>';
                 }
+                
+                // Умный парсер стены текста рекомендаций
                 if (item.recommendation) {
-                    html += '<div style="margin-top:10px;padding:10px;background:#0d1117;border-radius:4px;border:1px solid #30363d;border-left:4px solid #238636;">';
-                    html += '<strong style="color:#3fb950;font-size:12px;">Рекомендация системы:</strong><br>';
-                    html += '<span style="font-size:12px;">' + escapeHtml(item.recommendation || "").replace(/\\n/g, "<br>") + '</span>';
-                    html += '</div>';
+                    html += parseAndFormatRecommendations(item.recommendation);
                 }
-                html += '</div>';
-
+                
+                html += '</div>'; // Конец def-section
                 html += '</div></div>';
             });
             list.innerHTML = html;
+        }
+
+        function parseAndFormatRecommendations(text) {
+            let html = '<div class="rec-structured">';
+            html += '<strong style="color:#3fb950;font-size:14px;display:block;margin-bottom:10px;">🧠 Аналитика системы (Распознанные паттерны защиты):</strong>';
+            
+            // Выцепляем приоритет (🚨)
+            let alertMatch = text.match(/🚨 ПРИОРИТЕТ:(.*?)(?=🔍|\\d+\\.|$)/s);
+            if (alertMatch) {
+                let alertLines = alertMatch[1].trim().split('\\n');
+                html += '<div class="rec-alert"><strong>🚨 ПРИОРИТЕТ:</strong><br><ul style="margin:5px 0 0 15px; font-size:13px; color:#c9d1d9;">';
+                alertLines.forEach(l => { if (l.trim()) html += `<li>${escapeHtml(l.replace(/^- /, '').trim())}</li>`; });
+                html += '</ul></div>';
+            }
+
+            // Выцепляем мониторинг (🔍)
+            let monMatch = text.match(/🔍 Рекомендации по мониторингу:(.*?)(?=🚨|\\d+\\.|$)/s);
+            if (monMatch) {
+                let monLines = monMatch[1].trim().split('\\n');
+                html += '<div class="rec-monitor"><strong>🔍 Мониторинг:</strong><br><ul style="margin:5px 0 0 15px; font-size:13px; color:#c9d1d9;">';
+                monLines.forEach(l => { if (l.trim()) html += `<li>${escapeHtml(l.replace(/^- /, '').trim())}</li>`; });
+                html += '</ul></div>';
+            }
+
+            // Выцепляем нумерованные списки (меры защиты)
+            let listRegex = /(\\d+)\\.\\s(.*?)(?=(?:\\n\\d+\\.\\s)|🚨|🔍|$)/gs;
+            let match;
+            let stepsFound = false;
+            html += '<div class="rec-list">';
+            while ((match = listRegex.exec(text)) !== null) {
+                stepsFound = true;
+                let num = match[1];
+                let content = match[2].trim().replace(/\\n/g, ' ');
+                // Сокращаем длинный текст, прячем под спойлер
+                html += `<details class="rec-item">
+                            <summary><span class="rec-item-num">${num}.</span> ${escapeHtml(content.substring(0, 80))}...</summary>
+                            <div style="margin-top:10px; padding-top:10px; border-top:1px solid #30363d;">${escapeHtml(content)}</div>
+                         </details>`;
+            }
+            html += '</div>';
+
+            // Если парсер ничего не нашел, выводим как есть, но красиво
+            if (!alertMatch && !monMatch && !stepsFound) {
+                html += `<div style="font-size:13px; color:#c9d1d9; line-height:1.6;">${escapeHtml(text).replace(/\\n/g, '<br>')}</div>`;
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        function generateBugReport() {
+            let inputs = document.querySelectorAll('.bug-feedback-input');
+            let reportLines = [];
+            let hasErrors = false;
+            
+            reportLines.push("# 🐞 Отчёт об ошибках в сценариях (Киберполигон)");
+            reportLines.push(`**Дата генерации:** ${new Date().toLocaleString('ru-RU')}\\n---\\n`);
+            
+            inputs.forEach(inp => {
+                let comment = inp.value.trim();
+                if (comment) { 
+                    hasErrors = true;
+                    let team = inp.getAttribute('data-team');
+                    let cve = inp.getAttribute('data-cve');
+                    let sw = inp.getAttribute('data-sw');
+                    let step = inp.getAttribute('data-step');
+                    let tool = inp.getAttribute('data-tool');
+                    
+                    let cmdBlock = document.getElementById('cmd_' + inp.id);
+                    let cmds = cmdBlock ? cmdBlock.innerText.trim() : "Команды отсутствуют";
+                    
+                    let emoji = team === "Red" ? "🥷" : "🛡️";
+                    reportLines.push(`## ${emoji} Команда: ${team} Team | Цель: ${sw} (${cve})`);
+                    reportLines.push(`### Шаг ${step}: Инструмент - ${tool}`);
+                    reportLines.push(`**Код из базы:**`);
+                    reportLines.push(`\`\`\`bash\\n${cmds}\\n\`\`\``);
+                    reportLines.push(`**Комментарий/Правка пользователя:**`);
+                    reportLines.push(`> ⚠️ ${comment}\\n---\\n`);
+                }
+            });
+            
+            if (!hasErrors) {
+                alert("Нет заполненных полей с комментариями.");
+                return;
+            }
+            
+            let blob = new Blob([reportLines.join("\\n")], { type: 'text/markdown;charset=utf-8;' });
+            let link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `playbook_bugs_${new Date().getTime()}.md`;
+            link.click();
         }
 
         function toggleAtkDef() {
