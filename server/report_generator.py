@@ -303,6 +303,7 @@ class ReportGenerator:
         self.cwe_db = self._load_local_db("databases/cwe_database.json")
         self.capec_db = self._load_local_db("databases/capec_database.json")
         self.cve_db = self._load_local_db("databases/cve_database.json")
+        self.mitre_db = self._load_local_db("databases/mitre_attack.json")
         self.defense_db = self._load_local_db("databases/defense_database.json")
 
         self.raw_results = correlation_results
@@ -910,6 +911,7 @@ class ReportGenerator:
 
             tools = getattr(representative_r, 'attack_software', None) or getattr(base_r, 'attack_software', None)
             steps = getattr(representative_r, 'attack_steps', None) or getattr(base_r, 'attack_steps', None)
+            mitre_raw = getattr(representative_r, "mitre_technique", None) or getattr(base_r, "mitre_technique", None) or ""
 
             if not tools and self.tools_db and cwe_tokens:
                 db_info = None
@@ -945,6 +947,7 @@ class ReportGenerator:
                 "cwe": cwe_id or 'CWE-Неизвестно',
                 "cwe_desc": cwe_desc, # Передаем описание CWE в JavaScript
                 "capec": getattr(representative_r, 'capec_id', None) or getattr(base_r, 'capec_id', None) or 'CAPEC-Неизвестно',
+                "mitre": mitre_raw,
                 "name": names_joined,
                 "sw": g['mapped_sw'], 
                 "port": port,
@@ -1002,6 +1005,7 @@ class ReportGenerator:
                 "cwe": cwe_display_row,
                 "cwe_desc": cwe_desc_raw,
                 "capec": getattr(r, 'capec_id', None) or 'CAPEC-Неизвестно',
+                "mitre": getattr(r, "mitre_technique", None) or "",
                 "name": getattr(r, 'attack_name', None) or 'Атака',
                 "sw": real_sw,
                 "port": port,
@@ -1049,6 +1053,119 @@ class ReportGenerator:
             "ips": ", ".join(self.system_summary.get('ip_addresses', [])),
             "ports_count": self.system_summary.get('open_ports_count', 0)
         }
+
+        capec_ids = set()
+        cve_ids = set()
+        mitre_ids = set()
+
+        def _collect_ids(value, prefix, out_set: set):
+            if value is None:
+                return
+            for part in str(value).split(","):
+                tok = part.strip()
+                if not tok:
+                    continue
+                up = tok.upper()
+                if prefix == "CAPEC" and up.startswith("CAPEC-"):
+                    out_set.add(up)
+                elif prefix == "CVE" and up.startswith("CVE-"):
+                    out_set.add(up)
+                elif prefix == "MITRE":
+                    if up.startswith("T") and up[1:].isdigit():
+                        out_set.add(up)
+
+        for it in (raw_findings_data or []):
+            _collect_ids(it.get("capec"), "CAPEC", capec_ids)
+            _collect_ids(it.get("cve"), "CVE", cve_ids)
+            _collect_ids(it.get("mitre"), "MITRE", mitre_ids)
+
+        for it in (js_data or []):
+            _collect_ids(it.get("capec"), "CAPEC", capec_ids)
+            _collect_ids(it.get("cve"), "CVE", cve_ids)
+            _collect_ids(it.get("mitre"), "MITRE", mitre_ids)
+
+        capec_index = {}
+        if isinstance(self.capec_db, dict):
+            for k, v in self.capec_db.items():
+                capec_index[str(k).upper()] = v
+        elif isinstance(self.capec_db, list):
+            for v in self.capec_db:
+                cid = (v or {}).get("id") or (v or {}).get("capec_id")
+                if cid:
+                    capec_index[str(cid).upper()] = v
+
+        cve_index = {}
+        if isinstance(self.cve_db, dict):
+            for k, v in self.cve_db.items():
+                cve_index[str(k).upper()] = v
+        elif isinstance(self.cve_db, list):
+            for v in self.cve_db:
+                cid = (v or {}).get("id") or (v or {}).get("cve_id")
+                if cid:
+                    cve_index[str(cid).upper()] = v
+
+        mitre_index = {}
+        if isinstance(self.mitre_db, dict):
+            for k, v in self.mitre_db.items():
+                mitre_index[str(k).upper()] = v
+        elif isinstance(self.mitre_db, list):
+            for v in self.mitre_db:
+                mid = (v or {}).get("id") or (v or {}).get("technique_id")
+                if mid:
+                    mitre_index[str(mid).upper()] = v
+
+        capec_meta = {}
+        for cid in sorted(capec_ids):
+            entry = capec_index.get(cid, {}) or {}
+            mitigations = entry.get("mitigations", []) or []
+            prerequisites = entry.get("prerequisites", []) or []
+            capec_meta[cid] = {
+                "id": cid,
+                "name": entry.get("name", "") or "",
+                "description": entry.get("description", "") or "",
+                "prerequisites": prerequisites[:50] if isinstance(prerequisites, list) else [],
+                "mitigations": mitigations[:50] if isinstance(mitigations, list) else [],
+            }
+
+        cve_meta = {}
+        for cid in sorted(cve_ids):
+            entry = cve_index.get(cid, {}) or {}
+            cve_meta[cid] = {
+                "id": cid,
+                "description": entry.get("description", "") or "",
+                "severity": entry.get("severity", "") or "",
+                "cvss_score": entry.get("cvss_score", None),
+                "attack_type": entry.get("attack_type", "") or "",
+                "affected_software": (entry.get("affected_software", []) or [])[:80] if isinstance(entry.get("affected_software", []), list) else [],
+                "related_cwe": (entry.get("related_cwe", []) or [])[:80] if isinstance(entry.get("related_cwe", []), list) else [],
+                "related_capec": (entry.get("related_capec", []) or [])[:80] if isinstance(entry.get("related_capec", []), list) else [],
+                "related_mitre": (entry.get("related_mitre", []) or [])[:80] if isinstance(entry.get("related_mitre", []), list) else [],
+                "requires_service": (entry.get("requires_service", []) or [])[:80] if isinstance(entry.get("requires_service", []), list) else [],
+                "requires_port": (entry.get("requires_port", []) or [])[:80] if isinstance(entry.get("requires_port", []), list) else [],
+                "prerequisites": (entry.get("prerequisites", []) or [])[:80] if isinstance(entry.get("prerequisites", []), list) else [],
+                "mitigations": (entry.get("mitigations", []) or [])[:80] if isinstance(entry.get("mitigations", []), list) else [],
+            }
+
+        mitre_meta = {}
+        for mid in sorted(mitre_ids):
+            entry = mitre_index.get(mid, {}) or {}
+            platforms = entry.get("platforms", []) or []
+            mitigations = entry.get("mitigations", []) or []
+            related_cwe = entry.get("related_cwe", []) or []
+            related_capec = entry.get("related_capec", []) or []
+            requires_service = entry.get("requires_service", []) or []
+            mitre_meta[mid] = {
+                "id": mid,
+                "name": entry.get("name", "") or "",
+                "tactic": entry.get("tactic", "") or "",
+                "description": entry.get("description", "") or "",
+                "platforms": platforms[:50] if isinstance(platforms, list) else [],
+                "detection": entry.get("detection", "") or "",
+                "mitigations": mitigations[:80] if isinstance(mitigations, list) else [],
+                "related_cwe": related_cwe[:80] if isinstance(related_cwe, list) else [],
+                "related_capec": related_capec[:80] if isinstance(related_capec, list) else [],
+                "requires_service": requires_service[:80] if isinstance(requires_service, list) else [],
+            }
         
         with open(filepath, "w", encoding="utf-8") as f:
             html = HTML_TEMPLATE.replace('__REPORT_DATA__', json.dumps(js_data, ensure_ascii=False))
@@ -1057,6 +1174,9 @@ class ReportGenerator:
             html = html.replace('__SYS_DATA__', json.dumps(sys_data, ensure_ascii=False))
             html = html.replace('__SUMMARY_DATA__', json.dumps(summary_data, ensure_ascii=False))
             html = html.replace('__ATK_DEF_DATA__', json.dumps(atk_def_data, ensure_ascii=False))
+            html = html.replace('__CAPEC_META__', json.dumps(capec_meta, ensure_ascii=False))
+            html = html.replace('__CVE_META__', json.dumps(cve_meta, ensure_ascii=False))
+            html = html.replace('__MITRE_META__', json.dumps(mitre_meta, ensure_ascii=False))
             html = html.replace('__STATUS_META__', json.dumps(report_status_meta(), ensure_ascii=False))
             f.write(html)
 

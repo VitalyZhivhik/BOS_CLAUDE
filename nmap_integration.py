@@ -19,6 +19,49 @@ from common.bundle_paths import bundle_resources_root
 
 logger = get_server_logger()
 
+def _resolve_nuclei_templates_dir() -> str:
+    base_dir = bundle_resources_root()
+    tools_root = os.path.join(base_dir, "tools")
+    candidates = [
+        os.path.join(tools_root, "nuclei-templates"),
+        os.path.join(tools_root, "nuclei_templates"),
+        os.path.join(tools_root, "templates"),
+        os.path.join(tools_root, "nuclei", "nuclei-templates"),
+        os.path.join(tools_root, "nuclei", "templates"),
+        os.path.join(base_dir, "nuclei-templates"),
+        os.path.join(base_dir, "templates"),
+    ]
+    for root in candidates:
+        if not root or not os.path.isdir(root):
+            continue
+        cves_dir = os.path.join(root, "cves")
+        if os.path.isdir(cves_dir):
+            return cves_dir
+        return root
+    return ""
+
+
+def _resolve_nmap_datadir(nmap_exe_path: str) -> str:
+    if not isinstance(nmap_exe_path, str) or not nmap_exe_path:
+        return ""
+    base = os.path.dirname(os.path.abspath(nmap_exe_path)) if os.path.isfile(nmap_exe_path) else ""
+    candidates = [base]
+    if base:
+        candidates.extend([
+            os.path.join(base, "share", "nmap"),
+            os.path.join(base, "..", "share", "nmap"),
+            os.path.join(base, "..", "..", "share", "nmap"),
+        ])
+    for root in candidates:
+        if not root or not os.path.isdir(root):
+            continue
+        scripts_dir = os.path.join(root, "scripts")
+        probes = os.path.join(root, "nmap-service-probes")
+        if os.path.isdir(scripts_dir) and os.path.isfile(probes):
+            return os.path.abspath(root)
+    return ""
+
+
 class NmapScanner:
     """Интеграция с Nmap для сканирования уязвимостей."""
 
@@ -82,11 +125,18 @@ class NmapScanner:
 
         try:
             logger.info(f"Запуск Nmap для сканирования уязвимостей: {' '.join(cmd)}")
+            env = os.environ.copy()
+            datadir = _resolve_nmap_datadir(self.nmap_path)
+            if datadir:
+                env["NMAPDIR"] = datadir
+            cwd = os.path.dirname(os.path.abspath(self.nmap_path)) if os.path.isfile(self.nmap_path) else None
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 timeout=int(self.settings.get("process_timeout", 240)),
+                cwd=cwd,
+                env=env,
             )
 
             if result.returncode == 0:
@@ -223,10 +273,10 @@ class NucleiScanner:
 
         # Формируем команду Nuclei
         target_url = f"http://{self.target}" if any(p in [80, 443, 8080, 8443] for p in ports) else self.target
+        templates_dir = _resolve_nuclei_templates_dir()
         cmd = [
             self.nuclei_path,
             "-u", target_url,
-            "-t", "cves/",
             "-json",
             "-silent",
             "-c", str(self.settings.get("concurrency", 40)),
@@ -234,14 +284,18 @@ class NucleiScanner:
             "-retries", str(self.settings.get("retries", 1)),
             "-mhe", str(self.settings.get("max_host_errors", 100000)),
         ]
+        if templates_dir:
+            cmd.extend(["-t", templates_dir])
 
         try:
             logger.info(f"Запуск Nuclei для сканирования уязвимостей: {' '.join(cmd)}")
+            cwd = os.path.dirname(os.path.abspath(self.nuclei_path)) if os.path.isfile(self.nuclei_path) else None
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 timeout=int(self.settings.get("process_timeout", 300)),
+                cwd=cwd,
             )
 
             if result.returncode == 0 and result.stdout:

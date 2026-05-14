@@ -11,6 +11,7 @@ import os
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from common.logger import get_server_logger
+from common.bundle_paths import bundle_resources_root
 logger = get_server_logger()
 TOOLS_DB_PATH = "databases/tools_database.json"
 DEFENSE_DB_PATH = "databases/defense_database.json"
@@ -20,7 +21,7 @@ class AttackToolkit:
     Используется для обогащения отчётов пошаговыми инструкциями.
     """
     def __init__(self, base_dir: str = ""):
-        self.base_dir = base_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.base_dir = base_dir or bundle_resources_root()
         self.tools_db: list[dict] = []
         self.defense_db: list[dict] = []
     def load(self):

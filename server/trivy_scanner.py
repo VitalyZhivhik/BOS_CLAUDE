@@ -18,7 +18,7 @@ from typing import List, Dict, Optional, Any
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from common.logger import get_server_logger
-from common.bundle_paths import bundle_resources_root
+from common.bundle_paths import application_base_dir, bundle_resources_root
 
 logger = get_server_logger()
 
@@ -215,10 +215,39 @@ class TrivyScanner:
                 if custom_file and custom_file not in skip_files:
                     skip_files.append(str(custom_file))
 
+            target_path = scan_options.get("target_path", "")
+            if not isinstance(target_path, str) or not target_path.strip():
+                candidates = [
+                    os.environ.get("ProgramFiles", ""),
+                    os.environ.get("ProgramFiles(x86)", ""),
+                    r"C:\Program Files",
+                    r"C:\Program Files (x86)",
+                    r"C:\\",
+                ]
+                target_path = next((p for p in candidates if p and os.path.isdir(p)), r"C:\\")
+            target_path = os.path.abspath(target_path)
+
+            cache_dir = scan_options.get("cache_dir", "")
+            if not isinstance(cache_dir, str) or not cache_dir.strip():
+                cache_dir = os.path.join(application_base_dir(), "data", "trivy_cache")
+            cache_dir = os.path.abspath(cache_dir)
+
+            skip_db_update = scan_options.get("skip_db_update", None)
+            if not isinstance(skip_db_update, bool):
+                skip_db_update = True
+
+            db_repos = scan_options.get("db_repositories", None)
+            if not isinstance(db_repos, list) or not db_repos:
+                db_repos = [
+                    "ghcr.io/aquasecurity/trivy-db",
+                    "public.ecr.aws/aquasecurity/trivy-db",
+                    "mirror.gcr.io/aquasec/trivy-db",
+                ]
+
             cmd = [
                 self.trivy_path,
                 "fs",  # Filesystem scan
-                "C:\\",  # Сканируем диск C:
+                target_path,
                 "--format", "json",
                 "--output", output_path,
                 "--scanners", ",".join(scanners) if scanners else "vuln",
@@ -226,8 +255,13 @@ class TrivyScanner:
                 "--exit-code", "0",
                 "--timeout", f"{timeout_minutes}m",
                 "--parallel", str(scan_threads),
-                "--cache-dir", os.path.join(tempfile.gettempdir(), "trivy_cache"),
+                "--cache-dir", cache_dir,
             ]
+            for repo in db_repos:
+                if repo:
+                    cmd.extend(["--db-repository", str(repo)])
+            if skip_db_update:
+                cmd.append("--skip-db-update")
             if security_checks:
                 cmd.extend(["--security-checks", "vuln,config,secret"])
             for skip_dir in skip_dirs:
@@ -235,6 +269,9 @@ class TrivyScanner:
             for skip_file in skip_files:
                 cmd.extend(["--skip-files", skip_file])
 
+            logger.info(f"  Цель сканирования: {target_path}")
+            logger.info(f"  Cache dir: {cache_dir}")
+            logger.info(f"  skip_db_update: {skip_db_update}")
             logger.info(f"  Команда: {' '.join(cmd)}")
             self.progress_callback(15, "Trivy анализирует установленное ПО...")
 
@@ -329,6 +366,56 @@ class TrivyScanner:
                     process.wait()
                     return_code = process.returncode
                     logger.info(f"[TRIVY] Повтор завершён с кодом: {return_code}")
+                else:
+                    out = "\n".join(output_lines[-50:]) if output_lines else ""
+                    if skip_db_update and ("failed to download" in out.lower() or "db error" in out.lower()):
+                        logger.warning("[TRIVY] Похоже, отсутствует локальная DB. Повторяем с обновлением DB.")
+                        retry_cmd = [x for x in cmd if x != "--skip-db-update"]
+                        process = subprocess.Popen(
+                            retry_cmd,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                            bufsize=1,
+                            universal_newlines=True,
+                            startupinfo=startupinfo,
+                            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
+                            cwd=trivy_home or None,
+                            env=env,
+                        )
+                        output_lines = []
+                        for line in process.stdout:
+                            line = line.strip()
+                            if line:
+                                output_lines.append(line)
+                                logger.debug(f"[TRIVY-RETRY] {line}")
+                        process.wait()
+                        return_code = process.returncode
+                        logger.info(f"[TRIVY] Повтор (DB update) завершён с кодом: {return_code}")
+                    elif (not skip_db_update) and ("failed to download" in out.lower() or "db error" in out.lower()):
+                        logger.warning("[TRIVY] Ошибка загрузки DB. Повторяем без обновления DB (если cache уже есть).")
+                        retry_cmd = cmd + ["--skip-db-update"]
+                        process = subprocess.Popen(
+                            retry_cmd,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                            bufsize=1,
+                            universal_newlines=True,
+                            startupinfo=startupinfo,
+                            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
+                            cwd=trivy_home or None,
+                            env=env,
+                        )
+                        output_lines = []
+                        for line in process.stdout:
+                            line = line.strip()
+                            if line:
+                                output_lines.append(line)
+                                logger.debug(f"[TRIVY-RETRY] {line}")
+                        process.wait()
+                        return_code = process.returncode
+                        logger.info(f"[TRIVY] Повтор (skip DB update) завершён с кодом: {return_code}")
 
             # Читаем JSON результат
             if os.path.exists(output_path) and os.path.getsize(output_path) > 0:

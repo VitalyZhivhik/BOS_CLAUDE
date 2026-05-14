@@ -101,6 +101,46 @@ def get_app_dir() -> str:
     """Папка с .exe (frozen) или корень репозитория — для записи history и т.п."""
     return application_base_dir()
 
+
+def _resolve_nuclei_templates_dir() -> str:
+    base = tools_dir()
+    candidates = [
+        os.path.join(base, "nuclei-templates"),
+        os.path.join(base, "nuclei_templates"),
+        os.path.join(base, "templates"),
+        os.path.join(base, "nuclei", "nuclei-templates"),
+        os.path.join(base, "nuclei", "templates"),
+    ]
+    for root in candidates:
+        if not root or not os.path.isdir(root):
+            continue
+        cves_dir = os.path.join(root, "cves")
+        if os.path.isdir(cves_dir):
+            return cves_dir
+        return root
+    return ""
+
+
+def _resolve_nmap_datadir(nmap_exe_path: str) -> str:
+    if not isinstance(nmap_exe_path, str) or not nmap_exe_path:
+        return ""
+    base = os.path.dirname(os.path.abspath(nmap_exe_path)) if os.path.isfile(nmap_exe_path) else ""
+    candidates = [base]
+    if base:
+        candidates.extend([
+            os.path.join(base, "share", "nmap"),
+            os.path.join(base, "..", "share", "nmap"),
+            os.path.join(base, "..", "..", "share", "nmap"),
+        ])
+    for root in candidates:
+        if not root or not os.path.isdir(root):
+            continue
+        scripts_dir = os.path.join(root, "scripts")
+        probes = os.path.join(root, "nmap-service-probes")
+        if os.path.isdir(scripts_dir) and os.path.isfile(probes):
+            return os.path.abspath(root)
+    return ""
+
 # ─────────────────────────── СТИЛЬ ───────────────────────────
 STYLE = """
 QMainWindow { background: #121212; }
@@ -479,6 +519,10 @@ class NucleiWorker(QThread):
             f.write("\n".join(urls))
 
         try:
+            templates_dir = _resolve_nuclei_templates_dir()
+            if not templates_dir:
+                self.log_msg.emit("  ⚠️ Шаблоны Nuclei не найдены в tools/. Будут использованы шаблоны из профиля пользователя/онлайн.")
+
             cmd = [
                 self.nuclei_path,
                 "-l", url_list_path,
@@ -490,16 +534,20 @@ class NucleiWorker(QThread):
                 "-retries", str(self.settings.get("retries", 0)),
                 "-stats", "-si", "2"
             ]
+            if templates_dir:
+                cmd.extend(["-t", templates_dir])
 
             startupinfo = subprocess.STARTUPINFO() if os.name == 'nt' else None
             if startupinfo:
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
+            cwd = os.path.dirname(os.path.abspath(self.nuclei_path)) if os.path.isfile(self.nuclei_path) else None
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, bufsize=1, universal_newlines=True,
-                startupinfo=startupinfo
+                startupinfo=startupinfo,
+                cwd=cwd,
             )
 
             vuln_count_live = 0
@@ -669,11 +717,18 @@ class NmapWorker(QThread):
             if startupinfo:
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
+            env = os.environ.copy()
+            datadir = _resolve_nmap_datadir(self.nmap_path)
+            if datadir:
+                env["NMAPDIR"] = datadir
+            cwd = os.path.dirname(os.path.abspath(self.nmap_path)) if os.path.isfile(self.nmap_path) else None
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, bufsize=1, universal_newlines=True,
-                startupinfo=startupinfo
+                startupinfo=startupinfo,
+                cwd=cwd,
+                env=env,
             )
 
             for line in process.stdout:

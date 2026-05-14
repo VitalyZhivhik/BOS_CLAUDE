@@ -402,8 +402,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         var summaryData = __SUMMARY_DATA__;
         var atkDefData = __ATK_DEF_DATA__;
         var statusMeta = __STATUS_META__;
+        var capecMeta = __CAPEC_META__;
+        var cveMeta = __CVE_META__;
+        var mitreMeta = __MITRE_META__;
         var network = null;
-        var detailsMap = {};
+        var detailsMapRows = {};
+        var detailsMapNodes = {};
+        function lookupDetails(id) {
+            return detailsMapNodes[id] || detailsMapRows[id];
+        }
 
         function escapeHtml(s) {
             if (s === undefined || s === null) return "";
@@ -1323,21 +1330,53 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             refill("f-cwe", cwes, "-- Все классы --");
         }
 
+        function expandSeedToRawItems(seed) {
+            let out = [];
+            let s = Array.isArray(seed) ? seed : [];
+            for (let i = 0; i < s.length; i++) {
+                let g = s[i] || {};
+                let ms = Array.isArray(g.members) ? g.members : [];
+                if (ms.length) {
+                    for (let j = 0; j < ms.length; j++) {
+                        let m = Object.assign({}, ms[j] || {});
+                        if (m.raw_id === undefined || m.raw_id === null || m.raw_id === "") {
+                            m.raw_id = "seed_" + String(g.id ?? i) + "_" + String(j);
+                        } else {
+                            m.raw_id = "m_" + String(m.raw_id);
+                        }
+                        if (!m.feas) m.feas = g.feas || "UNKNOWN";
+                        if (!m.sev) m.sev = g.sev || "INFO";
+                        if (!m.desc) m.desc = g.desc || "";
+                        if (!m.rec) m.rec = g.rec || "";
+                        if (!m.reason) m.reason = g.reason || "";
+                        if (!m.tools) m.tools = g.tools || "";
+                        if (!m.steps) m.steps = g.steps || "";
+                        if (!m.sw_category) m.sw_category = g.sw_category || "";
+                        if (!m.sw_purpose) m.sw_purpose = g.sw_purpose || "";
+                        if (!m.sw_impact) m.sw_impact = g.sw_impact || "";
+                        if (!m.sw_scope) m.sw_scope = g.sw_scope || "";
+                        if (!m.feasibility_trace) m.feasibility_trace = g.feasibility_trace || {};
+                        out.push(m);
+                    }
+                } else {
+                    let x = Object.assign({}, g);
+                    x.raw_id = "seed_" + String(g.id ?? i);
+                    out.push(x);
+                }
+            }
+            return out;
+        }
+
         function rebuildAggregatedData() {
             let keys = getSelectedAggregationKeys();
             let rawItems = Array.isArray(rawFindingsData) ? rawFindingsData : [];
+            if (!rawItems.length) rawItems = expandSeedToRawItems(reportDataSeed);
             let hasRaw = rawItems.length > 0;
-            if (!hasRaw) {
-                // В некоторых отчётах raw-блок может отсутствовать/быть пустым.
-                // Тогда используем уже подготовленные сервером агрегированные данные.
-                reportData = Array.isArray(reportDataSeed) ? reportDataSeed.slice() : [];
-            } else {
-                try {
-                    reportData = aggregateByKeys(rawItems, keys);
-                } catch (e) {
-                    console.error("Ошибка агрегации отчёта:", e);
-                    reportData = [];
-                }
+            try {
+                reportData = hasRaw ? aggregateByKeys(rawItems, keys) : [];
+            } catch (e) {
+                console.error("Ошибка агрегации отчёта:", e);
+                reportData = [];
             }
             if ((!reportData || reportData.length === 0) && hasRaw) {
                 // Фолбэк: если агрегация дала пустой набор, показываем сырые записи,
@@ -1480,6 +1519,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function renderTable(data) {
             let tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
+            detailsMapRows = {};
             data.forEach(r => {
                 let nameShort = r.name.substring(0, 50) + (r.name.length > 50 ? "..." : "");
                 let dupes = r.count > 1 ? `<br><small style="color:#58a6ff;">(Сгруппировано из ${r.count} CVE)</small>` : "";
@@ -1503,11 +1543,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 tbody.innerHTML += tr;
                 
                 // Сохраняем данные для модалки по главному ID
-                detailsMap['aggr_' + r.id] = { type: 'aggr', data: r };
+                detailsMapRows['aggr_' + r.id] = { type: 'aggr', data: r };
             });
         }
 
         function renderGraph(data) {
+            detailsMapNodes = {};
             let viewId = document.getElementById('map-view-select').value;
             let nodes = [];
             let edges = [];
@@ -1521,205 +1562,389 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             let addNode = (n) => {
                 if(!addedNodes.has(n.id)) { addedNodes.add(n.id); nodes.push(n); }
             };
+            let addDetail = (id, type, payload, item) => {
+                if (!detailsMapNodes[id]) {
+                    detailsMapNodes[id] = Object.assign({ type: type, items: [] }, payload || {});
+                }
+                if (item) detailsMapNodes[id].items.push(item);
+            };
+            let safeIdPart = (s) => {
+                return String(s ?? "").replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 140) || "_";
+            };
+            let splitCsv = (s) => {
+                let raw = String(s ?? "");
+                if (!raw) return [];
+                return raw.split(",").map(x => x.trim()).filter(Boolean);
+            };
+            let splitSources = (s) => {
+                let raw = String(s ?? "");
+                if (!raw) return [];
+                return raw.split("&").map(x => x.trim()).filter(Boolean);
+            };
+            let uniq = (arr) => Array.from(new Set((arr || []).filter(Boolean)));
+            let keys = getSelectedAggregationKeys();
+            let noAgg = !keys || keys.length === 0;
 
             // ---- КАРТА 1.1: Asset-Centric (От Актива к Атаке — Blue Team) ----
             if (viewId === "1_1") {
-                data.forEach(r => {
-                    let swId = "ac_sw_" + r.sw + "_" + r.port;
-                    addNode({ id: swId, label: "🎯 ПО (Актив):\\n" + r.sw + "\\nПорт: " + r.port, level: 0, shape: "box", color: {background: "#1f77b4"} });
-                    
-                    let cveId = "ac_cve_" + r.id;
-                    let cvesStr = r.cve.length > 25 ? r.cve.substring(0, 25) + "..." : r.cve;
-                    addNode({ id: cveId, label: "🛡️ CVE (Дыра):\\n" + cvesStr, level: 1, shape: "box", color: {background: getSevColor(r.sev)} });
-                    
-                    let cweId = "ac_cwe_" + r.cwe;
-                    addNode({ id: cweId, label: "🐛 CWE (Причина):\\n" + r.cwe, level: 2, shape: "box", color: {background: "#484f58"} });
-                    
-                    let capecId = "ac_capec_" + r.capec;
-                    addNode({ id: capecId, label: "🥷 CAPEC (Метод):\\n" + r.capec, level: 3, shape: "box", color: {background: "#58a6ff"} });
-                    
-                    let mitreId = "ac_mitre_" + r.capec;
-                    addNode({ id: mitreId, label: "⚔️ MITRE ATT&CK\\n(Импакт / Тактика)", level: 4, shape: "box", color: {background: "#d29922"} });
-                    
-                    let verdId = "ac_verd_" + r.id;
-                    addNode({ id: verdId, label: "⚖️ Вердикт:\\n" + r.feas, level: 5, shape: "box", color: {background: getFeasColor(r.feas)} });
-                    
-                    addEdge(swId, cveId, "#8b949e");
-                    addEdge(cveId, cweId, "#8b949e");
-                    addEdge(cweId, capecId, "#8b949e");
-                    addEdge(capecId, mitreId, "#8b949e");
-                    addEdge(mitreId, verdId, getFeasColor(r.feas), r.feas === "РЕАЛИЗУЕМА" ? 3 : 2, r.feas === "НЕ РЕАЛИЗУЕМА");
-                    
-                    detailsMap[swId] = { type: 'sw', data: r };
-                    detailsMap[cveId] = { type: 'aggr', data: r };
-                    detailsMap[cweId] = { type: 'cwe', data: r };
-                    detailsMap[capecId] = { type: 'aggr', data: r };
-                    detailsMap[mitreId] = { type: 'aggr', data: r }; 
-                    detailsMap[verdId] = { type: 'aggr', data: r };
+                data.forEach((r, idx) => {
+                    r = r || {};
+                    let rk = String(r.raw_id ?? r.id ?? idx);
+                    let swId = "ac_sw_" + (noAgg ? safeIdPart(rk) : (safeIdPart(r.sw) + "_" + safeIdPart(r.port)));
+                    addNode({ id: swId, label: "🎯 ПО (Актив):\\n" + (r.sw || "") + "\\nПорт: " + (r.port || ""), level: 0, shape: "box", color: {background: "#1f77b4"} });
+                    addDetail(swId, "sw", { data: r, sw: r.sw, port: r.port }, r);
+
+                    let cweTokens = uniq(splitCsv(r.cwe));
+                    if (!cweTokens.length) cweTokens = [String(r.cwe || "CWE-Неизвестно")];
+                    let capecTokens = uniq(splitCsv(r.capec));
+                    if (!capecTokens.length) capecTokens = [String(r.capec || "CAPEC-Неизвестно")];
+                    let mitreTokens = uniq(splitCsv(r.mitre));
+                    if (!mitreTokens.length) mitreTokens = ["—"];
+
+                    let verdId = "ac_verd_" + (noAgg ? safeIdPart(rk) : safeIdPart(r.id));
+                    addNode({ id: verdId, label: "⚖️ Вердикт:\\n" + (r.feas || ""), level: 5, shape: "box", color: {background: getFeasColor(r.feas)} });
+                    addDetail(verdId, "verdict", { data: r }, r);
+
+                    mitreTokens.forEach(mitreTok => {
+                        let mId = "ac_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
+                        let mt = (mitreMeta && mitreMeta[mitreTok] && mitreMeta[mitreTok].tactic) ? String(mitreMeta[mitreTok].tactic) : "";
+                        let lbl = "⚔️ MITRE ATT&CK:\\n" + mitreTok + (mt ? ("\\n" + mt) : "");
+                        addNode({ id: mId, label: lbl, level: 4, shape: "box", color: {background: "#d29922"} });
+                        addDetail(mId, "mitre", { data: r, mitre: mitreTok }, r);
+                        addEdge(mId, verdId, getFeasColor(r.feas), r.feas === "РЕАЛИЗУЕМА" ? 3 : 2, r.feas === "НЕ РЕАЛИЗУЕМА");
+                    });
+
+                    if (noAgg) {
+                        let cveTokens = uniq(splitCsv(r.cve));
+                        if (!cveTokens.length) cveTokens = [String(r.cve || "N/A")];
+                        cveTokens.forEach(cveTok => {
+                            let cveId = "ac_cve_" + safeIdPart(rk) + "_" + safeIdPart(cveTok);
+                            addNode({ id: cveId, label: "🛡️ CVE (Дыра):\\n" + cveTok, level: 1, shape: "box", color: {background: getSevColor(r.sev)} });
+                            addDetail(cveId, "cve", { data: r, cve: cveTok }, r);
+                            addEdge(swId, cveId, "#8b949e");
+
+                            cweTokens.forEach(cweTok => {
+                                let cweId = "ac_cwe_" + safeIdPart(rk) + "_" + safeIdPart(cweTok);
+                                addNode({ id: cweId, label: "🐛 CWE (Причина):\\n" + cweTok, level: 2, shape: "box", color: {background: "#484f58"} });
+                                addDetail(cweId, "cwe", { data: r, cwe: cweTok }, r);
+                                addEdge(cveId, cweId, "#8b949e");
+
+                                capecTokens.forEach(capecTok => {
+                                    let capecId = "ac_capec_" + safeIdPart(rk) + "_" + safeIdPart(capecTok);
+                                    addNode({ id: capecId, label: "🥷 CAPEC (Метод):\\n" + capecTok, level: 3, shape: "box", color: {background: "#58a6ff"} });
+                                    addDetail(capecId, "capec", { data: r, capec: capecTok }, r);
+                                    addEdge(cweId, capecId, "#8b949e");
+                                    mitreTokens.forEach(mitreTok => {
+                                        let mId = "ac_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
+                                        addEdge(capecId, mId, "#8b949e");
+                                    });
+                                });
+                            });
+                        });
+                    } else {
+                        let cveId = "ac_cve_" + safeIdPart(r.id);
+                        let cvesStr = String(r.cve || "");
+                        cvesStr = cvesStr.length > 25 ? cvesStr.substring(0, 25) + "..." : cvesStr;
+                        addNode({ id: cveId, label: "🛡️ CVE (Дыра):\\n" + cvesStr, level: 1, shape: "box", color: {background: getSevColor(r.sev)} });
+                        addDetail(cveId, "finding", { data: r }, r);
+                        addEdge(swId, cveId, "#8b949e");
+
+                        cweTokens.forEach(cweTok => {
+                            let cweId = "ac_cwe_" + safeIdPart(cweTok);
+                            addNode({ id: cweId, label: "🐛 CWE (Причина):\\n" + cweTok, level: 2, shape: "box", color: {background: "#484f58"} });
+                            addDetail(cweId, "cwe", { data: r, cwe: cweTok }, r);
+                            addEdge(cveId, cweId, "#8b949e");
+
+                            capecTokens.forEach(capecTok => {
+                                let capecId = "ac_capec_" + safeIdPart(capecTok);
+                                addNode({ id: capecId, label: "🥷 CAPEC (Метод):\\n" + capecTok, level: 3, shape: "box", color: {background: "#58a6ff"} });
+                                addDetail(capecId, "capec", { data: r, capec: capecTok }, r);
+                                addEdge(cweId, capecId, "#8b949e");
+                                mitreTokens.forEach(mitreTok => {
+                                    let mId = "ac_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
+                                    addEdge(capecId, mId, "#8b949e");
+                                });
+                            });
+                        });
+                    }
                 });
             }
             // ---- КАРТА 1.2: Attacker-Centric (От Цели к Активу — Red Team) ----
             else if (viewId === "1_2") {
-                data.forEach(r => {
-                    let mitreId = "at_mitre_" + r.capec;
-                    addNode({ id: mitreId, label: "⚔️ MITRE ATT&CK\\n(Глобальная цель)", level: 0, shape: "box", color: {background: "#d29922"} });
-                    
-                    let capecId = "at_capec_" + r.capec;
-                    addNode({ id: capecId, label: "🥷 CAPEC (Метод):\\n" + r.capec, level: 1, shape: "box", color: {background: "#58a6ff"} });
-                    
-                    let cweId = "at_cwe_" + r.cwe;
-                    addNode({ id: cweId, label: "🐛 CWE (Слабость):\\n" + r.cwe, level: 2, shape: "box", color: {background: "#484f58"} });
-                    
-                    let cveId = "at_cve_" + r.id;
-                    let cvesStr = r.cve.length > 25 ? r.cve.substring(0, 25) + "..." : r.cve;
-                    addNode({ id: cveId, label: "🛡️ CVE (Уязвимость):\\n" + cvesStr, level: 3, shape: "box", color: {background: getSevColor(r.sev)} });
-                    
-                    let swId = "at_sw_" + r.sw + "_" + r.port;
-                    addNode({ id: swId, label: "🎯 Наше ПО (Актив):\\n" + r.sw, level: 4, shape: "box", color: {background: "#1f77b4"} });
-                    
-                    let verdId = "at_verd_" + r.id;
-                    addNode({ id: verdId, label: "⚖️ Вердикт:\\n" + r.feas, level: 5, shape: "box", color: {background: getFeasColor(r.feas)} });
-                    
-                    addEdge(mitreId, capecId, "#8b949e");
-                    addEdge(capecId, cweId, "#8b949e");
-                    addEdge(cweId, cveId, "#8b949e");
-                    addEdge(cveId, swId, "#8b949e");
-                    addEdge(swId, verdId, getFeasColor(r.feas), r.feas === "РЕАЛИЗУЕМА" ? 3 : 2, r.feas === "НЕ РЕАЛИЗУЕМА");
-                    
-                    detailsMap[mitreId] = { type: 'aggr', data: r };
-                    detailsMap[capecId] = { type: 'aggr', data: r };
-                    detailsMap[cweId] = { type: 'cwe', data: r };
-                    detailsMap[cveId] = { type: 'aggr', data: r };
-                    detailsMap[swId] = { type: 'sw', data: r };
-                    detailsMap[verdId] = { type: 'aggr', data: r };
+                data.forEach((r, idx) => {
+                    r = r || {};
+                    let rk = String(r.raw_id ?? r.id ?? idx);
+
+                    let mitreTokens = uniq(splitCsv(r.mitre));
+                    if (!mitreTokens.length) mitreTokens = ["—"];
+                    mitreTokens.forEach(mitreTok => {
+                        let mId = "at_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
+                        let mt = (mitreMeta && mitreMeta[mitreTok] && mitreMeta[mitreTok].tactic) ? String(mitreMeta[mitreTok].tactic) : "";
+                        let lbl = "⚔️ MITRE ATT&CK:\\n" + mitreTok + (mt ? ("\\n" + mt) : "");
+                        addNode({ id: mId, label: lbl, level: 0, shape: "box", color: {background: "#d29922"} });
+                        addDetail(mId, "mitre", { data: r, mitre: mitreTok }, r);
+                    });
+
+                    let swId = "at_sw_" + (noAgg ? safeIdPart(rk) : (safeIdPart(r.sw) + "_" + safeIdPart(r.port)));
+                    addNode({ id: swId, label: "🎯 Наше ПО (Актив):\\n" + (r.sw || ""), level: 4, shape: "box", color: {background: "#1f77b4"} });
+                    addDetail(swId, "sw", { data: r, sw: r.sw, port: r.port }, r);
+
+                    let verdId = "at_verd_" + (noAgg ? safeIdPart(rk) : safeIdPart(r.id));
+                    addNode({ id: verdId, label: "⚖️ Вердикт:\\n" + (r.feas || ""), level: 5, shape: "box", color: {background: getFeasColor(r.feas)} });
+                    addDetail(verdId, "verdict", { data: r }, r);
+
+                    let cweTokens = uniq(splitCsv(r.cwe));
+                    if (!cweTokens.length) cweTokens = [String(r.cwe || "CWE-Неизвестно")];
+                    let capecTokens = uniq(splitCsv(r.capec));
+                    if (!capecTokens.length) capecTokens = [String(r.capec || "CAPEC-Неизвестно")];
+
+                    if (noAgg) {
+                        let cveTokens = uniq(splitCsv(r.cve));
+                        if (!cveTokens.length) cveTokens = [String(r.cve || "N/A")];
+                        capecTokens.forEach(capecTok => {
+                            let capecId = "at_capec_" + safeIdPart(rk) + "_" + safeIdPart(capecTok);
+                            addNode({ id: capecId, label: "🥷 CAPEC (Метод):\\n" + capecTok, level: 1, shape: "box", color: {background: "#58a6ff"} });
+                            addDetail(capecId, "capec", { data: r, capec: capecTok }, r);
+                            mitreTokens.forEach(mitreTok => {
+                                let mId = "at_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
+                                addEdge(mId, capecId, "#8b949e");
+                            });
+
+                            cweTokens.forEach(cweTok => {
+                                let cweId = "at_cwe_" + safeIdPart(rk) + "_" + safeIdPart(cweTok);
+                                addNode({ id: cweId, label: "🐛 CWE (Слабость):\\n" + cweTok, level: 2, shape: "box", color: {background: "#484f58"} });
+                                addDetail(cweId, "cwe", { data: r, cwe: cweTok }, r);
+                                addEdge(capecId, cweId, "#8b949e");
+
+                                cveTokens.forEach(cveTok => {
+                                    let cveId = "at_cve_" + safeIdPart(rk) + "_" + safeIdPart(cveTok);
+                                    addNode({ id: cveId, label: "🛡️ CVE (Уязвимость):\\n" + cveTok, level: 3, shape: "box", color: {background: getSevColor(r.sev)} });
+                                    addDetail(cveId, "cve", { data: r, cve: cveTok }, r);
+                                    addEdge(cweId, cveId, "#8b949e");
+                                    addEdge(cveId, swId, "#8b949e");
+                                });
+                            });
+                        });
+                        addEdge(swId, verdId, getFeasColor(r.feas), r.feas === "РЕАЛИЗУЕМА" ? 3 : 2, r.feas === "НЕ РЕАЛИЗУЕМА");
+                    } else {
+                        let capecAnchor = capecTokens[0];
+                        let capecId = "at_capec_" + safeIdPart(capecAnchor);
+                        addNode({ id: capecId, label: "🥷 CAPEC (Метод):\\n" + capecAnchor, level: 1, shape: "box", color: {background: "#58a6ff"} });
+                        addDetail(capecId, "capec", { data: r, capec: capecAnchor }, r);
+                        mitreTokens.forEach(mitreTok => {
+                            let mId = "at_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
+                            addEdge(mId, capecId, "#8b949e");
+                        });
+
+                        cweTokens.forEach(cweTok => {
+                            let cweId = "at_cwe_" + safeIdPart(cweTok);
+                            addNode({ id: cweId, label: "🐛 CWE (Слабость):\\n" + cweTok, level: 2, shape: "box", color: {background: "#484f58"} });
+                            addDetail(cweId, "cwe", { data: r, cwe: cweTok }, r);
+                            addEdge(capecId, cweId, "#8b949e");
+
+                            let cveId = "at_cve_" + safeIdPart(r.id);
+                            let cvesStr = String(r.cve || "");
+                            cvesStr = cvesStr.length > 25 ? cvesStr.substring(0, 25) + "..." : cvesStr;
+                            addNode({ id: cveId, label: "🛡️ CVE (Уязвимость):\\n" + cvesStr, level: 3, shape: "box", color: {background: getSevColor(r.sev)} });
+                            addDetail(cveId, "finding", { data: r }, r);
+                            addEdge(cweId, cveId, "#8b949e");
+                            addEdge(cveId, swId, "#8b949e");
+                        });
+                        addEdge(swId, verdId, getFeasColor(r.feas), r.feas === "РЕАЛИЗУЕМА" ? 3 : 2, r.feas === "НЕ РЕАЛИЗУЕМА");
+                    }
                 });
             }
             // ---- КАРТА 1.3: Causal Chain (Причинно-следственная связь — RCA) ----
             else if (viewId === "1_3") {
-                data.forEach(r => {
-                    let cweId = "cc_cwe_" + r.cwe;
-                    addNode({ id: cweId, label: "🐛 CWE (Корень):\\n" + r.cwe, level: 0, shape: "box", color: {background: "#484f58"} });
-                    
-                    let cveId = "cc_cve_" + r.id;
-                    let cvesStr = r.cve.length > 25 ? r.cve.substring(0, 25) + "..." : r.cve;
-                    addNode({ id: cveId, label: "🛡️ CVE (Дыра):\\n" + cvesStr, level: 1, shape: "box", color: {background: getSevColor(r.sev)} });
-                    
-                    let swId = "cc_sw_" + r.sw + "_" + r.port;
-                    addNode({ id: swId, label: "🎯 ПО (Среда):\\n" + r.sw, level: 2, shape: "box", color: {background: "#1f77b4"} });
-                    
-                    let capecId = "cc_capec_" + r.capec;
-                    addNode({ id: capecId, label: "🥷 CAPEC (Вектор):\\n" + r.capec, level: 3, shape: "box", color: {background: "#58a6ff"} });
-                    
-                    let mitreId = "cc_mitre_" + r.capec;
-                    addNode({ id: mitreId, label: "⚔️ MITRE ATT&CK\\n(Последствия)", level: 4, shape: "box", color: {background: "#d29922"} });
-                    
-                    let verdId = "cc_verd_" + r.id;
-                    addNode({ id: verdId, label: "⚖️ Вердикт:\\n" + r.feas, level: 5, shape: "box", color: {background: getFeasColor(r.feas)} });
-                    
-                    addEdge(cweId, cveId, "#8b949e");
-                    addEdge(cveId, swId, "#8b949e");
-                    addEdge(swId, capecId, "#8b949e");
-                    addEdge(capecId, mitreId, "#8b949e");
-                    addEdge(mitreId, verdId, getFeasColor(r.feas), r.feas === "РЕАЛИЗУЕМА" ? 3 : 2, r.feas === "НЕ РЕАЛИЗУЕМА");
-                    
-                    detailsMap[cweId] = { type: 'cwe', data: r };
-                    detailsMap[cveId] = { type: 'aggr', data: r };
-                    detailsMap[swId] = { type: 'sw', data: r };
-                    detailsMap[capecId] = { type: 'aggr', data: r };
-                    detailsMap[mitreId] = { type: 'aggr', data: r };
-                    detailsMap[verdId] = { type: 'aggr', data: r };
+                data.forEach((r, idx) => {
+                    r = r || {};
+                    let rk = String(r.raw_id ?? r.id ?? idx);
+                    let cweTokens = uniq(splitCsv(r.cwe));
+                    if (!cweTokens.length) cweTokens = [String(r.cwe || "CWE-Неизвестно")];
+                    let capecTokens = uniq(splitCsv(r.capec));
+                    if (!capecTokens.length) capecTokens = [String(r.capec || "CAPEC-Неизвестно")];
+
+                    let verdId = "cc_verd_" + (noAgg ? safeIdPart(rk) : safeIdPart(r.id));
+                    addNode({ id: verdId, label: "⚖️ Вердикт:\\n" + (r.feas || ""), level: 5, shape: "box", color: {background: getFeasColor(r.feas)} });
+                    addDetail(verdId, "verdict", { data: r }, r);
+
+                    let mitreTokens = uniq(splitCsv(r.mitre));
+                    if (!mitreTokens.length) mitreTokens = ["—"];
+                    mitreTokens.forEach(mitreTok => {
+                        let mId = "cc_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
+                        let mt = (mitreMeta && mitreMeta[mitreTok] && mitreMeta[mitreTok].tactic) ? String(mitreMeta[mitreTok].tactic) : "";
+                        let lbl = "⚔️ MITRE ATT&CK:\\n" + mitreTok + (mt ? ("\\n" + mt) : "");
+                        addNode({ id: mId, label: lbl, level: 4, shape: "box", color: {background: "#d29922"} });
+                        addDetail(mId, "mitre", { data: r, mitre: mitreTok }, r);
+                        addEdge(mId, verdId, getFeasColor(r.feas), r.feas === "РЕАЛИЗУЕМА" ? 3 : 2, r.feas === "НЕ РЕАЛИЗУЕМА");
+                    });
+                    let swId = "cc_sw_" + (noAgg ? safeIdPart(rk) : (safeIdPart(r.sw) + "_" + safeIdPart(r.port)));
+                    addNode({ id: swId, label: "🎯 ПО (Среда):\\n" + (r.sw || ""), level: 2, shape: "box", color: {background: "#1f77b4"} });
+                    addDetail(swId, "sw", { data: r, sw: r.sw, port: r.port }, r);
+
+                    if (noAgg) {
+                        let cveTokens = uniq(splitCsv(r.cve));
+                        if (!cveTokens.length) cveTokens = [String(r.cve || "N/A")];
+                        cweTokens.forEach(cweTok => {
+                            let cweId = "cc_cwe_" + safeIdPart(rk) + "_" + safeIdPart(cweTok);
+                            addNode({ id: cweId, label: "🐛 CWE (Корень):\\n" + cweTok, level: 0, shape: "box", color: {background: "#484f58"} });
+                            addDetail(cweId, "cwe", { data: r, cwe: cweTok }, r);
+                            cveTokens.forEach(cveTok => {
+                                let cveId = "cc_cve_" + safeIdPart(rk) + "_" + safeIdPart(cveTok);
+                                addNode({ id: cveId, label: "🛡️ CVE (Дыра):\\n" + cveTok, level: 1, shape: "box", color: {background: getSevColor(r.sev)} });
+                                addDetail(cveId, "cve", { data: r, cve: cveTok }, r);
+                                addEdge(cweId, cveId, "#8b949e");
+                                addEdge(cveId, swId, "#8b949e");
+                                capecTokens.forEach(capecTok => {
+                                    let capecId = "cc_capec_" + safeIdPart(rk) + "_" + safeIdPart(capecTok);
+                                    addNode({ id: capecId, label: "🥷 CAPEC (Вектор):\\n" + capecTok, level: 3, shape: "box", color: {background: "#58a6ff"} });
+                                    addDetail(capecId, "capec", { data: r, capec: capecTok }, r);
+                                    addEdge(swId, capecId, "#8b949e");
+                                    mitreTokens.forEach(mitreTok => {
+                                        let mId = "cc_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
+                                        addEdge(capecId, mId, "#8b949e");
+                                    });
+                                });
+                            });
+                        });
+                    } else {
+                        let cweAnchor = cweTokens[0];
+                        let cweId = "cc_cwe_" + safeIdPart(cweAnchor);
+                        addNode({ id: cweId, label: "🐛 CWE (Корень):\\n" + cweAnchor, level: 0, shape: "box", color: {background: "#484f58"} });
+                        addDetail(cweId, "cwe", { data: r, cwe: cweAnchor }, r);
+
+                        let cveId = "cc_cve_" + safeIdPart(r.id);
+                        let cvesStr = String(r.cve || "");
+                        cvesStr = cvesStr.length > 25 ? cvesStr.substring(0, 25) + "..." : cvesStr;
+                        addNode({ id: cveId, label: "🛡️ CVE (Дыра):\\n" + cvesStr, level: 1, shape: "box", color: {background: getSevColor(r.sev)} });
+                        addDetail(cveId, "finding", { data: r }, r);
+                        addEdge(cweId, cveId, "#8b949e");
+                        addEdge(cveId, swId, "#8b949e");
+
+                        capecTokens.forEach(capecTok => {
+                            let capecId = "cc_capec_" + safeIdPart(capecTok);
+                            addNode({ id: capecId, label: "🥷 CAPEC (Вектор):\\n" + capecTok, level: 3, shape: "box", color: {background: "#58a6ff"} });
+                            addDetail(capecId, "capec", { data: r, capec: capecTok }, r);
+                            addEdge(swId, capecId, "#8b949e");
+                            mitreTokens.forEach(mitreTok => {
+                                let mId = "cc_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
+                                addEdge(capecId, mId, "#8b949e");
+                            });
+                        });
+                    }
                 });
             }
             // ---- КАРТА 2: Логическая (С УЗЛОМ ПО) ----
             else if (viewId === "2") {
-                data.forEach(r => {
-                    let capecId = "l_capec_" + r.capec;
-                    addNode({ id: capecId, label: "🥷 Вектор: " + r.capec, level: 0, shape: "box", color: {background: "#58a6ff"} });
-                    
-                    let swId = "l_sw_" + r.sw + "_" + r.port;
-                    addNode({ id: swId, label: "🎯 Цель:\\n" + r.sw + "\\nПорт: " + r.port, level: 1, shape: "box", color: {background: "#1f77b4"} });
-                    detailsMap[swId] = { type: 'sw', data: r };
-                    
-                    let cweId = "l_cwe_" + r.cwe;
-                    addNode({ id: cweId, label: "🐛 Слабость: " + r.cwe, level: 2, shape: "box", color: {background: "#484f58"} });
-                    detailsMap[cweId] = { type: 'cwe', data: r }; 
-                    
-                    let verdId = "l_verd_" + r.id;
-                    addNode({ id: verdId, label: "⚖️ Вердикт:\\n" + r.feas, level: 3, shape: "box", color: {background: getFeasColor(r.feas)} });
-                    
-                    addEdge(capecId, swId, "#8b949e");
-                    addEdge(swId, cweId, "#8b949e");
-                    addEdge(cweId, verdId, getFeasColor(r.feas), 3);
-                    
-                    detailsMap[capecId] = { type: 'aggr', data: r }; 
-                    detailsMap[verdId] = { type: 'aggr', data: r };
+                data.forEach((r, idx) => {
+                    r = r || {};
+                    let rk = String(r.raw_id ?? r.id ?? idx);
+                    let swId = "l_sw_" + (noAgg ? safeIdPart(rk) : (safeIdPart(r.sw) + "_" + safeIdPart(r.port)));
+                    addNode({ id: swId, label: "🎯 Цель:\\n" + (r.sw || "") + "\\nПорт: " + (r.port || ""), level: 1, shape: "box", color: {background: "#1f77b4"} });
+                    addDetail(swId, "sw", { data: r, sw: r.sw, port: r.port }, r);
+
+                    let verdId = "l_verd_" + (noAgg ? safeIdPart(rk) : safeIdPart(r.id));
+                    addNode({ id: verdId, label: "⚖️ Вердикт:\\n" + (r.feas || ""), level: 3, shape: "box", color: {background: getFeasColor(r.feas)} });
+                    addDetail(verdId, "verdict", { data: r }, r);
+
+                    let cweTokens = uniq(splitCsv(r.cwe));
+                    if (!cweTokens.length) cweTokens = [String(r.cwe || "CWE-Неизвестно")];
+                    let capecTokens = uniq(splitCsv(r.capec));
+                    if (!capecTokens.length) capecTokens = [String(r.capec || "CAPEC-Неизвестно")];
+
+                    capecTokens.forEach(capecTok => {
+                        let capecId = "l_capec_" + (noAgg ? safeIdPart(rk) + "_" + safeIdPart(capecTok) : safeIdPart(capecTok));
+                        addNode({ id: capecId, label: "🥷 Вектор: " + capecTok, level: 0, shape: "box", color: {background: "#58a6ff"} });
+                        addDetail(capecId, "capec", { data: r, capec: capecTok }, r);
+                        addEdge(capecId, swId, "#8b949e");
+                    });
+
+                    cweTokens.forEach(cweTok => {
+                        let cweId = "l_cwe_" + (noAgg ? safeIdPart(rk) + "_" + safeIdPart(cweTok) : safeIdPart(cweTok));
+                        addNode({ id: cweId, label: "🐛 Слабость: " + cweTok, level: 2, shape: "box", color: {background: "#484f58"} });
+                        addDetail(cweId, "cwe", { data: r, cwe: cweTok }, r);
+                        addEdge(swId, cweId, "#8b949e");
+                        addEdge(cweId, verdId, getFeasColor(r.feas), 3);
+                    });
                 });
             }
             // ---- КАРТА 3: Источник Обнаружения ----
             else if (viewId === "3") {
-                data.forEach(r => {
-                    let sources = r.found_by.split(' & ');
-                    let vulnId = "v_" + r.id;
-                    addNode({ id: vulnId, label: "🛡️ Уязвимость:\\n" + r.capec, level: 2, shape: "box", color: {background: getSevColor(r.sev)} });
-                    
-                    sources.forEach(src => {
-                        let srcClean = src.trim();
-                        let srcId = "src_" + srcClean;
-                        let sColor = srcClean.includes("Атакующий") ? "#da3633" : "#1f77b4";
+                data.forEach((r, idx) => {
+                    r = r || {};
+                    let rk = String(r.raw_id ?? r.id ?? idx);
+                    let vulnId = "v_" + (noAgg ? safeIdPart(rk) : safeIdPart(r.id));
+                    let vLabel = String(r.cve || r.capec || "");
+                    vLabel = vLabel.length > 30 ? vLabel.substring(0, 30) + "..." : vLabel;
+                    addNode({ id: vulnId, label: "🛡️ Уязвимость:\\n" + vLabel, level: 2, shape: "box", color: {background: getSevColor(r.sev)} });
+                    addDetail(vulnId, "finding", { data: r }, r);
+
+                    let swId = "sw_real_" + (noAgg ? safeIdPart(rk) : (safeIdPart(r.sw) + "_" + safeIdPart(r.port)));
+                    addNode({ id: swId, label: "🎯 Реальное ПО:\\n" + (r.sw || ""), level: 1, shape: "box", color: {background: "#484f58"} });
+                    addDetail(swId, "sw", { data: r, sw: r.sw, port: r.port }, r);
+
+                    uniq(splitSources(r.found_by)).forEach(srcClean => {
+                        let srcId = "src_" + (noAgg ? safeIdPart(rk) + "_" + safeIdPart(srcClean) : safeIdPart(srcClean));
+                        let sColor = String(srcClean).includes("Атакующий") ? "#da3633" : "#1f77b4";
                         addNode({ id: srcId, label: "🕵️ Источник:\\n" + srcClean, level: 0, shape: "box", color: {background: sColor} });
-                        
-                        let swId = "sw_real_" + r.sw;
-                        addNode({ id: swId, label: "🎯 Реальное ПО:\\n" + r.sw, level: 1, shape: "box", color: {background: "#484f58"} });
-                        
+                        addDetail(srcId, "source", { data: r, source: srcClean }, r);
                         addEdge(srcId, swId, "#8b949e");
-                        addEdge(swId, vulnId, getFeasColor(r.feas));
-                        
-                        detailsMap[swId] = { type: 'sw', data: r };
                     });
-                    detailsMap[vulnId] = { type: 'aggr', data: r };
+
+                    addEdge(swId, vulnId, getFeasColor(r.feas));
                 });
             }
             // ---- КАРТА 4: План Устранения ----
             else if (viewId === "4") {
-                data.forEach(r => {
-                    let vulnId = "uv_" + r.id;
-                    addNode({ id: vulnId, label: "🛡️ Уязвимость:\\n" + r.capec + "\\n(ПО: " + r.sw + ")", level: 0, shape: "box", color: {background: getSevColor(r.sev)} });
-                    
-                    let statId = "stat_" + r.id;
+                data.forEach((r, idx) => {
+                    r = r || {};
+                    let rk = String(r.raw_id ?? r.id ?? idx);
+                    let vulnId = "uv_" + (noAgg ? safeIdPart(rk) : safeIdPart(r.id));
+                    let vLabel = String(r.cve || r.capec || "");
+                    vLabel = vLabel.length > 30 ? vLabel.substring(0, 30) + "..." : vLabel;
+                    addNode({ id: vulnId, label: "🛡️ Уязвимость:\\n" + vLabel + "\\n(ПО: " + (r.sw || "") + ")", level: 0, shape: "box", color: {background: getSevColor(r.sev)} });
+                    addDetail(vulnId, "finding", { data: r }, r);
+
+                    let statId = "stat_" + (noAgg ? safeIdPart(rk) : safeIdPart(r.id));
                     let statLbl = r.feas === 'НЕ РЕАЛИЗУЕМА' ? '✅ Защищено' : '❌ Требует патча';
                     let statCol = r.feas === 'НЕ РЕАЛИЗУЕМА' ? '#238636' : '#da3633';
                     addNode({ id: statId, label: statLbl, level: 1, shape: "box", color: {background: statCol} });
-                    
-                    let recId = "rec_" + r.id;
-                    let shortRec = r.rec.length > 45 ? r.rec.substring(0, 45) + "..." : r.rec;
+
+                    let recId = "rec_" + (noAgg ? safeIdPart(rk) : safeIdPart(r.id));
+                    let shortRec = String(r.rec || "");
+                    shortRec = shortRec.length > 45 ? shortRec.substring(0, 45) + "..." : shortRec;
                     addNode({ id: recId, label: "🛠️ План:\\n" + shortRec, level: 2, shape: "box", color: {background: "#1f77b4"} });
-                    
+                    addDetail(recId, "plan", { data: r }, r);
+
                     addEdge(vulnId, statId, "#8b949e");
-                    addEdge(statId, recId, statCol, 2, r.feas === 'НЕ РЕАЛИЗУЕМА'); 
-                    
-                    detailsMap[vulnId] = { type: 'aggr', data: r }; 
-                    detailsMap[recId] = { type: 'aggr', data: r };
+                    addEdge(statId, recId, statCol, 2, r.feas === 'НЕ РЕАЛИЗУЕМА');
                 });
             }
             // ---- КАРТА 5: Полигон ----
             else if (viewId === "5") {
-                data.forEach(r => {
-                    let capecId = "pc_" + r.capec;
-                    addNode({ id: capecId, label: "🥷 Вектор:\\n" + r.capec, level: 0, shape: "box", color: {background: "#da3633"} });
-                    
-                    let toolId = "pt_" + r.id;
-                    let shortTool = r.tools.length > 30 ? r.tools.substring(0,30) + "..." : r.tools;
-                    addNode({ id: toolId, label: "🔫 Софт:\\n" + shortTool, level: 1, shape: "box", color: {background: "#d29922"} });
-                    
-                    let stepsId = "ps_" + r.id;
-                    addNode({ id: stepsId, label: "📜 Логика Атаки\\n(Кликните для деталей)", level: 2, shape: "box", color: {background: "#484f58"} });
-                    
-                    addEdge(capecId, toolId, "#8b949e");
-                    addEdge(toolId, stepsId, "#8b949e");
-                    
-                    detailsMap[capecId] = { type: 'aggr', data: r }; 
-                    detailsMap[toolId] = { type: 'aggr', data: r }; 
-                    detailsMap[stepsId] = { type: 'aggr', data: r };
+                data.forEach((r, idx) => {
+                    r = r || {};
+                    let rk = String(r.raw_id ?? r.id ?? idx);
+                    let capecTokens = uniq(splitCsv(r.capec));
+                    if (!capecTokens.length) capecTokens = [String(r.capec || "CAPEC-Неизвестно")];
+                    capecTokens.forEach(capecTok => {
+                        let capecId = "pc_" + (noAgg ? safeIdPart(rk) + "_" + safeIdPart(capecTok) : safeIdPart(capecTok));
+                        addNode({ id: capecId, label: "🥷 Вектор:\\n" + capecTok, level: 0, shape: "box", color: {background: "#da3633"} });
+                        addDetail(capecId, "capec", { data: r, capec: capecTok }, r);
+
+                        let toolId = "pt_" + (noAgg ? safeIdPart(rk) : safeIdPart(r.id));
+                        let shortTool = String(r.tools || "");
+                        shortTool = shortTool.length > 30 ? shortTool.substring(0, 30) + "..." : shortTool;
+                        addNode({ id: toolId, label: "🔫 Софт:\\n" + shortTool, level: 1, shape: "box", color: {background: "#d29922"} });
+                        addDetail(toolId, "tool", { data: r }, r);
+
+                        let stepsId = "ps_" + (noAgg ? safeIdPart(rk) : safeIdPart(r.id));
+                        addNode({ id: stepsId, label: "📜 Логика Атаки\\n(Кликните для деталей)", level: 2, shape: "box", color: {background: "#484f58"} });
+                        addDetail(stepsId, "steps", { data: r }, r);
+
+                        addEdge(capecId, toolId, "#8b949e");
+                        addEdge(toolId, stepsId, "#8b949e");
+                    });
                 });
             }
 
@@ -1753,11 +1978,47 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         var modal = document.getElementById("infoModal");
 
         function openModal(id) {
-            let nodeInfo = detailsMap[id];
+            let nodeInfo = lookupDetails(id);
             if(!nodeInfo) return;
             
-            let r = nodeInfo.data;
             let contentDiv = document.getElementById("dynamic-modal-content");
+            let items = (nodeInfo.items && Array.isArray(nodeInfo.items) && nodeInfo.items.length) ? nodeInfo.items : (nodeInfo.data ? [nodeInfo.data] : []);
+            let r = nodeInfo.data || items[0] || {};
+
+            let splitCsv = (s) => {
+                let raw = String(s ?? "");
+                if (!raw) return [];
+                return raw.split(",").map(x => x.trim()).filter(Boolean);
+            };
+            let uniq = (arr) => Array.from(new Set((arr || []).filter(Boolean)));
+            let flatTokens = (field) => {
+                let out = [];
+                for (let i = 0; i < items.length; i++) {
+                    splitCsv(items[i] && items[i][field]).forEach(t => out.push(t));
+                }
+                return uniq(out);
+            };
+            let formatEvidenceTable = (rows, limit) => {
+                let data = Array.isArray(rows) ? rows : [];
+                let lim = Math.max(1, Number(limit || 30));
+                let slice = data.slice(0, lim);
+                let html = '<div class="group-members" style="border:none;">';
+                html += '<div class="group-members-head">Показаны примеры связей (строк): ' + slice.length + (data.length > slice.length ? ' из ' + data.length : '') + '</div>';
+                html += '<div class="group-members-row" style="font-weight:700; color:#8b949e; background:#0d1117; border-top:1px solid #21262d;">'
+                    + '<div>ПО / CVE</div><div>Порт</div><div>CWE</div><div>CAPEC</div><div>Вердикт</div></div>';
+                slice.forEach(function(m) {
+                    let feas = String(m.feas || "");
+                    html += '<div class="group-members-row">'
+                        + '<div><strong>' + esc(m.sw || '—') + '</strong><br><span class="mono">' + esc(m.cve || 'N/A') + '</span></div>'
+                        + '<div>' + esc(m.port || 'Н/Д') + '</div>'
+                        + '<div>' + esc(m.cwe || 'Н/Д') + '</div>'
+                        + '<div>' + esc(m.capec || 'Н/Д') + '</div>'
+                        + '<div><span class="badge ' + getFeasClass(feas) + '">' + esc(feas || 'UNKNOWN') + '</span></div>'
+                        + '</div>';
+                });
+                html += '</div>';
+                return html;
+            };
             
             // 1. Если кликнули на отдельный элемент внутри агрегированной группы
             if (nodeInfo.type === 'member') {
@@ -1796,43 +2057,301 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
                 `;
             }
-            // 2. Если кликнули на слабость CWE
-            else if (nodeInfo.type === 'cwe') {
+            else if (nodeInfo.type === 'capec') {
+                let capecId = nodeInfo.capec || (splitCsv(r.capec)[0] || String(r.capec || ""));
+                let meta = (capecMeta && capecId && capecMeta[capecId]) ? capecMeta[capecId] : {};
+                let name = meta && meta.name ? String(meta.name) : "";
+                let desc = meta && meta.description ? String(meta.description) : (meta && meta.desc ? String(meta.desc) : "");
+                if (!desc) desc = String(r.name || r.desc || "Описание отсутствует.");
+                let cwes = flatTokens("cwe");
+                let cves = flatTokens("cve");
+                let sws = uniq(items.map(x => String((x && x.sw) || "")).filter(Boolean));
                 contentDiv.innerHTML = `
                     <div class="modal-header">
-                        <h2 style="margin: 0; font-size: 20px; color: #fff;">🐛 Класс уязвимости: ${esc(r.cwe)}</h2>
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">🥷 CAPEC: ${esc(capecId)}</h2>
                     </div>
-                    <div class="modal-body">
-                        <h4 style="color:#58a6ff;">Подробное описание (Common Weakness Enumeration)</h4>
-                        <p style="background: #0d1117; padding: 15px; border-radius: 6px; border: 1px solid #30363d; font-size: 15px; white-space:pre-wrap;">${esc(r.cwe_desc)}</p>
+                    <div class="grid-info">
+                        <div class="grid-item"><span>Название:</span><strong>${esc(name || (r.name || '—'))}</strong></div>
+                        <div class="grid-item"><span>Связанных CWE:</span><strong>${cwes.length}</strong></div>
+                        <div class="grid-item"><span>Связанных CVE:</span><strong>${cves.length}</strong></div>
+                        <div class="grid-item"><span>Целевое ПО (уникальных):</span><strong>${sws.length}</strong></div>
+                        <div class="grid-item"><span>Строк-оснований (в отчёте):</span><strong>${items.length}</strong></div>
+                        <div class="grid-item"><span>Источник связей:</span><strong>корреляция (поля CVE/CWE/CAPEC)</strong></div>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details" open>
+                            <summary>📝 Описание CAPEC</summary>
+                            <div class="modal-details-body"><p style="margin:0; line-height:1.55; white-space:pre-wrap;">${esc(desc)}</p></div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🔗 Связи и основания</summary>
+                            <div class="modal-details-body">
+                                <p class="trace-meta" style="margin:0 0 10px 0;">Связи построены по строкам отчёта: CAPEC присутствует в поле CAPEC у записей, которые одновременно содержат CWE/CVE/ПО.</p>
+                                ${formatEvidenceTable(items, 40)}
+                            </div>
+                        </details>
+                    </div>
+                `;
+            }
+            else if (nodeInfo.type === 'cve') {
+                let cveId = nodeInfo.cve || (splitCsv(r.cve)[0] || String(r.cve || ""));
+                let meta = (cveMeta && cveId && cveMeta[cveId]) ? cveMeta[cveId] : {};
+                let desc = meta && meta.description ? String(meta.description) : String(r.desc || "Описание отсутствует.");
+                let cvss = (meta && meta.cvss_score != null) ? String(meta.cvss_score) : "";
+                let relCwe = meta && meta.related_cwe ? meta.related_cwe : [];
+                let relCapec = meta && meta.related_capec ? meta.related_capec : [];
+                let relMitre = meta && meta.related_mitre ? meta.related_mitre : [];
+                let sws = uniq(items.map(x => String((x && x.sw) || "")).filter(Boolean));
+                contentDiv.innerHTML = `
+                    <div class="modal-header">
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">🛡️ CVE: ${esc(cveId)}</h2>
+                    </div>
+                    <div class="grid-info">
+                        <div class="grid-item"><span>CVSS:</span><strong>${esc(cvss || '—')}</strong></div>
+                        <div class="grid-item"><span>Связанных CWE (из БД):</span><strong>${(relCwe || []).length}</strong></div>
+                        <div class="grid-item"><span>Связанных CAPEC (из БД):</span><strong>${(relCapec || []).length}</strong></div>
+                        <div class="grid-item"><span>MITRE (из БД):</span><strong>${(relMitre || []).length}</strong></div>
+                        <div class="grid-item"><span>ПО в отчёте (уникальных):</span><strong>${sws.length}</strong></div>
+                        <div class="grid-item"><span>Строк-оснований (в отчёте):</span><strong>${items.length}</strong></div>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details" open>
+                            <summary>📝 Описание CVE</summary>
+                            <div class="modal-details-body"><p style="margin:0; line-height:1.55; white-space:pre-wrap;">${esc(desc)}</p></div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🔗 Связи и основания</summary>
+                            <div class="modal-details-body">
+                                <p class="trace-meta" style="margin:0 0 10px 0;">Основание: строки отчёта, в которых присутствует этот CVE (поле CVE), а также сопутствующие CWE/CAPEC/ПО.</p>
+                                ${formatEvidenceTable(items, 40)}
+                            </div>
+                        </details>
+                    </div>
+                `;
+            }
+            // 2. Если кликнули на слабость CWE
+            else if (nodeInfo.type === 'cwe') {
+                let cweId = nodeInfo.cwe || (splitCsv(r.cwe)[0] || String(r.cwe || ""));
+                let cweDesc = "";
+                for (let i = 0; i < items.length; i++) {
+                    let d = items[i] && items[i].cwe_desc;
+                    if (d) { cweDesc = String(d); break; }
+                }
+                contentDiv.innerHTML = `
+                    <div class="modal-header">
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">🐛 Класс уязвимости: ${esc(cweId)}</h2>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details" open>
+                            <summary>📝 Описание CWE</summary>
+                            <div class="modal-details-body"><p style="margin:0; line-height:1.55; white-space:pre-wrap;">${esc(cweDesc || 'Описание отсутствует.')}</p></div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🔗 Связи и основания</summary>
+                            <div class="modal-details-body">
+                                <p class="trace-meta" style="margin:0 0 10px 0;">Основание: строки отчёта, в которых присутствует этот CWE (поле CWE), плюс связанные CVE/CAPEC/ПО.</p>
+                                ${formatEvidenceTable(items, 40)}
+                            </div>
+                        </details>
                     </div>
                 `;
             } 
             // 3. Если кликнули на целевое ПО
             else if (nodeInfo.type === 'sw') {
+                let swName = nodeInfo.sw || r.sw || "";
+                let port = nodeInfo.port || r.port || "";
+                let swCategory = r.sw_category || "";
+                let swPurpose = r.sw_purpose || "";
+                let swImpact = r.sw_impact || "";
+                let swScope = r.sw_scope || "";
                 contentDiv.innerHTML = `
                     <div class="modal-header">
-                        <h2 style="margin: 0; font-size: 20px; color: #fff;">🎯 Анализ Целевого Компонента</h2>
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">🎯 Узел ПО</h2>
                     </div>
-                    <div class="modal-body">
+                    <div class="modal-body modal-body-accordion">
                         <div class="grid-info" style="grid-template-columns: 1fr;">
-                            <div class="grid-item"><span>Обнаруженное программное обеспечение:</span><strong style="font-size: 18px; color: #fff;">${esc(r.sw)}</strong></div>
-                            <div class="grid-item"><span>Открытый порт:</span><strong style="font-size: 16px; color: #58a6ff;">${esc(r.port)}</strong></div>
+                            <div class="grid-item"><span>Программное обеспечение:</span><strong style="font-size: 18px; color: #fff;">${esc(swName)}</strong></div>
+                            <div class="grid-item"><span>Порт:</span><strong style="font-size: 16px; color: #58a6ff;">${esc(port)}</strong></div>
                         </div>
-                        <div class="sw-context">
-                            <h4>Что это за ПО и почему важно</h4>
-                            <ul>
-                                <li><strong>Тип/категория:</strong> ${esc(r.sw_category || 'Не определено')}</li>
-                                <li><strong>Назначение:</strong> ${esc(r.sw_purpose || 'Нет описания')}</li>
-                                <li><strong>Последствия успешной атаки:</strong> ${esc(r.sw_impact || 'Требуется ручная оценка')}</li>
-                                <li><strong>Контекст:</strong> ${esc(r.sw_scope || 'Локальный компонент инфраструктуры')}</li>
-                            </ul>
-                        </div>
+                        <details class="modal-details" open>
+                            <summary>🧾 Характеристики</summary>
+                            <div class="modal-details-body">
+                                <div class="sw-context" style="margin-top:0;">
+                                    <ul>
+                                        <li><strong>Тип/категория:</strong> ${esc(swCategory || 'Не определено')}</li>
+                                        <li><strong>Назначение:</strong> ${esc(swPurpose || 'Нет описания')}</li>
+                                        <li><strong>Последствия успешной атаки:</strong> ${esc(swImpact || 'Требуется ручная оценка')}</li>
+                                        <li><strong>Контекст:</strong> ${esc(swScope || 'Локальный компонент инфраструктуры')}</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🔗 Связи и основания</summary>
+                            <div class="modal-details-body">
+                                <p class="trace-meta" style="margin:0 0 10px 0;">Основание: строки отчёта, в которых фигурирует это ПО/порт, плюс связанные CVE/CWE/CAPEC.</p>
+                                ${formatEvidenceTable(items, 40)}
+                            </div>
+                        </details>
                     </div>
                 `;
             } 
-            // 4. Стандартная карточка (Клик по вектору атаки или агрегации)
-            else {
+            else if (nodeInfo.type === 'source') {
+                let src = nodeInfo.source || String(r.found_by || "");
+                contentDiv.innerHTML = `
+                    <div class="modal-header">
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">🕵️ Источник: ${esc(src)}</h2>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details" open>
+                            <summary>🔗 Связи и основания</summary>
+                            <div class="modal-details-body">
+                                <p class="trace-meta" style="margin:0 0 10px 0;">Основание: строки отчёта, где поле «Кем обнаружено» содержит этот источник.</p>
+                                ${formatEvidenceTable(items, 40)}
+                            </div>
+                        </details>
+                    </div>
+                `;
+            }
+            else if (nodeInfo.type === 'tool') {
+                let tools = String(r.tools || "");
+                contentDiv.innerHTML = `
+                    <div class="modal-header">
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">🔫 Инструменты</h2>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details" open>
+                            <summary>🧾 Характеристики</summary>
+                            <div class="modal-details-body"><p style="margin:0; line-height:1.55; white-space:pre-wrap;">${esc(tools || '—')}</p></div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🔗 Связи и основания</summary>
+                            <div class="modal-details-body">${formatEvidenceTable(items, 40)}</div>
+                        </details>
+                    </div>
+                `;
+            }
+            else if (nodeInfo.type === 'steps') {
+                contentDiv.innerHTML = `
+                    <div class="modal-header">
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">📜 Логика атаки</h2>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details" open>
+                            <summary>🧾 Шаги</summary>
+                            <div class="modal-details-body">${formatStepsToOl(r.steps)}</div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🔗 Связи и основания</summary>
+                            <div class="modal-details-body">${formatEvidenceTable(items, 40)}</div>
+                        </details>
+                    </div>
+                `;
+            }
+            else if (nodeInfo.type === 'plan') {
+                let rec = String(r.rec || "");
+                contentDiv.innerHTML = `
+                    <div class="modal-header">
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">🛠️ План устранения</h2>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details" open>
+                            <summary>🧾 Рекомендации</summary>
+                            <div class="modal-details-body"><p class="rec-box" style="margin:0; white-space:pre-wrap;">${esc(rec || 'Специфичных рекомендаций нет.')}</p></div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🔗 Связи и основания</summary>
+                            <div class="modal-details-body">${formatEvidenceTable(items, 40)}</div>
+                        </details>
+                    </div>
+                `;
+            }
+            else if (nodeInfo.type === 'mitre') {
+                let mitreId = nodeInfo.mitre || (splitCsv(r.mitre)[0] || "");
+                let meta = (mitreMeta && mitreId && mitreMeta[mitreId]) ? mitreMeta[mitreId] : {};
+                let name = meta && meta.name ? String(meta.name) : "";
+                let tactic = meta && meta.tactic ? String(meta.tactic) : "";
+                let desc = meta && meta.description ? String(meta.description) : "";
+                let detection = meta && meta.detection ? String(meta.detection) : "";
+                let platforms = meta && meta.platforms ? meta.platforms : [];
+                let mitigations = meta && meta.mitigations ? meta.mitigations : [];
+                let relatedCwe = meta && meta.related_cwe ? meta.related_cwe : [];
+                let relatedCapec = meta && meta.related_capec ? meta.related_capec : [];
+                let reqServices = meta && meta.requires_service ? meta.requires_service : [];
+                contentDiv.innerHTML = `
+                    <div class="modal-header">
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">⚔️ MITRE ATT&CK: ${esc(mitreId || '—')}</h2>
+                    </div>
+                    <div class="grid-info">
+                        <div class="grid-item"><span>Техника:</span><strong>${esc(name || '—')}</strong></div>
+                        <div class="grid-item"><span>Тактика:</span><strong>${esc(tactic || '—')}</strong></div>
+                        <div class="grid-item"><span>Платформы:</span><strong>${esc((platforms || []).join(", ") || '—')}</strong></div>
+                        <div class="grid-item"><span>Связанных CWE (из БД):</span><strong>${(relatedCwe || []).length}</strong></div>
+                        <div class="grid-item"><span>Связанных CAPEC (из БД):</span><strong>${(relatedCapec || []).length}</strong></div>
+                        <div class="grid-item"><span>Строк-оснований (в отчёте):</span><strong>${items.length}</strong></div>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details" open>
+                            <summary>📝 Описание техники</summary>
+                            <div class="modal-details-body"><p style="margin:0; line-height:1.55; white-space:pre-wrap;">${esc(desc || 'Описание отсутствует.')}</p></div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🔎 Детектирование</summary>
+                            <div class="modal-details-body"><p style="margin:0; line-height:1.55; white-space:pre-wrap;">${esc(detection || 'Не указано.')}</p></div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🛡️ Митигирующие меры</summary>
+                            <div class="modal-details-body">${traceUl((mitigations || []).map(x => String(x)), "Не указано.")}</div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🧩 Требуемые сервисы</summary>
+                            <div class="modal-details-body">${traceUl((reqServices || []).map(x => String(x)), "Не указано.")}</div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🔗 Связи и основания</summary>
+                            <div class="modal-details-body">${formatEvidenceTable(items, 40)}</div>
+                        </details>
+                    </div>
+                `;
+            }
+            else if (nodeInfo.type === 'finding') {
+                let rawCves = JSON.stringify((r.cve || "").split(",").map(s => s.trim()).filter(Boolean));
+                contentDiv.innerHTML = `
+                    <div class="modal-header">
+                        <h2 style="margin: 0; font-size: 18px; color: #fff;">🧩 Запись корреляции</h2>
+                    </div>
+                    <div class="grid-info">
+                        <div class="grid-item"><span>Критичность:</span><strong style="color: ${getSevColor(r.sev)}">${esc(r.sev)}</strong></div>
+                        <div class="grid-item"><span>Статус:</span><strong style="color: ${getFeasColor(r.feas)}">${esc(r.feas)}</strong></div>
+                        <div class="grid-item"><span>ПО:</span><strong>${esc(r.sw)} <span class="trace-meta">(порт: ${esc(r.port)})</span></strong></div>
+                        <div class="grid-item"><span>CWE:</span><strong>${esc(r.cwe)}</strong></div>
+                        <div class="grid-item"><span>CAPEC:</span><strong>${esc(r.capec)}</strong></div>
+                        <div class="grid-item"><span>Источник:</span><strong>${esc(r.found_by)}</strong></div>
+                    </div>
+                    <div class="modal-toolbar">
+                        <button type="button" class="agg-btn" onclick='openRawRegistryForCves(${rawCves})'>📂 Сырой реестр CVE</button>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details" open>
+                            <summary>📝 CVE</summary>
+                            <div class="modal-details-body"><p style="color:#58a6ff; font-family:monospace; font-size: 13px; margin:0;">${esc(r.cve || 'N/A')}</p></div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>📝 Описание</summary>
+                            <div class="modal-details-body"><p style="margin:0; line-height:1.55; white-space:pre-wrap;">${esc(r.desc || 'Описание отсутствует.')}</p></div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🔬 Трассировка вердикта</summary>
+                            <div class="modal-details-body">${formatTraceBlock(r.feasibility_trace, r)}</div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🔗 Связи и основания</summary>
+                            <div class="modal-details-body">${formatEvidenceTable(items, 40)}</div>
+                        </details>
+                    </div>
+                `;
+            }
+            else if (nodeInfo.type === 'aggr' || nodeInfo.type === 'verdict') {
                 let rawCvesGrp = JSON.stringify((r.cve || "").split(",").map(s => s.trim()).filter(Boolean));
                 let mu = r.members_unique != null ? r.members_unique : (r.members || []).length;
                 let mt = r.members_total != null ? r.members_total : (r.members || []).length;
@@ -1910,6 +2429,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 `;
                 renderGroupMembers(r);
             }
+            else {
+                contentDiv.innerHTML = `
+                    <div class="modal-header">
+                        <h2 style="margin: 0; font-size: 18px; color: #fff;">Детали узла</h2>
+                    </div>
+                    <div class="modal-body">
+                        <p style="margin:0; white-space:pre-wrap;">${esc(JSON.stringify(nodeInfo || {}, null, 2))}</p>
+                    </div>
+                `;
+            }
             
             modal.style.display = "block";
         }
@@ -1928,7 +2457,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             let html = "";
             members.forEach((m, idx) => {
                 let memberId = "member_" + String(m.raw_id ?? (groupData.id + "_" + idx));
-                detailsMap[memberId] = { type: 'member', data: m, parentId: 'aggr_' + groupData.id };
+                detailsMapRows[memberId] = { type: 'member', data: m, parentId: 'aggr_' + groupData.id };
                 let repeatBadge = (m.occurrences && m.occurrences > 1)
                     ? `<br><small style="color:#e3b341;">Повторяется: ${m.occurrences}x</small>`
                     : '';

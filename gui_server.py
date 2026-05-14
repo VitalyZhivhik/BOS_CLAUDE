@@ -2136,9 +2136,18 @@ class ServerGUI(QMainWindow):
             state.last_correlation_id = None
         
         class Handler(BaseHTTPRequestHandler):
+            def _sync_state(self):
+                state.base_dir = PROJECT_DIR
+                state.system_info = gui.system_info
+                state.system_summary = gui.system_summary if isinstance(gui.system_summary, dict) else {}
+                state.vuln_db = getattr(gui, "vuln_db", None)
+                state.trivy_result = getattr(gui, "trivy_result", None)
+                state.ready = bool(state.system_info and state.vuln_db)
+
             def do_GET(self):
                 ip = self.client_address[0]
                 try:
+                    self._sync_state()
                     ss = state.system_summary if isinstance(state.system_summary, dict) else {}
                     hn = ss.get("hostname", "")
                     if self.path == "/ping":
@@ -2168,8 +2177,14 @@ class ServerGUI(QMainWindow):
                 if self.path != "/analyze":
                     self._r(404, {"error": "Not Found"})
                     return
-                if not state.ready or not state.system_info or not state.vuln_db:
-                    self._r(503, {"error": "Сервер не готов", "ready": False, "hint": "Выполните шаги 1-2"})
+                self._sync_state()
+                if not state.system_info or not state.vuln_db:
+                    parts = []
+                    if not state.system_info:
+                        parts.append("анализ системы не выполнен")
+                    if not state.vuln_db:
+                        parts.append("базы данных не загружены")
+                    self._r(503, {"error": "Сервер не готов: " + "; ".join(parts), "ready": False, "hint": "Выполните шаги 1–2 в gui_server"})
                     return
                 try:
                     ln = int(self.headers.get("Content-Length", 0))

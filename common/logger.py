@@ -7,9 +7,10 @@
 import logging
 import os
 import sys
+from common.bundle_paths import application_base_dir
 
 # Директория для логов
-LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+LOG_DIR = os.path.join(application_base_dir(), "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 def setup_logger(name: str, log_file: str = None, level=logging.DEBUG) -> logging.Logger:

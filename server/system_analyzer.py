@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from common.models import SystemInfo, InstalledSoftware, SecurityMeasure, OpenPort
 from common.config import KNOWN_PORTS
 from common.logger import get_server_logger
+from common.bundle_paths import application_base_dir, bundle_resources_root
 from server.trivy_scanner import TrivyScanner
 
 logger = get_server_logger()
@@ -163,8 +164,7 @@ class SystemAnalyzer:
         """Сверхбыстрый парсер базы ФСТЭК на чистом Python (Замена OVALDI)."""
         logger.info("Интеграция: Запуск встроенного Python-сканера OVAL (ФСТЭК)...")
 
-        base_dir = os.path.dirname(os.path.dirname(__file__))
-        tools_dir = os.path.join(base_dir, "tools")
+        tools_dir = os.path.join(bundle_resources_root(), "tools")
 
         # Ищем любой XML файл базы в папке tools
         definitions_path = None
@@ -312,7 +312,7 @@ class SystemAnalyzer:
             
             # Сохраняем историю сканирования Trivy в папку data
             try:
-                data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+                data_dir = os.path.join(application_base_dir(), "data")
                 os.makedirs(data_dir, exist_ok=True)
                 timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 save_path = os.path.join(data_dir, f"trivy_scan_{timestamp}.json")
