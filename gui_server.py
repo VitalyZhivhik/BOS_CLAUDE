@@ -48,6 +48,18 @@ from server.trivy_history import TrivyHistory
 logger = get_server_logger()
 PROJECT_DIR = application_base_dir()
 BUNDLE_ROOT = bundle_resources_root()
+DEFAULT_CORRELATION_SETTINGS = {
+    "max_score": 100,
+    "feasible_threshold": 60,
+    "partially_feasible_threshold": 40,
+    "not_feasible_threshold": 20,
+    "network_weight": 30,
+    "trivy_weight": 35,
+    "software_weight": 20,
+    "scanner_weight": 30,
+    "patch_weight": 10,
+    "protection_weight": 5,
+}
 TRIVY_SCAN_PROFILES = {
     "Fast": {
         "timeout_minutes": 8,
@@ -281,39 +293,33 @@ class CorrelationRestartWorker(QThread):
             results_by_profile = {}
             summaries_by_profile = {}
             profiles_meta = {}
+            settings_by_profile = {}
+
             ordered_ids = []
-
-            if self.settings:
-                pid = "_current"
-                profiles_meta[pid] = {"id": pid, "name": "Текущие настройки", "description": ""}
-                ordered_ids.append(pid)
-
             for p in profiles:
                 pid = p.get("file") or p.get("id")
                 if not pid or pid in ordered_ids:
                     continue
                 profiles_meta[pid] = {"id": pid, "name": p.get("name", pid), "description": p.get("description", "")}
+                if isinstance(p.get("settings"), dict):
+                    settings_by_profile[pid] = dict(p.get("settings"))
                 ordered_ids.append(pid)
 
             if not ordered_ids:
                 pid = "_default"
                 profiles_meta[pid] = {"id": pid, "name": "По умолчанию", "description": ""}
+                settings_by_profile[pid] = dict(DEFAULT_CORRELATION_SETTINGS)
                 ordered_ids.append(pid)
 
-            default_profile_id = ordered_ids[0]
+            default_profile_id = "standard.json" if "standard.json" in ordered_ids else ordered_ids[0]
             total_profiles = max(1, len(ordered_ids))
 
+            for pid in ordered_ids:
+                if pid not in settings_by_profile:
+                    settings_by_profile[pid] = dict(DEFAULT_CORRELATION_SETTINGS)
+
             for idx, pid in enumerate(ordered_ids, 1):
-                if pid == "_current":
-                    settings = self.settings or {}
-                elif pid == "_default":
-                    settings = None
-                else:
-                    settings = None
-                    for p in profiles:
-                        if (p.get("file") or p.get("id")) == pid:
-                            settings = p.get("settings", None)
-                            break
+                settings = settings_by_profile.get(pid, dict(DEFAULT_CORRELATION_SETTINGS) if pid == "_default" else {})
 
                 cor = AttackCorrelator(
                     self.system_info,
@@ -357,49 +363,33 @@ class CorrelationRestartWorker(QThread):
             hp = rep.generate_html(os.path.join(rd, f"report_{ts}.html"))
             jp = rep.generate_json(os.path.join(rd, f"report_{ts}.json"))
 
-            settings_used = {}
-            if default_profile_id == "_current" and isinstance(self.settings, dict):
-                settings_used = dict(self.settings)
-            elif default_profile_id and default_profile_id not in ("_default", "_current"):
-                for p in profiles:
-                    if (p.get("file") or p.get("id")) == default_profile_id:
-                        if isinstance(p.get("settings"), dict):
-                            settings_used = dict(p.get("settings"))
-                        break
-            if not settings_used:
-                settings_used = {
-                    "max_score": 100,
-                    "feasible_threshold": 60,
-                    "partially_feasible_threshold": 40,
-                    "not_feasible_threshold": 20,
-                    "network_weight": 30,
-                    "trivy_weight": 35,
-                    "software_weight": 20,
-                    "scanner_weight": 30,
-                    "patch_weight": 10,
-                    "protection_weight": 5,
-                }
+            settings_used = settings_by_profile.get(default_profile_id, dict(DEFAULT_CORRELATION_SETTINGS))
+            def _to_details(items):
+                out = []
+                for r in items:
+                    out.append({
+                        "cve_id": str(r.cve_id) if getattr(r, "cve_id", None) else "",
+                        "attack_name": str(r.attack_name) if getattr(r, "attack_name", None) else "",
+                        "severity": getattr(r.severity, "name", str(r.severity)),
+                        "feasibility": __import__("common.models", fromlist=["normalize_feasibility"]).normalize_feasibility(getattr(r, "feasibility", None)),
+                        "description": str(r.description) if getattr(r, "description", None) else "",
+                        "recommendation": str(r.recommendation) if getattr(r, "recommendation", None) else "",
+                    })
+                return out
+            details_by_profile = {pid: _to_details(res) for pid, res in results_by_profile.items()}
             payload = {
                 "status": "success",
                 "correlation_id": ts,
                 "summary": summary,
                 "settings_used": settings_used,
+                "profiles_meta": profiles_meta,
+                "default_profile_id": default_profile_id,
+                "settings_by_profile": settings_by_profile,
+                "summaries_by_profile": summaries_by_profile,
                 "html_report": hp,
                 "results_count": len(results),
-                "details": [
-                    {
-                        "cve_id": str(r.cve_id) if r.cve_id else "",
-                        "attack_name": str(r.attack_name) if r.attack_name else "",
-                        "severity": getattr(r.severity, 'name', str(r.severity)),
-                        "feasibility": __import__(
-                            "common.models",
-                            fromlist=["normalize_feasibility"],
-                        ).normalize_feasibility(getattr(r, "feasibility", None)),
-                        "description": str(r.description) if r.description else "",
-                        "recommendation": str(r.recommendation) if r.recommendation else "",
-                    }
-                    for r in results
-                ],
+                "details": details_by_profile.get(default_profile_id, []),
+                "details_by_profile": details_by_profile,
             }
             self.progress.emit(100, "✅ Корреляция перезапущена")
             self.finished.emit({
@@ -409,6 +399,11 @@ class CorrelationRestartWorker(QThread):
                 "json_path": jp,
                 "correlation_id": ts,
                 "payload": payload,
+                "results_by_profile": results_by_profile,
+                "summaries_by_profile": summaries_by_profile,
+                "profiles_meta": profiles_meta,
+                "default_profile_id": default_profile_id,
+                "settings_by_profile": settings_by_profile,
             })
         except Exception as e:
             logger.error(f"Ошибка перезапуска корреляции: {e}", exc_info=True)
@@ -421,6 +416,7 @@ class ServerGUI(QMainWindow):
     client_connected_signal = pyqtSignal(str)
     analysis_done_signal = pyqtSignal(dict, str)
     update_results_signal = pyqtSignal(object)
+    correlation_bundle_signal = pyqtSignal(object)
     correlation_progress_signal = pyqtSignal(int, str)  # Прогресс корреляции
     def __init__(self):
         super().__init__()
@@ -443,10 +439,16 @@ class ServerGUI(QMainWindow):
         self.actual_server_port = None
         self._last_scan_data = {}        # Данные от атакующего (для схем)
         self._last_results = []          # Результаты корреляции
+        self._correlation_results_by_profile = {}
+        self._correlation_summaries_by_profile = {}
+        self._correlation_profiles_meta = {}
+        self._correlation_settings_by_profile = {}
+        self._selected_profile_id = ""
         self.restart_correlation_worker = None
         self._build_ui()
         self.setStyleSheet(STYLE)
         self.update_results_signal.connect(self._update_results_table_slot)
+        self.correlation_bundle_signal.connect(self._apply_correlation_bundle_slot)
         self.correlation_progress_signal.connect(self._on_correlation_progress_update)
         self.log_signal.connect(self._append_log)
         gh = GUILogHandler(self._on_log_message)
@@ -975,6 +977,21 @@ class ServerGUI(QMainWindow):
         self.correlation_progress_bar.setValue(0)
         rtl.addWidget(self.correlation_progress_bar)
 
+        prof_row = QHBoxLayout()
+        prof_row.addWidget(QLabel("Профиль корреляции:"))
+        self.correlation_profile_combo = QComboBox()
+        self.correlation_profile_combo.addItem("—")
+        self.correlation_profile_combo.setEnabled(False)
+        self.correlation_profile_combo.currentIndexChanged.connect(self._on_correlation_profile_changed)
+        prof_row.addWidget(self.correlation_profile_combo, 1)
+        rtl.addLayout(prof_row)
+
+        self.correlation_profile_settings_text = QTextEdit()
+        self.correlation_profile_settings_text.setReadOnly(True)
+        self.correlation_profile_settings_text.setFixedHeight(140)
+        self.correlation_profile_settings_text.setPlainText("Параметры профиля: —")
+        rtl.addWidget(self.correlation_profile_settings_text)
+
         self.results_table = QTableWidget(0, 5)
         self.results_table.setHorizontalHeaderLabels(["CVE", "Серьёзность", "Реализуемость", "Атака", "Описание"])
         self.results_table.horizontalHeader().setStretchLastSection(True)
@@ -1232,8 +1249,9 @@ class ServerGUI(QMainWindow):
         self.btn_apply_profile.clicked.connect(self._apply_profile)
         self.btn_apply_profile.setEnabled(False)
         profiles_layout.addWidget(self.btn_apply_profile)
+        self.btn_apply_profile.setVisible(False)
 
-        self.btn_save_new_profile = QPushButton("💾 Сохранить как новый профиль")
+        self.btn_save_new_profile = QPushButton("➕ Добавить профиль")
         self.btn_save_new_profile.clicked.connect(self._save_new_profile_from_current_settings)
         profiles_layout.addWidget(self.btn_save_new_profile)
 
@@ -1241,10 +1259,12 @@ class ServerGUI(QMainWindow):
         self.btn_overwrite_profile.clicked.connect(self._overwrite_selected_profile_from_current_settings)
         self.btn_overwrite_profile.setEnabled(False)
         profiles_layout.addWidget(self.btn_overwrite_profile)
+        self.btn_overwrite_profile.setVisible(False)
 
         self.btn_copy_to_profile = QPushButton("📋 Записать настройки в другой профиль")
         self.btn_copy_to_profile.clicked.connect(self._copy_current_settings_to_other_profile)
         profiles_layout.addWidget(self.btn_copy_to_profile)
+        self.btn_copy_to_profile.setVisible(False)
         
         stl.addWidget(profiles_group)
 
@@ -1253,18 +1273,17 @@ class ServerGUI(QMainWindow):
         self.btn_apply_settings.setStyleSheet("QPushButton { background: #2a4a2a; }")
         self.btn_apply_settings.clicked.connect(self._apply_correlation_settings)
         stl.addWidget(self.btn_apply_settings)
+        self.btn_apply_settings.setVisible(False)
 
         # Кнопка сброса к значениям по умолчанию
         self.btn_reset_settings = QPushButton("🔙 Сбросить к значениям по умолчанию")
         self.btn_reset_settings.clicked.connect(self._reset_correlation_settings)
         stl.addWidget(self.btn_reset_settings)
+        self.btn_reset_settings.setVisible(False)
 
         # Пересчёт по последним данным атакующего (после применения настроек или профиля)
-        self.btn_restart_correlation = QPushButton("🔄 Перезапустить корреляцию")
-        self.btn_restart_correlation.setToolTip(
-            "Пересчитать результаты по последним данным от атакующего с текущими параметрами "
-            "(сначала примените настройки или профиль, если меняли их)."
-        )
+        self.btn_restart_correlation = QPushButton("🔄 Провести корреляцию для всех профилей")
+        self.btn_restart_correlation.setToolTip("Пересчитать результаты по последним данным от атакующего для всех профилей корреляции.")
         self.btn_restart_correlation.setStyleSheet("QPushButton { background: #4a2a4a; }")
         self.btn_restart_correlation.clicked.connect(self._restart_correlation)
         self.btn_restart_correlation.setEnabled(False)
@@ -2473,13 +2492,52 @@ class ServerGUI(QMainWindow):
                         if state.on_client_connected:
                             state.on_client_connected(ip)
                     sr = from_json_scan_result(scan_data)
-                    cor = AttackCorrelator(
-                        state.system_info, 
-                        state.vuln_db,
-                        trivy_result=state.trivy_result
-                    )
-                    results = cor.correlate(sr)
-                    summary = cor.get_summary()
+                    profiles = []
+                    try:
+                        profiles = list_correlation_profiles(PROJECT_DIR)
+                    except Exception:
+                        profiles = []
+
+                    results_by_profile = {}
+                    summaries_by_profile = {}
+                    profiles_meta = {}
+                    settings_by_profile = {}
+
+                    ordered_ids = []
+                    for p in profiles:
+                        pid = p.get("file") or p.get("id")
+                        if not pid or pid in ordered_ids:
+                            continue
+                        profiles_meta[pid] = {"id": pid, "name": p.get("name", pid), "description": p.get("description", "")}
+                        if isinstance(p.get("settings"), dict):
+                            settings_by_profile[pid] = dict(p.get("settings"))
+                        ordered_ids.append(pid)
+
+                    if not ordered_ids:
+                        pid = "_default"
+                        profiles_meta[pid] = {"id": pid, "name": "По умолчанию", "description": ""}
+                        settings_by_profile[pid] = dict(DEFAULT_CORRELATION_SETTINGS)
+                        ordered_ids.append(pid)
+
+                    default_profile_id = "standard.json" if "standard.json" in ordered_ids else ordered_ids[0]
+
+                    for pid in ordered_ids:
+                        if pid not in settings_by_profile:
+                            settings_by_profile[pid] = dict(DEFAULT_CORRELATION_SETTINGS)
+
+                    for pid in ordered_ids:
+                        settings = settings_by_profile.get(pid, dict(DEFAULT_CORRELATION_SETTINGS) if pid == "_default" else {})
+                        cor = AttackCorrelator(
+                            state.system_info,
+                            state.vuln_db,
+                            trivy_result=state.trivy_result,
+                            correlation_settings=settings,
+                        )
+                        results_by_profile[pid] = cor.correlate(sr)
+                        summaries_by_profile[pid] = cor.get_summary()
+
+                    results = results_by_profile.get(default_profile_id, [])
+                    summary = summaries_by_profile.get(default_profile_id, {})
                     # Сохраняем данные для генерации расширенного отчёта
                     gui._last_scan_data = scan_data
                     gui._last_results = results
@@ -2493,42 +2551,45 @@ class ServerGUI(QMainWindow):
                         toolkit=gui.toolkit,
                         local_scan_report=gui.vuln_scan_report,
                         attacker_scan_data=scan_data,
+                        correlation_results_by_profile=results_by_profile,
+                        summaries_by_profile=summaries_by_profile,
+                        profiles_meta=profiles_meta,
+                        default_profile_id=default_profile_id,
                     )
                     hp = rep.generate_html(os.path.join(rd, f"report_{ts}.html"))
                     jp = rep.generate_json(os.path.join(rd, f"report_{ts}.json"))
                     gui.last_report_path = hp
                     # Добавляем в историю
                     gui._add_to_history(results, summary, ts, hp, jp)
-                    settings_used = getattr(state, "correlation_settings", None) or {
-                        "max_score": cor.max_score,
-                        "feasible_threshold": cor.feasible_threshold,
-                        "partially_feasible_threshold": cor.partially_feasible_threshold,
-                        "not_feasible_threshold": cor.not_feasible_threshold,
-                        "network_weight": cor.network_weight,
-                        "trivy_weight": cor.trivy_weight,
-                        "software_weight": cor.software_weight,
-                        "scanner_weight": cor.scanner_weight,
-                    }
+                    settings_used = settings_by_profile.get(default_profile_id, dict(DEFAULT_CORRELATION_SETTINGS))
+
+                    def _to_details(items):
+                        out = []
+                        for r in items:
+                            out.append({
+                                "cve_id": str(r.cve_id) if getattr(r, "cve_id", None) else "",
+                                "attack_name": str(r.attack_name) if getattr(r, "attack_name", None) else "",
+                                "severity": getattr(r.severity, "name", str(r.severity)),
+                                "feasibility": __import__("common.models", fromlist=["normalize_feasibility"]).normalize_feasibility(getattr(r, "feasibility", None)),
+                                "description": str(r.description) if getattr(r, "description", None) else "",
+                                "recommendation": str(r.recommendation) if getattr(r, "recommendation", None) else "",
+                            })
+                        return out
+
+                    details_by_profile = {pid: _to_details(res) for pid, res in results_by_profile.items()}
                     resp = {
                         "status": "success",
                         "correlation_id": ts,
                         "summary": summary,
                         "settings_used": settings_used,
+                        "profiles_meta": profiles_meta,
+                        "default_profile_id": default_profile_id,
+                        "settings_by_profile": settings_by_profile,
+                        "summaries_by_profile": summaries_by_profile,
                         "html_report": hp,
                         "results_count": len(results),
-                        "details": [
-                            {
-                                "cve_id": str(r.cve_id) if r.cve_id else "",
-                                "attack_name": str(r.attack_name) if r.attack_name else "",
-                                # Фикс ошибки 500 (сериализация Enum)
-                                "severity": getattr(r.severity, 'name', str(r.severity)),
-                                # Возвращаем единый формат (русские значения из AttackFeasibility.value)
-                                "feasibility": __import__("common.models", fromlist=["normalize_feasibility"]).normalize_feasibility(getattr(r, "feasibility", None)),
-                                "description": str(r.description) if r.description else "",
-                                "recommendation": str(r.recommendation) if r.recommendation else "",
-                            }
-                            for r in results
-                        ],
+                        "details": details_by_profile.get(default_profile_id, []),
+                        "details_by_profile": details_by_profile,
                     }
                     with state.last_correlation_lock:
                         state.last_correlation_payload = resp
@@ -2537,7 +2598,13 @@ class ServerGUI(QMainWindow):
                     logger.info(f"[API] Ответ 200 OK. Результатов: {len(results)}")
                     if state.on_analysis_complete:
                         state.on_analysis_complete(summary, hp)
-                    gui.update_results_signal.emit(results)
+                    gui.correlation_bundle_signal.emit({
+                        "results_by_profile": results_by_profile,
+                        "summaries_by_profile": summaries_by_profile,
+                        "profiles_meta": profiles_meta,
+                        "default_profile_id": default_profile_id,
+                        "settings_by_profile": settings_by_profile,
+                    })
                 except json.JSONDecodeError as e:
                     logger.error(f"[API] Ошибка JSON: {e}")
                     self._r(400, {"error": f"Некорректный JSON: {e}"})
@@ -2612,6 +2679,89 @@ class ServerGUI(QMainWindow):
             QTimer.singleShot(2000, lambda: self.correlation_progress_bar.setVisible(False))
             self.correlation_progress_label.setText("✅ Корреляция завершена")
             self.correlation_progress_label.setStyleSheet("color:#8a8;font-size:11px;padding:4px;")
+
+    def _apply_correlation_bundle_slot(self, bundle):
+        try:
+            bundle = bundle if isinstance(bundle, dict) else {}
+            self._correlation_results_by_profile = bundle.get("results_by_profile") if isinstance(bundle.get("results_by_profile"), dict) else {}
+            self._correlation_summaries_by_profile = bundle.get("summaries_by_profile") if isinstance(bundle.get("summaries_by_profile"), dict) else {}
+            self._correlation_profiles_meta = bundle.get("profiles_meta") if isinstance(bundle.get("profiles_meta"), dict) else {}
+            self._correlation_settings_by_profile = bundle.get("settings_by_profile") if isinstance(bundle.get("settings_by_profile"), dict) else {}
+            default_pid = str(bundle.get("default_profile_id") or "").strip()
+
+            if not hasattr(self, "correlation_profile_combo"):
+                return
+
+            self.correlation_profile_combo.blockSignals(True)
+            self.correlation_profile_combo.clear()
+
+            pids = list(self._correlation_results_by_profile.keys())
+            for pid in pids:
+                meta = self._correlation_profiles_meta.get(pid, {}) if isinstance(self._correlation_profiles_meta.get(pid), dict) else {}
+                label = str(meta.get("name") or pid)
+                self.correlation_profile_combo.addItem(label, pid)
+
+            self.correlation_profile_combo.setEnabled(bool(pids))
+            self.correlation_profile_combo.blockSignals(False)
+
+            if not pids:
+                self._selected_profile_id = ""
+                self.correlation_profile_settings_text.setPlainText("Параметры профиля: —")
+                return
+
+            chosen = default_pid if default_pid in pids else (pids[0] if pids else "")
+            idx = self.correlation_profile_combo.findData(chosen)
+            if idx >= 0:
+                self.correlation_profile_combo.setCurrentIndex(idx)
+            self._set_correlation_profile(chosen)
+        except Exception as e:
+            logger.error(f"[UI] Ошибка применения профилей корреляции: {e}", exc_info=True)
+
+    def _on_correlation_profile_changed(self):
+        try:
+            pid = self.correlation_profile_combo.currentData()
+            pid = str(pid or "").strip()
+            if not pid:
+                return
+            self._set_correlation_profile(pid)
+        except Exception as e:
+            logger.error(f"[UI] Ошибка смены профиля: {e}", exc_info=True)
+
+    def _set_correlation_profile(self, pid: str):
+        pid = str(pid or "").strip()
+        if not pid:
+            return
+        self._selected_profile_id = pid
+        results = self._correlation_results_by_profile.get(pid, [])
+        self.update_results_signal.emit(results)
+
+        settings = self._correlation_settings_by_profile.get(pid, {})
+        if not isinstance(settings, dict):
+            settings = {}
+        ordered = [
+            "max_score",
+            "feasible_threshold",
+            "partially_feasible_threshold",
+            "not_feasible_threshold",
+            "network_weight",
+            "trivy_weight",
+            "software_weight",
+            "scanner_weight",
+            "patch_weight",
+            "protection_weight",
+        ]
+        lines = ["ПАРАМЕТРЫ ПРОФИЛЯ"]
+        meta = self._correlation_profiles_meta.get(pid, {}) if isinstance(self._correlation_profiles_meta.get(pid), dict) else {}
+        name = str(meta.get("name") or pid)
+        desc = str(meta.get("description") or "").strip()
+        lines.append("")
+        lines.append(f"Профиль: {name}")
+        if desc:
+            lines.append(f"Описание: {desc}")
+        lines.append("")
+        for k in ordered:
+            lines.append(f"• {k}: {settings.get(k, DEFAULT_CORRELATION_SETTINGS.get(k, '-'))}")
+        self.correlation_profile_settings_text.setPlainText("\n".join(lines))
     # ─────────────────────────────────────────
     #  Таблица корреляции
     # ─────────────────────────────────────────
@@ -3221,8 +3371,6 @@ class ServerGUI(QMainWindow):
         self.correlation_progress_bar.setValue(0)
         self.btn_restart_correlation.setEnabled(False)
 
-        from server.api_server import state
-        settings = getattr(state, 'correlation_settings', None)
         self.restart_correlation_worker = CorrelationRestartWorker(
             system_info=self.system_info,
             vuln_db=self.vuln_db,
@@ -3231,7 +3379,7 @@ class ServerGUI(QMainWindow):
             toolkit=self.toolkit,
             vuln_scan_report=self.vuln_scan_report,
             system_summary=self.system_summary,
-            settings=settings,
+            settings=None,
         )
         self.restart_correlation_worker.progress.connect(self.correlation_progress_signal.emit)
         self.restart_correlation_worker.finished.connect(self._on_restart_correlation_finished)
@@ -3258,7 +3406,16 @@ class ServerGUI(QMainWindow):
             state.last_correlation_payload = data["payload"]
             state.last_correlation_id = ts
 
-        self.update_results_signal.emit(results)
+        if isinstance(data.get("results_by_profile"), dict):
+            self._apply_correlation_bundle_slot({
+                "results_by_profile": data.get("results_by_profile"),
+                "summaries_by_profile": data.get("summaries_by_profile"),
+                "profiles_meta": data.get("profiles_meta"),
+                "default_profile_id": data.get("default_profile_id"),
+                "settings_by_profile": data.get("settings_by_profile"),
+            })
+        else:
+            self.update_results_signal.emit(results)
         self.correlation_progress_label.setText("✅ Корреляция перезапущена")
         self.correlation_progress_label.setStyleSheet("color:#8a8;font-size:11px;padding:4px;")
         QMessageBox.information(

@@ -1,0 +1,14 @@
+{
+  "name": "Проверочный профиль",
+  "description": "",
+  "max_score": 100,
+  "feasible_threshold": 60,
+  "partially_feasible_threshold": 40,
+  "not_feasible_threshold": 20,
+  "network_weight": 25,
+  "trivy_weight": 30,
+  "software_weight": 30,
+  "scanner_weight": 30,
+  "patch_weight": 10,
+  "protection_weight": 5
+}

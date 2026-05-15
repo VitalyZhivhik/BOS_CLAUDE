@@ -1291,6 +1291,16 @@ class AttackerGUI(QMainWindow):
         rh.setStyleSheet(_HINT_NEUTRAL)
         rh.setWordWrap(True)
         rtl.addWidget(rh)
+
+        prof_row = QHBoxLayout()
+        prof_row.addWidget(QLabel("Профиль корреляции:"))
+        self.response_profile_combo = QComboBox()
+        self.response_profile_combo.addItem("—")
+        self.response_profile_combo.setEnabled(False)
+        self.response_profile_combo.currentIndexChanged.connect(self._on_response_profile_changed)
+        prof_row.addWidget(self.response_profile_combo, 1)
+        rtl.addLayout(prof_row)
+
         self.response_table = QTableWidget(0, 5)
         self.response_table.setHorizontalHeaderLabels(
             ["CVE", "Серьёзность", "Реализуемость", "Атака", "Рекомендация"])
@@ -2665,7 +2675,72 @@ class AttackerGUI(QMainWindow):
 
     def _apply_server_correlation_result(self, result: dict, source_note: str = ""):
         """Обновляет вкладку ответа сервера из payload корреляции."""
-        details = result.get("details", [])
+        self._server_profiles_meta = result.get("profiles_meta") if isinstance(result.get("profiles_meta"), dict) else {}
+        self._server_details_by_profile = result.get("details_by_profile") if isinstance(result.get("details_by_profile"), dict) else {}
+        self._server_settings_by_profile = result.get("settings_by_profile") if isinstance(result.get("settings_by_profile"), dict) else {}
+        self._server_default_profile_id = str(result.get("default_profile_id") or "").strip()
+        self._server_source_note = source_note
+
+        if not self._server_details_by_profile:
+            details = result.get("details", [])
+            self._server_details_by_profile = {"_single": details if isinstance(details, list) else []}
+            if not self._server_default_profile_id:
+                self._server_default_profile_id = "_single"
+        if not self._server_settings_by_profile:
+            settings = result.get("settings_used") if isinstance(result.get("settings_used"), dict) else {}
+            self._server_settings_by_profile = {"_single": settings}
+        if not self._server_profiles_meta:
+            for pid in self._server_details_by_profile.keys():
+                self._server_profiles_meta[pid] = {"id": pid, "name": pid, "description": ""}
+
+        pids = list(self._server_details_by_profile.keys())
+        chosen = self._server_default_profile_id if self._server_default_profile_id in pids else (pids[0] if pids else "")
+
+        if hasattr(self, "response_profile_combo"):
+            self.response_profile_combo.blockSignals(True)
+            self.response_profile_combo.clear()
+            for pid in pids:
+                meta = self._server_profiles_meta.get(pid, {}) if isinstance(self._server_profiles_meta.get(pid), dict) else {}
+                label = str(meta.get("name") or pid)
+                self.response_profile_combo.addItem(label, pid)
+            self.response_profile_combo.setEnabled(bool(pids) and len(pids) > 1)
+            self.response_profile_combo.blockSignals(False)
+            if chosen:
+                idx = self.response_profile_combo.findData(chosen)
+                if idx >= 0:
+                    self.response_profile_combo.setCurrentIndex(idx)
+
+        if chosen:
+            counters = self._render_server_profile(chosen)
+        else:
+            counters = {"total": 0, "feasible": 0, "partially_feasible": 0, "not_feasible": 0, "requires_analysis": 0}
+
+        correlation_id = result.get("correlation_id")
+        if correlation_id:
+            self._last_correlation_id = correlation_id
+
+        logger.info(_log_result_line("Всего уязвимостей:", counters["total"]))
+        logger.info(_log_result_line("Реализуемых:", counters["feasible"]))
+        logger.info(_log_result_line("Частичных:", counters["partially_feasible"]))
+        logger.info(_log_result_line("Нереализуемых:", counters["not_feasible"]))
+        logger.info(_log_result_line("Требуют анализа:", counters["requires_analysis"]))
+
+    def _on_response_profile_changed(self):
+        try:
+            pid = self.response_profile_combo.currentData()
+            pid = str(pid or "").strip()
+            if not pid:
+                return
+            self._render_server_profile(pid)
+        except Exception:
+            logger.debug("[UI] Ошибка смены профиля ответа сервера", exc_info=True)
+
+    def _render_server_profile(self, pid: str):
+        pid = str(pid or "").strip()
+        details = self._server_details_by_profile.get(pid, [])
+        if not isinstance(details, list):
+            details = []
+
         self.response_table.setRowCount(0)
         for it in details:
             r = self.response_table.rowCount()
@@ -2697,37 +2772,35 @@ class AttackerGUI(QMainWindow):
             f"⚪ Требуют анализа: {counters['requires_analysis']}"
         )
 
-        settings = result.get("settings_used") or {}
-        if settings:
-            settings_text = (
-                "ПАРАМЕТРЫ КОРРЕЛЯЦИИ\n\n"
-                f"• max_score: {settings.get('max_score', '-')}\n"
-                f"• feasible_threshold: {settings.get('feasible_threshold', '-')}\n"
-                f"• partially_feasible_threshold: {settings.get('partially_feasible_threshold', '-')}\n"
-                f"• not_feasible_threshold: {settings.get('not_feasible_threshold', '-')}\n"
-                f"• network_weight: {settings.get('network_weight', '-')}\n"
-                f"• trivy_weight: {settings.get('trivy_weight', '-')}\n"
-                f"• software_weight: {settings.get('software_weight', '-')}\n"
-                f"• scanner_weight: {settings.get('scanner_weight', '-')}"
-            )
-            if source_note:
-                settings_text += f"\n\nИсточник: {source_note}"
-            self.response_settings_text.setPlainText(settings_text)
-        else:
-            self.response_settings_text.setPlainText(
-                "Параметры корреляции: нет данных"
-                + (f"\nИсточник: {source_note}" if source_note else "")
-            )
-
-        correlation_id = result.get("correlation_id")
-        if correlation_id:
-            self._last_correlation_id = correlation_id
-
-        logger.info(_log_result_line("Всего уязвимостей:", counters["total"]))
-        logger.info(_log_result_line("Реализуемых:", counters["feasible"]))
-        logger.info(_log_result_line("Частичных:", counters["partially_feasible"]))
-        logger.info(_log_result_line("Нереализуемых:", counters["not_feasible"]))
-        logger.info(_log_result_line("Требуют анализа:", counters["requires_analysis"]))
+        settings = self._server_settings_by_profile.get(pid, {})
+        if not isinstance(settings, dict):
+            settings = {}
+        ordered = [
+            "max_score",
+            "feasible_threshold",
+            "partially_feasible_threshold",
+            "not_feasible_threshold",
+            "network_weight",
+            "trivy_weight",
+            "software_weight",
+            "scanner_weight",
+            "patch_weight",
+            "protection_weight",
+        ]
+        meta = self._server_profiles_meta.get(pid, {}) if isinstance(self._server_profiles_meta.get(pid), dict) else {}
+        name = str(meta.get("name") or pid)
+        desc = str(meta.get("description") or "").strip()
+        settings_text = ["ПАРАМЕТРЫ КОРРЕЛЯЦИИ", "", f"Профиль: {name}"]
+        if desc:
+            settings_text.append(f"Описание: {desc}")
+        settings_text.append("")
+        for k in ordered:
+            settings_text.append(f"• {k}: {settings.get(k, '-')}")
+        if self._server_source_note:
+            settings_text.append("")
+            settings_text.append(f"Источник: {self._server_source_note}")
+        self.response_settings_text.setPlainText("\n".join(settings_text))
+        return counters
 
     def _start_poll_server_correlation_worker(self):
         """Запускает polling в отдельном потоке, чтобы не блокировать UI."""
