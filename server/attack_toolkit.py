@@ -82,6 +82,11 @@ class AttackToolkit:
             # Проверяем наличие команд для конкретного CVE или "default"
             cmd_list = commands.get(cve_id) or commands.get("default", [])
             if cmd_list:
+                verified_for = tool.get("verified_for_cve", {})
+                verified_override = None
+                if isinstance(verified_for, dict):
+                    verified_override = verified_for.get(cve_id)
+                verified = bool(verified_override) if verified_override is not None else bool(tool.get("verified", False))
                 # Подставляем IP адрес если он известен
                 processed_cmds = [
                     c.replace("<TARGET_IP>", target_ip) if not c.startswith("#") else c
@@ -97,6 +102,8 @@ class AttackToolkit:
                     "commands": processed_cmds,
                     "url": tool.get("url", ""),
                     "os": tool.get("os", []),
+                    "order": tool.get("order", 0),
+                    "verified": verified,
                 })
         return results
     # ─── Поиск мер защиты ───
@@ -122,7 +129,18 @@ class AttackToolkit:
         for defense in self.defense_db:
             if cve_id not in defense.get("cve_ids", []):
                 continue
-            for tool in defense.get("tools", []):
+            defense_verified_for = defense.get("verified_for_cve", {})
+            defense_verified_override = None
+            if isinstance(defense_verified_for, dict):
+                defense_verified_override = defense_verified_for.get(cve_id)
+            defense_verified = bool(defense_verified_override) if defense_verified_override is not None else bool(defense.get("verified", False))
+            tools = defense.get("tools", []) if isinstance(defense.get("tools", []), list) else []
+            for tool_index, tool in enumerate(tools):
+                tool_verified_for = tool.get("verified_for_cve", {})
+                tool_verified_override = None
+                if isinstance(tool_verified_for, dict):
+                    tool_verified_override = tool_verified_for.get(cve_id)
+                tool_verified = bool(tool_verified_override) if tool_verified_override is not None else bool(tool.get("verified", False))
                 results.append({
                     "defense_id": defense["id"],
                     "attack_type": defense["attack_type"],
@@ -134,6 +152,10 @@ class AttackToolkit:
                     "tool_name": tool.get("name", ""),
                     "tool_description": tool.get("description", ""),
                     "commands": tool.get("commands", []),
+                    "tool_index": tool_index,
+                    "order": defense.get("order", 0),
+                    "tool_order": tool.get("order", 0),
+                    "verified": bool(defense_verified or tool_verified),
                 })
         return results
     # ─── Получение всех инструментов для списка CVE ───

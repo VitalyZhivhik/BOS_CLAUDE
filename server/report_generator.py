@@ -3,6 +3,7 @@ import os
 import re
 
 from common.models import normalize_feasibility, normalize_severity, report_status_meta
+from common.config import SERVER_PORT
 from server.report_template import HTML_TEMPLATE
 
 class SoftwareEnricher:
@@ -774,26 +775,49 @@ class ReportGenerator:
 
             attack_tools = []
             defense_tools = []
+            seen_attack = set()
+            seen_defense = set()
 
             if self.toolkit:
                 # Ищем инструменты атаки по CVE
                 for cve_id in cve_list[:5]:  # Ограничиваем для производительности
                     tools = self.toolkit.get_attack_commands(cve_id)
                     for tool in tools:
+                        tool_id = tool.get("tool_id") or ""
+                        key = (tool_id or tool.get("tool_name", ""), cve_id)
+                        if key in seen_attack:
+                            continue
+                        seen_attack.add(key)
                         attack_tools.append({
+                            "tool_id": tool_id,
+                            "cve_id": cve_id,
                             "name": tool.get('tool_name', ''),
                             "desc": tool.get('description', ''),
                             "skill": tool.get('skill_level', ''),
                             "commands": tool.get('commands', []),
+                            "order": tool.get("order", 0),
+                            "verified": bool(tool.get("verified", False)),
                         })
 
                     defenses = self.toolkit.get_defense_tools(cve_id)
                     for d in defenses:
+                        defense_id = d.get("defense_id") or ""
+                        tool_index = d.get("tool_index")
+                        key = (defense_id or d.get("name", ""), tool_index, cve_id)
+                        if key in seen_defense:
+                            continue
+                        seen_defense.add(key)
                         defense_tools.append({
+                            "defense_id": defense_id,
+                            "tool_index": tool_index,
+                            "cve_id": cve_id,
                             "name": d.get('tool_name', ''),
                             "desc": d.get('defense_description', d.get('tool_description', '')),
                             "priority": d.get('priority', ''),
                             "commands": d.get('commands', []),
+                            "order": d.get("order", 0),
+                            "tool_order": d.get("tool_order", 0),
+                            "verified": bool(d.get("verified", False)),
                         })
 
             # Если нет инструментов из toolkit, ищем в локальных БД
@@ -804,39 +828,86 @@ class ReportGenerator:
                             cmds = tool.get('commands', {}).get(cve_id, [])
                             if not cmds:
                                 cmds = tool.get('commands', {}).get('default', [])
+                            tool_id = tool.get("id", "")
+                            key = (tool_id or tool.get("name", ""), cve_id)
+                            if key in seen_attack:
+                                continue
+                            seen_attack.add(key)
+                            verified_for = tool.get("verified_for_cve", {})
+                            verified_override = None
+                            if isinstance(verified_for, dict):
+                                verified_override = verified_for.get(cve_id)
+                            verified = bool(verified_override) if verified_override is not None else bool(tool.get("verified", False))
                             attack_tools.append({
+                                "tool_id": tool_id,
+                                "cve_id": cve_id,
                                 "name": tool.get('name', ''),
                                 "desc": tool.get('description', ''),
                                 "skill": tool.get('skill_level', ''),
                                 "commands": cmds,
+                                "order": tool.get("order", 0),
+                                "verified": verified,
                             })
 
             if not defense_tools and isinstance(self.defense_db, list):
                 for cve_id in cve_list[:5]:
                     for defense in self.defense_db:
                         if cve_id in defense.get('cve_ids', []):
-                            for dt in defense.get('tools', []):
+                            defense_verified_for = defense.get("verified_for_cve", {})
+                            defense_verified_override = None
+                            if isinstance(defense_verified_for, dict):
+                                defense_verified_override = defense_verified_for.get(cve_id)
+                            defense_verified = bool(defense_verified_override) if defense_verified_override is not None else bool(defense.get("verified", False))
+                            tools = defense.get("tools", []) if isinstance(defense.get("tools", []), list) else []
+                            for tool_index, dt in enumerate(tools):
+                                defense_id = defense.get("id", "")
+                                tool_name = dt.get("name", "")
+                                key = (defense_id or tool_name, tool_name, cve_id)
+                                if key in seen_defense:
+                                    continue
+                                seen_defense.add(key)
+                                tool_verified_for = dt.get("verified_for_cve", {})
+                                tool_verified_override = None
+                                if isinstance(tool_verified_for, dict):
+                                    tool_verified_override = tool_verified_for.get(cve_id)
+                                tool_verified = bool(tool_verified_override) if tool_verified_override is not None else bool(dt.get("verified", False))
                                 defense_tools.append({
+                                    "defense_id": defense_id,
+                                    "tool_index": tool_index,
+                                    "cve_id": cve_id,
                                     "name": dt.get('name', ''),
                                     "desc": dt.get('description', ''),
                                     "priority": defense.get('priority', ''),
                                     "commands": dt.get('commands', []),
+                                    "order": defense.get("order", 0),
+                                    "tool_order": dt.get("order", 0),
+                                    "verified": bool(defense_verified or tool_verified),
                                 })
 
             cve_short = cve_list[0] if cve_list else 'N/A'
             if len(cve_list) > 1:
                 cve_short += f" +{len(cve_list)-1}"
+            cve_primary = cve_list[0] if cve_list else "N/A"
+
+            attack_tools.sort(key=lambda t: (int(t.get("order") or 0), str(t.get("name") or "")))
+            defense_tools.sort(key=lambda t: (int(t.get("order") or 0), int(t.get("tool_order") or 0), str(t.get("name") or "")))
+            attack_verified = bool(attack_tools) and all(bool(t.get("verified", False)) for t in attack_tools)
+            defense_verified = bool(defense_tools) and all(bool(t.get("verified", False)) for t in defense_tools)
 
             atk_def_list.append({
                 "sw": item.get('sw', ''),
                 "capec": item.get('capec', ''),
                 "cwe": item.get('cwe', ''),
                 "cve_short": cve_short,
+                "cve_primary": cve_primary,
+                "cves": cve_list,
                 "sev": item.get('sev', 'INFO'),
                 "feas": item.get('feas', 'UNKNOWN'),
                 "recommendation": item.get('rec', ''),
                 "attack_tools": attack_tools,
                 "defense_tools": defense_tools,
+                "attack_verified": attack_verified,
+                "defense_verified": defense_verified,
             })
 
         return atk_def_list
@@ -1178,6 +1249,7 @@ class ReportGenerator:
             html = html.replace('__CVE_META__', json.dumps(cve_meta, ensure_ascii=False))
             html = html.replace('__MITRE_META__', json.dumps(mitre_meta, ensure_ascii=False))
             html = html.replace('__STATUS_META__', json.dumps(report_status_meta(), ensure_ascii=False))
+            html = html.replace('__SERVER_PORT__', str(SERVER_PORT))
             f.write(html)
 
         return filepath

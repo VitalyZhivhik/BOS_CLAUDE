@@ -24,7 +24,6 @@ import urllib.error
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import subprocess
-import requests
 import xml.etree.ElementTree as ET
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))

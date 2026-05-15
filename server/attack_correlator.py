@@ -77,6 +77,21 @@ class AttackCorrelator:
         if self.progress_callback:
             self.progress_callback(percent, message)
 
+    def _trivy_scan_successful(self) -> bool:
+        tr = self.trivy_result
+        if not tr:
+            return False
+        if isinstance(tr, dict):
+            if isinstance(tr.get("error"), str) and tr.get("error").strip():
+                return False
+            summ = tr.get("summary")
+            if isinstance(summ, dict) and isinstance(summ.get("error"), str) and summ.get("error").strip():
+                return False
+            return True
+        if hasattr(tr, "error"):
+            return not bool(getattr(tr, "error", "") or "")
+        return True
+
     def correlate(self, scan_result: ScanResult) -> list[VulnerabilityMatch]:
         """Основной метод корреляции."""
         start_time = time.time()
@@ -236,8 +251,8 @@ class AttackCorrelator:
         logger.info("=" * 70)
         logger.info(f" КОРРЕЛЯЦИЯ ЗАВЕРШЕНА ЗА {total_elapsed:.2f} СЕК")
         logger.info(f" Уникальных результатов: {len(self.results)}")
-        if self.trivy_result:
-            logger.info(f" ✅ Trivy подтвердил уязвимости")
+        if self._trivy_scan_successful():
+            logger.info(" ✅ Trivy выполнен")
         else:
             logger.warning(f" ⚠️ Trivy НЕ запущен - реализуемость атак НЕ подтверждена!")
         logger.info("=" * 70)
@@ -290,13 +305,13 @@ class AttackCorrelator:
         Проверяет уязвимость через данные Trivy.
         Возвращает (confirmed: bool, details: str, severity: str).
         """
-        if not self.trivy_result:
+        if not self._trivy_scan_successful():
             return False, "Trivy не запущен - подтверждение уязвимости недоступно", "UNKNOWN"
         
         # Преобразуем trivy_result в список уязвимостей
         vulns = []
         if isinstance(self.trivy_result, dict):
-            vulns = self.trivy_result.get("vulnerabilities", [])
+            vulns = self.trivy_result.get("vulnerabilities", []) or []
         elif hasattr(self.trivy_result, "vulnerabilities"):
             vulns = self.trivy_result.vulnerabilities
         
@@ -433,7 +448,7 @@ class AttackCorrelator:
             # Trivy не подтвердил: без штрафа/бонуса, это зона неопределённости
             score_details.append("Trivy не подтвердил уязвимость")
             uncertainty_flags.append("Нет подтверждения Trivy")
-            if self.trivy_result and not scanner_confirmed:
+            if self._trivy_scan_successful() and not scanner_confirmed:
                 # Trivy сканировал и не нашел, а сетевые сканеры тоже молчат - сильно занижаем балл
                 penalty = int(self.trivy_weight * 0.4)
                 score -= penalty

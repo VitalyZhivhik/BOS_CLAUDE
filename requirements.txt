@@ -14,4 +14,5 @@
 #   pip install -r requirements.txt
 
 PyQt6>=6.5            # Графический интерфейс
+requests>=2.31        # HTTP-клиент (attacker_agent, MITRE_PARSER и др.)
 pyinstaller>=6.0      # Сборка EXE-файлов (опционально)

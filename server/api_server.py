@@ -18,6 +18,7 @@ import os
 import sys
 import threading
 import logging
+import random
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
@@ -60,6 +61,7 @@ class ServerState:
         self.last_correlation_payload = None
         self.last_correlation_id = None
         self.last_correlation_lock = threading.Lock()
+        self.db_lock = threading.Lock()
 
 
 state = ServerState()
@@ -105,6 +107,11 @@ def _save_to_history(results: list, summary: dict, ts: str,
 
 class RequestHandler(BaseHTTPRequestHandler):
     """Обработчик HTTP-запросов."""
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self._send_cors_headers()
+        self.end_headers()
 
     def do_GET(self):
         client_ip = self.client_address[0]
@@ -155,6 +162,24 @@ class RequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         client_ip = self.client_address[0]
         logger.info(f"[HTTP-IN] POST {self.path} от {client_ip}")
+
+        if self.path.startswith("/polygon/"):
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_length).decode("utf-8") if content_length else "{}"
+                payload = json.loads(body) if body else {}
+                res = self._handle_polygon_request(self.path, payload)
+                self._respond(200, res)
+            except json.JSONDecodeError as e:
+                self._respond(400, {"error": f"Некорректный JSON: {e}"})
+            except ValueError as e:
+                self._respond(400, {"error": str(e)})
+            except FileNotFoundError as e:
+                self._respond(500, {"error": f"Файл БД не найден: {e}"})
+            except Exception as e:
+                logger.error(f"[HTTP-IN] Ошибка polygon API: {e}", exc_info=True)
+                self._respond(500, {"error": str(e)})
+            return
 
         if self.path == "/analyze":
             # Проверяем готовность сервера
@@ -303,12 +328,284 @@ class RequestHandler(BaseHTTPRequestHandler):
         else:
             self._respond(404, {"error": "Не найдено"})
 
+    def _handle_polygon_request(self, path: str, payload: dict) -> dict:
+        base_dir = state.base_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        tools_path = os.path.join(base_dir, "databases", "tools_database.json")
+        defense_path = os.path.join(base_dir, "databases", "defense_database.json")
+
+        def read_list(p: str) -> list[dict]:
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, list):
+                raise ValueError("Ожидался JSON-массив в базе данных.")
+            return data
+
+        def write_list(p: str, data: list[dict]) -> None:
+            tmp = p + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, p)
+
+        def normalize_commands(cmds) -> list[str]:
+            if cmds is None:
+                return []
+            if isinstance(cmds, str):
+                return [line.rstrip("\r") for line in cmds.split("\n")]
+            if isinstance(cmds, list):
+                out = []
+                for c in cmds:
+                    if c is None:
+                        continue
+                    out.append(str(c))
+                return out
+            raise ValueError("commands должен быть строкой или массивом строк.")
+
+        with state.db_lock:
+            if path == "/polygon/update_attack_tool":
+                tool_id = str(payload.get("tool_id") or "").strip()
+                cve_id = str(payload.get("cve_id") or "").strip()
+                if not tool_id:
+                    raise ValueError("tool_id обязателен.")
+                if not cve_id:
+                    raise ValueError("cve_id обязателен.")
+
+                tools = read_list(tools_path)
+                tool = next((t for t in tools if str(t.get("id") or "") == tool_id), None)
+                if tool is None:
+                    raise ValueError(f"Инструмент не найден: {tool_id}")
+
+                if payload.get("name") is not None:
+                    tool["name"] = str(payload.get("name"))
+                if payload.get("description") is not None:
+                    tool["description"] = str(payload.get("description"))
+                if payload.get("order") is not None:
+                    try:
+                        tool["order"] = int(payload.get("order"))
+                    except Exception:
+                        pass
+
+                app = tool.get("applicable_cve", [])
+                if not isinstance(app, list):
+                    app = []
+                if cve_id not in app:
+                    app.append(cve_id)
+                tool["applicable_cve"] = app
+
+                cmds = normalize_commands(payload.get("commands"))
+                commands = tool.get("commands", {})
+                if not isinstance(commands, dict):
+                    commands = {}
+                commands[cve_id] = cmds
+                tool["commands"] = commands
+
+                if payload.get("verified") is not None:
+                    vf = tool.get("verified_for_cve", {})
+                    if not isinstance(vf, dict):
+                        vf = {}
+                    vf[cve_id] = bool(payload.get("verified"))
+                    tool["verified_for_cve"] = vf
+
+                write_list(tools_path, tools)
+                if state.toolkit:
+                    state.toolkit.load()
+                return {"status": "ok", "tool_id": tool_id, "cve_id": cve_id}
+
+            if path == "/polygon/add_attack_tool":
+                cve_id = str(payload.get("cve_id") or "").strip()
+                name = str(payload.get("name") or "").strip()
+                if not cve_id:
+                    raise ValueError("cve_id обязателен.")
+                if not name:
+                    raise ValueError("name обязателен.")
+
+                tools = read_list(tools_path)
+                ts = datetime.now().strftime("%Y%m%d%H%M%S")
+                rid = f"TOOL-CUSTOM-{ts}-{random.randint(1000, 9999)}"
+                cmds = normalize_commands(payload.get("commands"))
+                order = payload.get("order")
+                tool = {
+                    "id": rid,
+                    "name": name,
+                    "type": str(payload.get("type") or "custom"),
+                    "description": str(payload.get("description") or ""),
+                    "url": str(payload.get("url") or ""),
+                    "applicable_attack_types": payload.get("attack_types") if isinstance(payload.get("attack_types"), list) else [],
+                    "applicable_cve": [cve_id],
+                    "commands": {cve_id: cmds},
+                    "phases": payload.get("phases") if isinstance(payload.get("phases"), list) else [],
+                    "skill_level": str(payload.get("skill_level") or "Unknown"),
+                    "os": payload.get("os") if isinstance(payload.get("os"), list) else [],
+                    "language": "ru",
+                }
+                if order is not None:
+                    try:
+                        tool["order"] = int(order)
+                    except Exception:
+                        pass
+                if payload.get("verified") is not None:
+                    tool["verified_for_cve"] = {cve_id: bool(payload.get("verified"))}
+
+                tools.append(tool)
+                write_list(tools_path, tools)
+                if state.toolkit:
+                    state.toolkit.load()
+                return {"status": "ok", "tool_id": rid, "cve_id": cve_id}
+
+            if path == "/polygon/update_defense_tool":
+                defense_id = str(payload.get("defense_id") or "").strip()
+                cve_id = str(payload.get("cve_id") or "").strip()
+                tool_index = payload.get("tool_index")
+                if not defense_id:
+                    raise ValueError("defense_id обязателен.")
+                if not cve_id:
+                    raise ValueError("cve_id обязателен.")
+
+                defenses = read_list(defense_path)
+                defense = next((d for d in defenses if str(d.get("id") or "") == defense_id), None)
+                if defense is None:
+                    raise ValueError(f"Метод защиты не найден: {defense_id}")
+
+                if payload.get("attack_type") is not None:
+                    defense["attack_type"] = str(payload.get("attack_type"))
+                if payload.get("name") is not None:
+                    defense["name"] = str(payload.get("name"))
+                if payload.get("description") is not None:
+                    defense["description"] = str(payload.get("description"))
+                if payload.get("priority") is not None:
+                    defense["priority"] = str(payload.get("priority"))
+                if payload.get("order") is not None:
+                    try:
+                        defense["order"] = int(payload.get("order"))
+                    except Exception:
+                        pass
+
+                cves = defense.get("cve_ids", [])
+                if not isinstance(cves, list):
+                    cves = []
+                if cve_id not in cves:
+                    cves.append(cve_id)
+                defense["cve_ids"] = cves
+
+                tools = defense.get("tools", [])
+                if not isinstance(tools, list):
+                    raise ValueError("В defense_database.json поле tools должно быть массивом.")
+                if tool_index is None:
+                    raise ValueError("tool_index обязателен для update_defense_tool.")
+                try:
+                    tool_index_i = int(tool_index)
+                except Exception:
+                    raise ValueError("tool_index должен быть числом.")
+                if tool_index_i < 0 or tool_index_i >= len(tools):
+                    raise ValueError("tool_index вне диапазона.")
+                tool = tools[tool_index_i]
+
+                if payload.get("tool_name") is not None:
+                    tool["name"] = str(payload.get("tool_name"))
+                if payload.get("tool_description") is not None:
+                    tool["description"] = str(payload.get("tool_description"))
+                if payload.get("tool_order") is not None:
+                    try:
+                        tool["order"] = int(payload.get("tool_order"))
+                    except Exception:
+                        pass
+                if payload.get("commands") is not None:
+                    tool["commands"] = normalize_commands(payload.get("commands"))
+                if payload.get("verified") is not None:
+                    vf = tool.get("verified_for_cve", {})
+                    if not isinstance(vf, dict):
+                        vf = {}
+                    vf[cve_id] = bool(payload.get("verified"))
+                    tool["verified_for_cve"] = vf
+
+                defense["tools"] = tools
+                write_list(defense_path, defenses)
+                if state.toolkit:
+                    state.toolkit.load()
+                return {"status": "ok", "defense_id": defense_id, "tool_index": tool_index_i, "cve_id": cve_id}
+
+            if path == "/polygon/add_defense_entry":
+                cve_id = str(payload.get("cve_id") or "").strip()
+                name = str(payload.get("name") or "").strip()
+                if not cve_id:
+                    raise ValueError("cve_id обязателен.")
+                if not name:
+                    raise ValueError("name обязателен.")
+
+                defenses = read_list(defense_path)
+                ts = datetime.now().strftime("%Y%m%d%H%M%S")
+                rid = f"DEF-CUSTOM-{ts}-{random.randint(1000, 9999)}"
+                tool_name = str(payload.get("tool_name") or "Шаг 1").strip()
+                tool = {
+                    "name": tool_name,
+                    "description": str(payload.get("tool_description") or ""),
+                    "commands": normalize_commands(payload.get("commands")),
+                }
+                entry = {
+                    "id": rid,
+                    "attack_type": str(payload.get("attack_type") or "custom"),
+                    "cve_ids": [cve_id],
+                    "name": name,
+                    "description": str(payload.get("description") or ""),
+                    "tools": [tool],
+                    "priority": str(payload.get("priority") or "MEDIUM"),
+                    "effort": str(payload.get("effort") or "Medium"),
+                    "effectiveness": str(payload.get("effectiveness") or "Medium"),
+                    "language": "ru",
+                }
+                if payload.get("order") is not None:
+                    try:
+                        entry["order"] = int(payload.get("order"))
+                    except Exception:
+                        pass
+                defenses.append(entry)
+                write_list(defense_path, defenses)
+                if state.toolkit:
+                    state.toolkit.load()
+                return {"status": "ok", "defense_id": rid, "cve_id": cve_id}
+
+            if path == "/polygon/add_defense_tool":
+                defense_id = str(payload.get("defense_id") or "").strip()
+                if not defense_id:
+                    raise ValueError("defense_id обязателен.")
+                defenses = read_list(defense_path)
+                defense = next((d for d in defenses if str(d.get("id") or "") == defense_id), None)
+                if defense is None:
+                    raise ValueError(f"Метод защиты не найден: {defense_id}")
+                tools = defense.get("tools", [])
+                if not isinstance(tools, list):
+                    tools = []
+                tool = {
+                    "name": str(payload.get("tool_name") or "").strip(),
+                    "description": str(payload.get("tool_description") or ""),
+                    "commands": normalize_commands(payload.get("commands")),
+                }
+                if not tool["name"]:
+                    raise ValueError("tool_name обязателен.")
+                if payload.get("tool_order") is not None:
+                    try:
+                        tool["order"] = int(payload.get("tool_order"))
+                    except Exception:
+                        pass
+                tools.append(tool)
+                defense["tools"] = tools
+                write_list(defense_path, defenses)
+                if state.toolkit:
+                    state.toolkit.load()
+                return {"status": "ok", "defense_id": defense_id, "tool_index": len(tools) - 1}
+
+            raise ValueError(f"Неизвестный polygon endpoint: {path}")
+
     def _respond(self, code: int, data: dict):
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self._send_cors_headers()
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
+
+    def _send_cors_headers(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def log_message(self, format, *args):
         # Подавляем стандартные логи — используем свой логгер

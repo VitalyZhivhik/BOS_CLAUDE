@@ -28,17 +28,22 @@ proxy_handler = urllib.request.ProxyHandler({})
 opener = urllib.request.build_opener(proxy_handler)
 urllib.request.install_opener(opener)
 
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QTextEdit, QGroupBox, QSpinBox, QLineEdit,
-    QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget, QProgressBar,
-    QFrame, QMessageBox, QStatusBar, QCheckBox, QFileDialog,
-    QTreeWidget, QTreeWidgetItem, QAbstractItemView, QSplitter,
-    QComboBox, QListWidget, QListWidgetItem, QFormLayout,
-    QScrollArea
-)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer
-from PyQt6.QtGui import QFont, QColor, QTextCursor, QIcon
+try:
+    from PyQt6.QtWidgets import (
+        QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+        QLabel, QPushButton, QTextEdit, QGroupBox, QSpinBox, QLineEdit,
+        QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget, QProgressBar,
+        QFrame, QMessageBox, QStatusBar, QCheckBox, QFileDialog,
+        QTreeWidget, QTreeWidgetItem, QAbstractItemView, QSplitter,
+        QComboBox, QListWidget, QListWidgetItem, QFormLayout,
+        QScrollArea
+    )
+    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer
+    from PyQt6.QtGui import QFont, QColor, QTextCursor, QIcon
+except Exception:
+    print("GUI не может запуститься: PyQt6 не установлен или недоступен.")
+    print("Установите зависимости: pip install -r requirements.txt")
+    sys.exit(1)
 
 _BOOT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _BOOT_DIR)
@@ -542,13 +547,41 @@ class NucleiWorker(QThread):
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
             cwd = os.path.dirname(os.path.abspath(self.nuclei_path)) if os.path.isfile(self.nuclei_path) else None
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1, universal_newlines=True,
-                startupinfo=startupinfo,
-                cwd=cwd,
-            )
+            try:
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True, bufsize=1, universal_newlines=True,
+                    startupinfo=startupinfo,
+                    cwd=cwd,
+                )
+            except PermissionError as e:
+                if os.name == "nt" and os.path.isfile(self.nuclei_path):
+                    try:
+                        subprocess.run(
+                            [
+                                "powershell",
+                                "-NoProfile",
+                                "-ExecutionPolicy", "Bypass",
+                                "-Command",
+                                f"Unblock-File -LiteralPath '{self.nuclei_path}'",
+                            ],
+                            capture_output=True,
+                            text=True,
+                            timeout=10,
+                            creationflags=subprocess.CREATE_NO_WINDOW,
+                        )
+                        process = subprocess.Popen(
+                            cmd,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, bufsize=1, universal_newlines=True,
+                            startupinfo=startupinfo,
+                            cwd=cwd,
+                        )
+                    except Exception:
+                        raise e
+                else:
+                    raise e
 
             vuln_count_live = 0
             for line in process.stdout:
@@ -624,7 +657,14 @@ class NucleiWorker(QThread):
 
         except Exception as e:
             logger.error(f"❌ Ошибка Nuclei: {e}", exc_info=True)
-            self.error.emit(str(e))
+            if isinstance(e, PermissionError) and os.name == "nt":
+                self.error.emit(
+                    "Отказано в доступе при запуске Nuclei (WinError 5). "
+                    "Частая причина — файл nuclei.exe заблокирован Windows. "
+                    "Откройте свойства файла и нажмите «Разблокировать» или запустите приложение от администратора."
+                )
+            else:
+                self.error.emit(str(e))
         finally:
             for p in [temp_path, url_list_path]:
                 if os.path.exists(p):
