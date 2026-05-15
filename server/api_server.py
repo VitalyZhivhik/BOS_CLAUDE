@@ -218,6 +218,32 @@ class RequestHandler(BaseHTTPRequestHandler):
                     self._respond(200, {"cve_id": str(cve_q).upper(), "playbook": entry or {}})
                 else:
                     self._respond(200, db)
+            elif path == "/trivy-history":
+                try:
+                    from server.trivy_history import TrivyHistory
+                    base_dir = state.base_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    hist = TrivyHistory(base_dir)
+                    records = [
+                        {
+                            "id": r.record_id,
+                            "filename": r.filename,
+                            "timestamp": r.timestamp,
+                            "total_vulns": r.total_vulns,
+                            "critical": r.critical,
+                        }
+                        for r in hist.list_records()
+                    ]
+                    self._respond(200, {"records": records})
+                except Exception as e:
+                    self._respond(500, {"error": str(e)})
+
+            elif path == "/correlation-profiles":
+                try:
+                    from server.correlation_profiles import list_profiles
+                    base_dir = state.base_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    self._respond(200, {"profiles": list_profiles(base_dir)})
+                except Exception as e:
+                    self._respond(500, {"error": str(e)})
 
             else:
                 self._respond(404, {"error": "Не найдено"})
@@ -307,6 +333,67 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._respond(500, {"error": str(e)})
             return
 
+        if path == "/trivy-history/delete":
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_length).decode("utf-8") if content_length else "{}"
+                payload = json.loads(body) if body else {}
+                record_id = str(payload.get("record_id") or payload.get("id") or payload.get("filename") or "").strip()
+                if not record_id:
+                    self._respond(400, {"error": "record_id обязателен"})
+                    return
+                from server.trivy_history import TrivyHistory
+                base_dir = state.base_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                hist = TrivyHistory(base_dir)
+                ok = hist.delete_record(record_id)
+                self._respond(200, {"status": "ok" if ok else "not_found"})
+            except json.JSONDecodeError as e:
+                self._respond(400, {"error": f"Некорректный JSON: {e}"})
+            except Exception as e:
+                self._respond(500, {"error": str(e)})
+            return
+
+        if path == "/correlation-profiles/save":
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_length).decode("utf-8") if content_length else "{}"
+                payload = json.loads(body) if body else {}
+                name = str(payload.get("name") or "").strip()
+                description = str(payload.get("description") or "").strip()
+                settings = payload.get("settings", None)
+                profile_id = payload.get("profile_id", None)
+                if not name:
+                    self._respond(400, {"error": "name обязателен"})
+                    return
+                from server.correlation_profiles import save_profile
+                base_dir = state.base_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                res = save_profile(base_dir, name=name, description=description, settings=settings or {}, profile_id=profile_id)
+                self._respond(200, {"status": "ok", "profile": res})
+            except json.JSONDecodeError as e:
+                self._respond(400, {"error": f"Некорректный JSON: {e}"})
+            except Exception as e:
+                self._respond(500, {"error": str(e)})
+            return
+
+        if path == "/correlation-profiles/delete":
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_length).decode("utf-8") if content_length else "{}"
+                payload = json.loads(body) if body else {}
+                profile_id = str(payload.get("profile_id") or payload.get("id") or "").strip()
+                if not profile_id:
+                    self._respond(400, {"error": "profile_id обязателен"})
+                    return
+                from server.correlation_profiles import delete_profile
+                base_dir = state.base_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                ok = delete_profile(base_dir, profile_id)
+                self._respond(200, {"status": "ok" if ok else "not_found"})
+            except json.JSONDecodeError as e:
+                self._respond(400, {"error": f"Некорректный JSON: {e}"})
+            except Exception as e:
+                self._respond(500, {"error": str(e)})
+            return
+
         if path == "/analyze":
             # Проверяем готовность сервера
             if not state.system_info:
@@ -365,26 +452,83 @@ class RequestHandler(BaseHTTPRequestHandler):
                 if state.on_correlation_progress:
                     state.on_correlation_progress(0, "Начало корреляции...")
 
-                # trivy_result: если выполнен скан Trivy на сервере — усиливает корреляцию и
-                # подтверждение CVE; иначе correlator работает без слоя Trivy (см. attack_correlator).
-                correlator = AttackCorrelator(
-                    state.system_info,
-                    state.vuln_db,
-                    trivy_result=state.trivy_result,
-                )
-                
-                # Устанавливаем callback для прогресса
-                def progress_callback(percent, message):
-                    state.correlation_progress = percent
-                    state.correlation_message = message
-                    logger.info(f"[CORRELATION] {percent}% - {message}")
-                    if state.on_correlation_progress:
-                        state.on_correlation_progress(percent, message)
-                
-                correlator.set_progress_callback(progress_callback)
-                
-                results = correlator.correlate(scan_result)
-                summary = correlator.get_summary()
+                base_dir = state.base_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                profiles = []
+                try:
+                    from server.correlation_profiles import list_profiles
+                    profiles = list_profiles(base_dir)
+                except Exception:
+                    profiles = []
+
+                results_by_profile = {}
+                summaries_by_profile = {}
+                profiles_meta = {}
+                ordered_ids = []
+
+                current_settings = getattr(state, "correlation_settings", None)
+                if isinstance(current_settings, dict):
+                    pid = "_current"
+                    profiles_meta[pid] = {"id": pid, "name": "Текущие настройки", "description": ""}
+                    ordered_ids.append(pid)
+
+                for p in profiles:
+                    pid = p.get("id") or p.get("file")
+                    if not pid or pid in ordered_ids:
+                        continue
+                    profiles_meta[pid] = {
+                        "id": pid,
+                        "name": p.get("name", pid),
+                        "description": p.get("description", ""),
+                    }
+                    ordered_ids.append(pid)
+
+                if not ordered_ids:
+                    pid = "_default"
+                    profiles_meta[pid] = {"id": pid, "name": "По умолчанию", "description": ""}
+                    ordered_ids.append(pid)
+
+                default_profile_id = ordered_ids[0]
+                total_profiles = max(1, len(ordered_ids))
+
+                for idx, pid in enumerate(ordered_ids, 1):
+                    if pid == "_current":
+                        settings = current_settings
+                    elif pid == "_default":
+                        settings = None
+                    else:
+                        settings = None
+                        for p in profiles:
+                            if (p.get("id") or p.get("file")) == pid:
+                                settings = p.get("settings", None)
+                                break
+
+                    correlator = AttackCorrelator(
+                        state.system_info,
+                        state.vuln_db,
+                        trivy_result=state.trivy_result,
+                        correlation_settings=settings,
+                    )
+
+                    def progress_callback(percent, message, _idx=idx, _pid=pid):
+                        base = int(((_idx - 1) / total_profiles) * 100)
+                        span = int(100 / total_profiles)
+                        overall = min(99, base + int((percent / 100) * span))
+                        name = profiles_meta.get(_pid, {}).get("name", _pid)
+                        msg = f"{name}: {message}"
+                        state.correlation_progress = overall
+                        state.correlation_message = msg
+                        logger.info(f"[CORRELATION] {overall}% - {msg}")
+                        if state.on_correlation_progress:
+                            state.on_correlation_progress(overall, msg)
+
+                    correlator.set_progress_callback(progress_callback)
+                    results = correlator.correlate(scan_result)
+                    summary = correlator.get_summary()
+                    results_by_profile[pid] = results
+                    summaries_by_profile[pid] = summary
+
+                results = results_by_profile.get(default_profile_id, [])
+                summary = summaries_by_profile.get(default_profile_id, {})
 
                 state.correlation_progress = 100
                 state.correlation_message = "Корреляция завершена"
@@ -409,6 +553,10 @@ class RequestHandler(BaseHTTPRequestHandler):
                     attacker_scan_data=scan_data,       # Данные атакующего для схемы 3
                     system_info=state.system_info,      # для точного сопоставления ПО в отчёте
                     trivy_result=state.trivy_result,
+                    correlation_results_by_profile=results_by_profile,
+                    summaries_by_profile=summaries_by_profile,
+                    profiles_meta=profiles_meta,
+                    default_profile_id=default_profile_id,
                 )
 
                 html_path = reporter.generate_html(os.path.join(reports_dir, f"report_{ts}.html"))
@@ -422,6 +570,11 @@ class RequestHandler(BaseHTTPRequestHandler):
                 response = {
                     "status": "success",
                     "summary": summary,
+                    "default_profile_id": default_profile_id,
+                    "profiles": {
+                        pid: {"meta": profiles_meta.get(pid, {"id": pid}), "summary": summaries_by_profile.get(pid, {})}
+                        for pid in results_by_profile.keys()
+                    },
                     "html_report": html_path,
                     "json_report": json_path,
                     "results_count": len(results),

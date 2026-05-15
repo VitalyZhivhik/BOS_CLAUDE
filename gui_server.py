@@ -21,7 +21,7 @@ try:
         QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
         QFrame, QMessageBox, QStatusBar, QProgressBar, QFileDialog,
         QComboBox, QListWidget, QListWidgetItem, QSplitter,
-        QScrollArea, QDialog, QDialogButtonBox, QFormLayout, QLineEdit, QAbstractItemView
+        QScrollArea, QDialog, QDialogButtonBox, QFormLayout, QLineEdit, QAbstractItemView, QInputDialog
     )
     from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
     from PyQt6.QtGui import QFont, QColor, QTextCursor
@@ -43,6 +43,8 @@ from server.attack_toolkit import AttackToolkit, validate_tools_database_at_star
 from server.report_history import ReportHistory, ReportRecord
 from server.scan_history import ScanHistory, ScanRecord
 from server.local_vuln_scanner import LocalVulnScanner, ScanReport
+from server.correlation_profiles import list_profiles as list_correlation_profiles, save_profile as save_correlation_profile
+from server.trivy_history import TrivyHistory
 logger = get_server_logger()
 PROJECT_DIR = application_base_dir()
 BUNDLE_ROOT = bundle_resources_root()
@@ -270,24 +272,72 @@ class CorrelationRestartWorker(QThread):
         try:
             self.progress.emit(0, "🔄 Перезапуск корреляции...")
             sr = from_json_scan_result(self.last_scan_data)
-            cor = AttackCorrelator(
-                self.system_info,
-                self.vuln_db,
-                trivy_result=self.trivy_result,
-            )
-            if self.settings:
-                cor.max_score = self.settings.get('max_score', 100)
-                cor.feasible_threshold = self.settings.get('feasible_threshold', 60)
-                cor.partially_feasible_threshold = self.settings.get('partially_feasible_threshold', 40)
-                cor.not_feasible_threshold = self.settings.get('not_feasible_threshold', 20)
-                cor.network_weight = self.settings.get('network_weight', 30)
-                cor.trivy_weight = self.settings.get('trivy_weight', 35)
-                cor.software_weight = self.settings.get('software_weight', 20)
-                cor.scanner_weight = self.settings.get('scanner_weight', 30)
-            cor.set_progress_callback(lambda p, m: self.progress.emit(p, m))
+            profiles = []
+            try:
+                profiles = list_correlation_profiles(PROJECT_DIR)
+            except Exception:
+                profiles = []
 
-            results = cor.correlate(sr)
-            summary = cor.get_summary()
+            results_by_profile = {}
+            summaries_by_profile = {}
+            profiles_meta = {}
+            ordered_ids = []
+
+            if self.settings:
+                pid = "_current"
+                profiles_meta[pid] = {"id": pid, "name": "Текущие настройки", "description": ""}
+                ordered_ids.append(pid)
+
+            for p in profiles:
+                pid = p.get("file") or p.get("id")
+                if not pid or pid in ordered_ids:
+                    continue
+                profiles_meta[pid] = {"id": pid, "name": p.get("name", pid), "description": p.get("description", "")}
+                ordered_ids.append(pid)
+
+            if not ordered_ids:
+                pid = "_default"
+                profiles_meta[pid] = {"id": pid, "name": "По умолчанию", "description": ""}
+                ordered_ids.append(pid)
+
+            default_profile_id = ordered_ids[0]
+            total_profiles = max(1, len(ordered_ids))
+
+            for idx, pid in enumerate(ordered_ids, 1):
+                if pid == "_current":
+                    settings = self.settings or {}
+                elif pid == "_default":
+                    settings = None
+                else:
+                    settings = None
+                    for p in profiles:
+                        if (p.get("file") or p.get("id")) == pid:
+                            settings = p.get("settings", None)
+                            break
+
+                cor = AttackCorrelator(
+                    self.system_info,
+                    self.vuln_db,
+                    trivy_result=self.trivy_result,
+                    correlation_settings=settings,
+                )
+
+                def _mk_cb(base_idx, pid_label):
+                    def _cb(pct, msg):
+                        base = int(((base_idx - 1) / total_profiles) * 100)
+                        span = int(100 / total_profiles)
+                        overall = min(99, base + int((pct / 100) * span))
+                        self.progress.emit(overall, f"{pid_label}: {msg}")
+                    return _cb
+
+                cor.set_progress_callback(_mk_cb(idx, profiles_meta.get(pid, {}).get("name", pid)))
+                results = cor.correlate(sr)
+                summary = cor.get_summary()
+                results_by_profile[pid] = results
+                summaries_by_profile[pid] = summary
+
+            results = results_by_profile.get(default_profile_id, [])
+            summary = summaries_by_profile.get(default_profile_id, {})
 
             rd = os.path.join(PROJECT_DIR, "reports")
             os.makedirs(rd, exist_ok=True)
@@ -299,20 +349,36 @@ class CorrelationRestartWorker(QThread):
                 toolkit=self.toolkit,
                 local_scan_report=self.vuln_scan_report,
                 attacker_scan_data=self.last_scan_data,
+                correlation_results_by_profile=results_by_profile,
+                summaries_by_profile=summaries_by_profile,
+                profiles_meta=profiles_meta,
+                default_profile_id=default_profile_id,
             )
             hp = rep.generate_html(os.path.join(rd, f"report_{ts}.html"))
             jp = rep.generate_json(os.path.join(rd, f"report_{ts}.json"))
 
-            settings_used = self.settings or {
-                "max_score": cor.max_score,
-                "feasible_threshold": cor.feasible_threshold,
-                "partially_feasible_threshold": cor.partially_feasible_threshold,
-                "not_feasible_threshold": cor.not_feasible_threshold,
-                "network_weight": cor.network_weight,
-                "trivy_weight": cor.trivy_weight,
-                "software_weight": cor.software_weight,
-                "scanner_weight": cor.scanner_weight,
-            }
+            settings_used = {}
+            if default_profile_id == "_current" and isinstance(self.settings, dict):
+                settings_used = dict(self.settings)
+            elif default_profile_id and default_profile_id not in ("_default", "_current"):
+                for p in profiles:
+                    if (p.get("file") or p.get("id")) == default_profile_id:
+                        if isinstance(p.get("settings"), dict):
+                            settings_used = dict(p.get("settings"))
+                        break
+            if not settings_used:
+                settings_used = {
+                    "max_score": 100,
+                    "feasible_threshold": 60,
+                    "partially_feasible_threshold": 40,
+                    "not_feasible_threshold": 20,
+                    "network_weight": 30,
+                    "trivy_weight": 35,
+                    "software_weight": 20,
+                    "scanner_weight": 30,
+                    "patch_weight": 10,
+                    "protection_weight": 5,
+                }
             payload = {
                 "status": "success",
                 "correlation_id": ts,
@@ -828,6 +894,11 @@ class ServerGUI(QMainWindow):
         self.btn_load_trivy_hist.clicked.connect(self._load_selected_trivy_history)
         self.btn_load_trivy_hist.setEnabled(False)
         ctrl.addWidget(self.btn_load_trivy_hist)
+
+        self.btn_delete_trivy_hist = QPushButton("🗑️ Удалить выбранное")
+        self.btn_delete_trivy_hist.clicked.connect(self._delete_selected_trivy_history)
+        self.btn_delete_trivy_hist.setEnabled(False)
+        ctrl.addWidget(self.btn_delete_trivy_hist)
         ctrl.addStretch()
         thtl.addLayout(ctrl)
         
@@ -836,7 +907,7 @@ class ServerGUI(QMainWindow):
         self.trivy_hist_table.horizontalHeader().setStretchLastSection(True)
         self.trivy_hist_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.trivy_hist_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.trivy_hist_table.itemSelectionChanged.connect(lambda: self.btn_load_trivy_hist.setEnabled(bool(self.trivy_hist_table.selectedItems())))
+        self.trivy_hist_table.itemSelectionChanged.connect(self._sync_trivy_hist_buttons)
         thtl.addWidget(self.trivy_hist_table)
         
         self.tabs.addTab(tht, "📜 История Trivy")
@@ -1094,6 +1165,24 @@ class ServerGUI(QMainWindow):
         scanner_weight_layout.addWidget(self.scanner_weight_spin)
         weights_layout.addLayout(scanner_weight_layout)
 
+        patch_weight_layout = QHBoxLayout()
+        patch_weight_layout.addWidget(QLabel("Состояние обновлений:"))
+        self.patch_weight_spin = QSpinBox()
+        self.patch_weight_spin.setRange(0, 50)
+        self.patch_weight_spin.setValue(10)
+        self.patch_weight_spin.setFixedWidth(80)
+        patch_weight_layout.addWidget(self.patch_weight_spin)
+        weights_layout.addLayout(patch_weight_layout)
+
+        protection_weight_layout = QHBoxLayout()
+        protection_weight_layout.addWidget(QLabel("Ослабление защиты (FW/AV):"))
+        self.protection_weight_spin = QSpinBox()
+        self.protection_weight_spin.setRange(0, 30)
+        self.protection_weight_spin.setValue(5)
+        self.protection_weight_spin.setFixedWidth(80)
+        protection_weight_layout.addWidget(self.protection_weight_spin)
+        weights_layout.addLayout(protection_weight_layout)
+
         stl.addWidget(weights_group)
 
         # Группа профилей корреляции
@@ -1108,6 +1197,25 @@ class ServerGUI(QMainWindow):
         self.profile_combo.addItem("Стандартный (баланс)")
         self.profile_combo.addItem("Приоритетный для анализа на сервере")
         self.profile_combo.addItem("Приоритетный для анализа атакующим")
+        self._profile_name_to_file = {
+            "Стандартный (баланс)": "standard.json",
+            "Приоритетный для анализа на сервере": "server_priority.json",
+            "Приоритетный для анализа атакующим": "attacker_priority.json",
+        }
+        try:
+            existing = list_correlation_profiles(PROJECT_DIR)
+            built_in_files = set(self._profile_name_to_file.values())
+            for p in existing:
+                pf = p.get("file") or p.get("id")
+                if not pf or pf in built_in_files:
+                    continue
+                label = str(p.get("name") or pf.replace(".json", ""))
+                if label in self._profile_name_to_file:
+                    label = f"{label} ({pf})"
+                self._profile_name_to_file[label] = pf
+                self.profile_combo.addItem(label)
+        except Exception:
+            pass
         self.profile_combo.addItem("Загрузить из файла...")
         self.profile_combo.currentTextChanged.connect(self._on_profile_selected)
         profile_layout.addWidget(self.profile_combo)
@@ -1124,6 +1232,19 @@ class ServerGUI(QMainWindow):
         self.btn_apply_profile.clicked.connect(self._apply_profile)
         self.btn_apply_profile.setEnabled(False)
         profiles_layout.addWidget(self.btn_apply_profile)
+
+        self.btn_save_new_profile = QPushButton("💾 Сохранить как новый профиль")
+        self.btn_save_new_profile.clicked.connect(self._save_new_profile_from_current_settings)
+        profiles_layout.addWidget(self.btn_save_new_profile)
+
+        self.btn_overwrite_profile = QPushButton("📝 Перезаписать выбранный профиль")
+        self.btn_overwrite_profile.clicked.connect(self._overwrite_selected_profile_from_current_settings)
+        self.btn_overwrite_profile.setEnabled(False)
+        profiles_layout.addWidget(self.btn_overwrite_profile)
+
+        self.btn_copy_to_profile = QPushButton("📋 Записать настройки в другой профиль")
+        self.btn_copy_to_profile.clicked.connect(self._copy_current_settings_to_other_profile)
+        profiles_layout.addWidget(self.btn_copy_to_profile)
         
         stl.addWidget(profiles_group)
 
@@ -1263,6 +1384,8 @@ class ServerGUI(QMainWindow):
                 'trivy_weight': self.trivy_weight_spin.value(),
                 'software_weight': self.software_weight_spin.value(),
                 'scanner_weight': self.scanner_weight_spin.value(),
+                'patch_weight': self.patch_weight_spin.value(),
+                'protection_weight': self.protection_weight_spin.value(),
             }
 
             # Сохраняем настройки в глобальном состоянии
@@ -1301,6 +1424,8 @@ class ServerGUI(QMainWindow):
             self.trivy_weight_spin.setValue(35)
             self.software_weight_spin.setValue(20)
             self.scanner_weight_spin.setValue(30)
+            self.patch_weight_spin.setValue(10)
+            self.protection_weight_spin.setValue(5)
 
             # Сбрасываем настройки в глобальном состоянии
             from server.api_server import state
@@ -1320,6 +1445,8 @@ class ServerGUI(QMainWindow):
                 'trivy_weight': 35,
                 'software_weight': 20,
                 'scanner_weight': 30,
+                'patch_weight': 10,
+                'protection_weight': 5,
             }
             self._update_current_settings_text(default_settings)
 
@@ -1347,6 +1474,8 @@ class ServerGUI(QMainWindow):
             text += f"   • Подтверждение Trivy: {settings['trivy_weight']} баллов\n"
             text += f"   • Уязвимое ПО: {settings['software_weight']} баллов\n"
             text += f"   • Подтверждение сканером: {settings['scanner_weight']} баллов\n\n"
+            text += f"   • Состояние обновлений: {settings.get('patch_weight', 10)} баллов\n"
+            text += f"   • Ослабление защиты (FW/AV): {settings.get('protection_weight', 5)} баллов\n\n"
             text += "💡 Эти параметры используются для оценки реализуемости атак."
 
             self.current_settings_text.setPlainText(text)
@@ -1981,29 +2110,22 @@ class ServerGUI(QMainWindow):
     def _refresh_trivy_history(self):
         """Обновляет таблицу истории Trivy из папки data"""
         self.trivy_hist_table.setRowCount(0)
-        data_dir = os.path.join(PROJECT_DIR, "data")
-        if not os.path.exists(data_dir):
-            return
-        for fname in sorted(os.listdir(data_dir), reverse=True):
-            if fname.startswith("trivy_scan_") and fname.endswith(".json"):
-                fpath = os.path.join(data_dir, fname)
-                try:
-                    with open(fpath, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                    summary = data.get("summary", {})
-                    total = summary.get("total_vulns", 0)
-                    crit = summary.get("critical", 0)
-                    date_part = fname.replace("trivy_scan_", "").replace(".json", "")
-                    row = self.trivy_hist_table.rowCount()
-                    self.trivy_hist_table.insertRow(row)
-                    self.trivy_hist_table.setItem(row, 0, QTableWidgetItem(date_part))
-                    self.trivy_hist_table.setItem(row, 1, QTableWidgetItem(str(total)))
-                    self.trivy_hist_table.setItem(row, 2, QTableWidgetItem(str(crit)))
-                    file_item = QTableWidgetItem(fname)
-                    file_item.setData(Qt.ItemDataRole.UserRole, fpath)
-                    self.trivy_hist_table.setItem(row, 3, file_item)
-                except Exception as e:
-                    logger.error(f"Ошибка чтения файла истории Trivy {fname}: {e}")
+        try:
+            history = TrivyHistory(PROJECT_DIR)
+            records = history.list_records()
+        except Exception:
+            records = []
+        for rec in records:
+            row = self.trivy_hist_table.rowCount()
+            self.trivy_hist_table.insertRow(row)
+            self.trivy_hist_table.setItem(row, 0, QTableWidgetItem(rec.timestamp))
+            self.trivy_hist_table.setItem(row, 1, QTableWidgetItem(str(rec.total_vulns)))
+            self.trivy_hist_table.setItem(row, 2, QTableWidgetItem(str(rec.critical)))
+            file_item = QTableWidgetItem(rec.filename)
+            file_item.setData(Qt.ItemDataRole.UserRole, rec.filepath)
+            file_item.setData(Qt.ItemDataRole.UserRole + 1, rec.record_id)
+            self.trivy_hist_table.setItem(row, 3, file_item)
+        self._sync_trivy_hist_buttons()
 
     def _load_selected_trivy_history(self):
         """Загрузка отчета Trivy выбранного в таблице истории"""
@@ -2012,6 +2134,35 @@ class ServerGUI(QMainWindow):
         fpath = self.trivy_hist_table.item(row, 3).data(Qt.ItemDataRole.UserRole)
         if not fpath or not os.path.exists(fpath): return
         self._process_trivy_file(fpath)
+
+    def _sync_trivy_hist_buttons(self):
+        has_sel = bool(self.trivy_hist_table.selectedItems())
+        self.btn_load_trivy_hist.setEnabled(has_sel)
+        self.btn_delete_trivy_hist.setEnabled(has_sel)
+
+    def _delete_selected_trivy_history(self):
+        row = self.trivy_hist_table.currentRow()
+        if row < 0:
+            return
+        item = self.trivy_hist_table.item(row, 3)
+        record_id = item.data(Qt.ItemDataRole.UserRole + 1) if item else None
+        if not record_id:
+            return
+        reply = QMessageBox.question(
+            self,
+            "Удаление",
+            "Удалить выбранную запись из истории Trivy? (Файл будет удалён с диска)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            history = TrivyHistory(PROJECT_DIR)
+            history.delete_record(str(record_id))
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось удалить запись:\n{e}")
+            return
+        self._refresh_trivy_history()
 
     def _process_trivy_file(self, path):
         """Общая логика парсинга JSON от Trivy и заполнения интерфейса"""
@@ -2752,22 +2903,30 @@ class ServerGUI(QMainWindow):
         if profile_name == "-- Выберите профиль --":
             self.profile_description.setText("Выберите профиль для просмотра описания")
             self.btn_apply_profile.setEnabled(False)
+            self.btn_overwrite_profile.setEnabled(False)
             return
         
         if profile_name == "Загрузить из файла...":
             self._load_profile_from_file()
             return
         
-        # Загружаем профиль из файла (явная карта имён -> файлов)
         profile_file_map = {
             "Стандартный (баланс)": "standard.json",
             "Приоритетный для анализа на сервере": "server_priority.json",
             "Приоритетный для анализа атакующим": "attacker_priority.json",
         }
-        profile_file = profile_file_map.get(profile_name, f"{profile_name.lower().replace(' ', '_')}.json")
-        profile_path = os.path.join(BUNDLE_ROOT, "profiles", profile_file)
-        if not os.path.exists(profile_path):
+        profile_file = None
+        if hasattr(self, "_profile_name_to_file") and profile_name in getattr(self, "_profile_name_to_file", {}):
+            profile_file = self._profile_name_to_file[profile_name]
+        else:
+            profile_file = profile_file_map.get(profile_name, f"{profile_name.lower().replace(' ', '_')}.json")
+
+        if os.path.isabs(profile_file):
+            profile_path = profile_file
+        else:
             profile_path = os.path.join(PROJECT_DIR, "profiles", profile_file)
+            if not os.path.exists(profile_path):
+                profile_path = os.path.join(BUNDLE_ROOT, "profiles", profile_file)
         logger.info(f"[PROFILE] Путь к профилю: {profile_path}")
         
         if os.path.exists(profile_path):
@@ -2785,15 +2944,21 @@ class ServerGUI(QMainWindow):
                 
                 # Сохраняем текущий профиль для применения
                 self._current_profile = profile
+                self._current_profile_path = profile_path
+                self.btn_overwrite_profile.setEnabled(
+                    os.path.abspath(profile_path).startswith(os.path.abspath(os.path.join(PROJECT_DIR, "profiles")) + os.sep)
+                )
                 
             except Exception as e:
                 logger.error(f"Ошибка загрузки профиля {profile_name}: {e}", exc_info=True)
                 self.profile_description.setText(f"Ошибка загрузки профиля: {e}")
                 self.btn_apply_profile.setEnabled(False)
+                self.btn_overwrite_profile.setEnabled(False)
         else:
             logger.warning(f"[PROFILE] Файл профиля не найден: {profile_path}")
             self.profile_description.setText(f"Файл профиля не найден: {profile_path}")
             self.btn_apply_profile.setEnabled(False)
+            self.btn_overwrite_profile.setEnabled(False)
     
     def _load_profile_from_file(self):
         """Загрузка профиля из файла."""
@@ -2823,16 +2988,23 @@ class ServerGUI(QMainWindow):
             profile_name = profile.get('name', os.path.basename(path).replace('.json', ''))
             self.profile_combo.addItem(profile_name)
             self.profile_combo.setCurrentText(profile_name)
+            if hasattr(self, "_profile_name_to_file"):
+                self._profile_name_to_file[profile_name] = path
             
             # Сохраняем профиль
             self._current_profile = profile
+            self._current_profile_path = path
             self.profile_description.setText(f"{profile.get('name', 'Пользовательский профиль')}\n\n{profile.get('description', 'Загружен из файла')}")
             self.btn_apply_profile.setEnabled(True)
+            self.btn_overwrite_profile.setEnabled(
+                os.path.abspath(path).startswith(os.path.abspath(os.path.join(PROJECT_DIR, "profiles")) + os.sep)
+            )
             
         except Exception as e:
             logger.error(f"Ошибка загрузки профиля из файла: {e}")
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить профиль:\n{e}")
             self.profile_combo.setCurrentIndex(0)
+            self.btn_overwrite_profile.setEnabled(False)
     
     def _apply_profile(self):
         """Применить выбранный профиль к настройкам."""
@@ -2858,6 +3030,8 @@ class ServerGUI(QMainWindow):
             self.trivy_weight_spin.setValue(profile['trivy_weight'])
             self.software_weight_spin.setValue(profile['software_weight'])
             self.scanner_weight_spin.setValue(profile['scanner_weight'])
+            self.patch_weight_spin.setValue(profile.get('patch_weight', 10))
+            self.protection_weight_spin.setValue(profile.get('protection_weight', 5))
             
             logger.info(f"[PROFILE] Значения установлены в интерфейсе")
             
@@ -2891,6 +3065,137 @@ class ServerGUI(QMainWindow):
         except Exception as e:
             logger.error(f"Ошибка применения профиля: {e}", exc_info=True)
             QMessageBox.critical(self, "Ошибка", f"Не удалось применить профиль:\n{e}")
+
+    def _collect_current_correlation_settings(self) -> dict:
+        return {
+            "max_score": self.max_score_spin.value(),
+            "feasible_threshold": self.feasible_threshold_spin.value(),
+            "partially_feasible_threshold": self.partially_threshold_spin.value(),
+            "not_feasible_threshold": self.not_feasible_threshold_spin.value(),
+            "network_weight": self.network_weight_spin.value(),
+            "trivy_weight": self.trivy_weight_spin.value(),
+            "software_weight": self.software_weight_spin.value(),
+            "scanner_weight": self.scanner_weight_spin.value(),
+            "patch_weight": self.patch_weight_spin.value(),
+            "protection_weight": self.protection_weight_spin.value(),
+        }
+
+    def _save_new_profile_from_current_settings(self):
+        name, ok = QInputDialog.getText(self, "Новый профиль", "Название профиля:")
+        if not ok:
+            return
+        name = str(name or "").strip()
+        if not name:
+            QMessageBox.warning(self, "Профиль", "Название профиля не задано.")
+            return
+        desc, _ok2 = QInputDialog.getText(self, "Новый профиль", "Описание (необязательно):")
+        if not _ok2:
+            desc = ""
+
+        settings = self._collect_current_correlation_settings()
+        try:
+            saved = save_correlation_profile(PROJECT_DIR, name=name, description=desc, settings=settings, profile_id=None)
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить профиль:\n{e}")
+            return
+
+        label = name
+        if hasattr(self, "_profile_name_to_file") and label in self._profile_name_to_file:
+            label = f"{name} ({saved.get('file')})"
+        if not hasattr(self, "_profile_name_to_file"):
+            self._profile_name_to_file = {}
+        self._profile_name_to_file[label] = saved.get("file")
+        if self.profile_combo.findText(label) < 0:
+            self.profile_combo.addItem(label)
+        self.profile_combo.setCurrentText(label)
+        QMessageBox.information(self, "Профиль сохранён", f"Профиль сохранён: {saved.get('file')}")
+
+    def _overwrite_selected_profile_from_current_settings(self):
+        profile_path = getattr(self, "_current_profile_path", "") or ""
+        if not profile_path or not os.path.exists(profile_path):
+            return
+        base_profiles_dir = os.path.abspath(os.path.join(PROJECT_DIR, "profiles")) + os.sep
+        if not os.path.abspath(profile_path).startswith(base_profiles_dir):
+            QMessageBox.warning(self, "Профиль", "Перезапись разрешена только для профилей в папке profiles проекта.")
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Перезапись профиля",
+            "Перезаписать выбранный профиль текущими настройками?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            with open(profile_path, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        except Exception:
+            existing = {}
+
+        name = str(existing.get("name") or self.profile_combo.currentText() or "Профиль")
+        desc = str(existing.get("description") or "")
+        settings = self._collect_current_correlation_settings()
+        try:
+            saved = save_correlation_profile(
+                PROJECT_DIR,
+                name=name,
+                description=desc,
+                settings=settings,
+                profile_id=os.path.basename(profile_path),
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось перезаписать профиль:\n{e}")
+            return
+
+        QMessageBox.information(self, "Профиль обновлён", f"Профиль обновлён: {saved.get('file')}")
+
+    def _copy_current_settings_to_other_profile(self):
+        if not hasattr(self, "_profile_name_to_file"):
+            return
+        options = []
+        for label, pf in self._profile_name_to_file.items():
+            if os.path.isabs(pf):
+                continue
+            ppath = os.path.join(PROJECT_DIR, "profiles", pf)
+            if os.path.exists(ppath):
+                options.append(label)
+        options = sorted(options)
+        if not options:
+            QMessageBox.information(self, "Профили", "Не найдено профилей для записи в папке profiles.")
+            return
+
+        target_label, ok = QInputDialog.getItem(self, "Выбор профиля", "Куда записать настройки:", options, 0, False)
+        if not ok:
+            return
+
+        target_file = self._profile_name_to_file.get(target_label)
+        if not target_file:
+            return
+        target_path = os.path.join(PROJECT_DIR, "profiles", target_file)
+        try:
+            with open(target_path, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        except Exception:
+            existing = {}
+
+        name = str(existing.get("name") or target_label)
+        desc = str(existing.get("description") or "")
+        settings = self._collect_current_correlation_settings()
+        try:
+            saved = save_correlation_profile(
+                PROJECT_DIR,
+                name=name,
+                description=desc,
+                settings=settings,
+                profile_id=target_file,
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось записать настройки:\n{e}")
+            return
+
+        QMessageBox.information(self, "Готово", f"Настройки записаны в профиль: {saved.get('file')}")
     
     def _sync_restart_correlation_button_state(self):
         """Включает «Перезапустить корреляцию», если есть данные последнего скана и готовность к расчёту."""
