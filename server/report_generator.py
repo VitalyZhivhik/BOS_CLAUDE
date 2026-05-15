@@ -294,11 +294,27 @@ class SoftwareEnricher:
 
 
 class ReportGenerator:
-    def __init__(self, system_summary, correlation_results, summary, toolkit=None, trivy_result=None, **kwargs):
+    def __init__(
+        self,
+        system_summary,
+        correlation_results,
+        summary,
+        toolkit=None,
+        trivy_result=None,
+        correlation_results_by_profile=None,
+        summaries_by_profile=None,
+        profiles_meta=None,
+        default_profile_id=None,
+        **kwargs,
+    ):
         self.system_summary = system_summary
         self.summary = summary
         self.toolkit = toolkit
         self.trivy_result = trivy_result
+        self.correlation_results_by_profile = correlation_results_by_profile if isinstance(correlation_results_by_profile, dict) else None
+        self.summaries_by_profile = summaries_by_profile if isinstance(summaries_by_profile, dict) else {}
+        self.profiles_meta = profiles_meta if isinstance(profiles_meta, dict) else {}
+        self.default_profile_id = str(default_profile_id or "").strip() if self.correlation_results_by_profile else ""
 
         self.tools_db = self._load_local_db("databases/tools_database.json")
         self.cwe_db = self._load_local_db("databases/cwe_database.json")
@@ -308,6 +324,13 @@ class ReportGenerator:
         self.playbooks_db = self._load_local_db("databases/attack_playbooks.json")
         self.defense_db = self._load_local_db("databases/defense_database.json")
 
+        if self.correlation_results_by_profile:
+            keys = list(self.correlation_results_by_profile.keys())
+            if not self.default_profile_id or self.default_profile_id not in self.correlation_results_by_profile:
+                self.default_profile_id = keys[0] if keys else ""
+            correlation_results = self.correlation_results_by_profile.get(self.default_profile_id, [])
+            self.summary = self.summaries_by_profile.get(self.default_profile_id, summary)
+
         self.raw_results = correlation_results
 
         # Инициализируем обогатитель ПО:
@@ -316,46 +339,46 @@ class ReportGenerator:
         system_info_for_enricher = kwargs.get("system_info") or system_summary or {}
         self.sw_enricher = SoftwareEnricher(system_info_for_enricher, self.cve_db, self.capec_db, trivy_result=trivy_result)
 
+        self.aggregated_groups = self._build_aggregated_groups(correlation_results)
+
+    def _build_aggregated_groups(self, correlation_results):
         groups = {}
-        for r in correlation_results:
-            capec = getattr(r, 'capec_id', None) or 'Нет CAPEC'
-            cwe = getattr(r, 'cwe_id', None) or 'Нет CWE'
-            
-            # ЧЕСТНАЯ работа с портами (без "Порт не найден")
-            port_raw = getattr(r, 'target_port', None)
+        for r in correlation_results or []:
+            capec = getattr(r, "capec_id", None) or "Нет CAPEC"
+            cwe = getattr(r, "cwe_id", None) or "Нет CWE"
+
+            port_raw = getattr(r, "target_port", None)
             if port_raw in (None, "None", "null", "", 0, "0"):
                 port = "Локальный вектор (без порта)"
             else:
                 port = str(port_raw)
-            
-            # ИСПОЛЬЗУЕМ НОВЫЙ АЛГОРИТМ ПО
+
             real_sw = self.sw_enricher.identify_real_software(r, port)
-            
             key = f"{real_sw}_{port}_{capec}_{cwe}"
-            
+
             if key not in groups:
                 groups[key] = {
-                    'base_record': r,
-                    'records': [r],
-                    'mapped_sw': real_sw,
-                    'count': 1,
-                    'cves': set([getattr(r, 'cve_id', 'Нет CVE')]),
-                    'names': set([getattr(r, 'attack_name', 'Атака')]),
-                    'sevs': [getattr(r, 'severity', 'INFO')],
-                    'feas': [getattr(r, 'feasibility', 'UNKNOWN')],
-                    'found_by': set([getattr(r, 'found_by', 'Сервер')]) if hasattr(r, 'found_by') else set(['Сервер'])
+                    "base_record": r,
+                    "records": [r],
+                    "mapped_sw": real_sw,
+                    "count": 1,
+                    "cves": set([getattr(r, "cve_id", "Нет CVE")]),
+                    "names": set([getattr(r, "attack_name", "Атака")]),
+                    "sevs": [getattr(r, "severity", "INFO")],
+                    "feas": [getattr(r, "feasibility", "UNKNOWN")],
+                    "found_by": set([getattr(r, "found_by", "Сервер")]) if hasattr(r, "found_by") else set(["Сервер"]),
                 }
             else:
-                groups[key]['count'] += 1
-                groups[key]['records'].append(r)
-                groups[key]['cves'].add(getattr(r, 'cve_id', 'Нет CVE'))
-                groups[key]['names'].add(getattr(r, 'attack_name', 'Атака'))
-                groups[key]['sevs'].append(getattr(r, 'severity', 'INFO'))
-                groups[key]['feas'].append(getattr(r, 'feasibility', 'UNKNOWN'))
-                if hasattr(r, 'found_by'):
-                    groups[key]['found_by'].add(getattr(r, 'found_by', 'Сервер'))
+                groups[key]["count"] += 1
+                groups[key]["records"].append(r)
+                groups[key]["cves"].add(getattr(r, "cve_id", "Нет CVE"))
+                groups[key]["names"].add(getattr(r, "attack_name", "Атака"))
+                groups[key]["sevs"].append(getattr(r, "severity", "INFO"))
+                groups[key]["feas"].append(getattr(r, "feasibility", "UNKNOWN"))
+                if hasattr(r, "found_by"):
+                    groups[key]["found_by"].add(getattr(r, "found_by", "Сервер"))
 
-        self.aggregated_groups = groups
+        return groups
 
     def _load_local_db(self, path):
         try:
@@ -994,70 +1017,98 @@ class ReportGenerator:
         except Exception:
             pass
 
-        out = {
-            "system_summary": self.system_summary,
-            "summary": self.summary,
-            "aggregated_groups": [],
-        }
+        def build_aggregated_groups_list(groups: dict) -> list[dict]:
+            out_groups = []
+            for key, g in groups.items():
+                base_r = g["base_record"]
+                port_raw = getattr(base_r, "target_port", None)
+                if port_raw in (None, "None", "null", "", 0, "0"):
+                    port = "Локальный вектор (без порта)"
+                else:
+                    port = str(port_raw)
 
-        for key, g in self.aggregated_groups.items():
-            base_r = g["base_record"]
-            port_raw = getattr(base_r, "target_port", None)
-            if port_raw in (None, "None", "null", "", 0, "0"):
-                port = "Локальный вектор (без порта)"
-            else:
-                port = str(port_raw)
+                out_groups.append(
+                    {
+                        "software": g.get("mapped_sw", ""),
+                        "software_key": key,
+                        "port": port,
+                        "capec": getattr(base_r, "capec_id", "") or "Нет CAPEC",
+                        "cwe": getattr(base_r, "cwe_id", "") or "Нет CWE",
+                        "cves": sorted(list(g.get("cves", set()))),
+                        "attack_names": sorted(list(g.get("names", set()))),
+                        "severity": self._get_max_sev(g.get("sevs", [])),
+                        "feasibility": self._get_worst_feas(g.get("feas", [])),
+                        "count": int(g.get("count", 1)),
+                    }
+                )
+            return out_groups
 
-            out["aggregated_groups"].append(
-                {
-                    "software": g.get("mapped_sw", ""),
-                    "software_key": key,
-                    "port": port,
-                    "capec": getattr(base_r, "capec_id", "") or "Нет CAPEC",
-                    "cwe": getattr(base_r, "cwe_id", "") or "Нет CWE",
-                    "cves": sorted(list(g.get("cves", set()))),
-                    "attack_names": sorted(list(g.get("names", set()))),
-                    "severity": self._get_max_sev(g.get("sevs", [])),
-                    "feasibility": self._get_worst_feas(g.get("feas", [])),
-                    "count": int(g.get("count", 1)),
+        if self.correlation_results_by_profile:
+            default_id = self.default_profile_id
+            default_results = self.correlation_results_by_profile.get(default_id, [])
+            default_groups = self._build_aggregated_groups(default_results)
+            out = {
+                "system_summary": self.system_summary,
+                "summary": self.summaries_by_profile.get(default_id, self.summary),
+                "aggregated_groups": build_aggregated_groups_list(default_groups),
+                "default_profile_id": default_id,
+                "profiles": {},
+            }
+            for pid, results in self.correlation_results_by_profile.items():
+                groups = self._build_aggregated_groups(results)
+                payload = self._build_template_payload(results, groups)
+                out["profiles"][pid] = {
+                    "meta": self.profiles_meta.get(pid, {"id": pid}),
+                    "summary": self.summaries_by_profile.get(pid, {}),
+                    "aggregated_groups": build_aggregated_groups_list(groups),
+                    "report_data": payload["reportData"],
+                    "raw_findings_data": payload["rawFindingsData"],
+                    "raw_cve_data": payload["rawCveData"],
+                    "summary_data": payload["summaryData"],
+                    "atk_def_data": payload["atkDefData"],
                 }
-            )
+        else:
+            groups = self._build_aggregated_groups(self.raw_results)
+            out = {
+                "system_summary": self.system_summary,
+                "summary": self.summary,
+                "aggregated_groups": build_aggregated_groups_list(groups),
+            }
 
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(out, f, ensure_ascii=False, indent=2)
 
         return filepath
 
-    def generate_html(self, filepath):
+    def _build_template_payload(self, correlation_results, aggregated_groups=None) -> dict:
+        aggregated_groups = aggregated_groups if isinstance(aggregated_groups, dict) else self._build_aggregated_groups(correlation_results)
         js_data = []
-        
-        # 1. Готовим данные агрегированных групп для карт
-        for i, (key, g) in enumerate(self.aggregated_groups.items()):
-            base_r = g['base_record']
-            representative_r = self._select_group_representative(g.get('records', [])) or base_r
-            
-            cves_joined = ", ".join(sorted(list(g['cves'])))
-            names_joined = " / ".join(sorted(list(g['names'])))
-            found_by_joined = " & ".join(sorted(list(g['found_by'])))
-            
-            max_sev = self._get_max_sev(g['sevs'])
-            worst_feas = self._get_worst_feas(g['feas'])
-            
-            port_raw = getattr(base_r, 'target_port', None)
+        for i, (_key, g) in enumerate(aggregated_groups.items()):
+            base_r = g["base_record"]
+            representative_r = self._select_group_representative(g.get("records", [])) or base_r
+
+            cves_joined = ", ".join(sorted(list(g["cves"])))
+            names_joined = " / ".join(sorted(list(g["names"])))
+            found_by_joined = " & ".join(sorted(list(g["found_by"])))
+
+            max_sev = self._get_max_sev(g["sevs"])
+            worst_feas = self._get_worst_feas(g["feas"])
+
+            port_raw = getattr(base_r, "target_port", None)
             if port_raw in (None, "None", "null", "", 0, "0"):
                 port = "Локальный вектор (без порта)"
             else:
                 port = str(port_raw)
 
-            cwe_raw = getattr(representative_r, 'cwe_id', '') or getattr(base_r, 'cwe_id', '')
+            cwe_raw = getattr(representative_r, "cwe_id", "") or getattr(base_r, "cwe_id", "")
             cwe_tokens = self._canonical_cwe_list(cwe_raw)
             cwe_id = ", ".join(cwe_tokens) if cwe_tokens else (str(cwe_raw).strip() or "")
             if not cwe_id or cwe_id.upper() == "N/A":
                 cwe_id = "CWE-Неизвестно"
             cwe_desc = self._get_cwe_description(cwe_raw)
 
-            tools = getattr(representative_r, 'attack_software', None) or getattr(base_r, 'attack_software', None)
-            steps = getattr(representative_r, 'attack_steps', None) or getattr(base_r, 'attack_steps', None)
+            tools = getattr(representative_r, "attack_software", None) or getattr(base_r, "attack_software", None)
+            steps = getattr(representative_r, "attack_steps", None) or getattr(base_r, "attack_steps", None)
             mitre_raw = getattr(representative_r, "mitre_technique", None) or getattr(base_r, "mitre_technique", None) or ""
 
             if not tools and self.tools_db and cwe_tokens:
@@ -1069,65 +1120,67 @@ class ReportGenerator:
             else:
                 db_info = None
             if not tools and db_info:
-                tools_list = db_info.get('tools', [])
+                tools_list = db_info.get("tools", [])
                 tools = ", ".join(tools_list) if tools_list else "Nmap, Metasploit"
-                steps = db_info.get('exploitation_steps', "1. Сканирование сети.\\n2. Выбор эксплоита.\\n3. Запуск.")
-            
-            if not tools: tools = "Burp Suite, SQLMap, Nmap"
-            if not steps: steps = "1. Анализ порта.\\n2. Идентификация службы.\\n3. Подбор эксплоита."
+                steps = db_info.get("exploitation_steps", "1. Сканирование сети.\\n2. Выбор эксплоита.\\n3. Запуск.")
 
-            feasibility_explanation = getattr(representative_r, 'reason', None) or "Подробные пояснения недоступны."
+            if not tools:
+                tools = "Burp Suite, SQLMap, Nmap"
+            if not steps:
+                steps = "1. Анализ порта.\\n2. Идентификация службы.\\n3. Подбор эксплоита."
+
+            feasibility_explanation = getattr(representative_r, "reason", None) or "Подробные пояснения недоступны."
             representative_trace = getattr(representative_r, "feasibility_trace", None) or {}
             if not isinstance(representative_trace, dict):
                 representative_trace = {}
             sw_ctx = self._build_software_context(
-                g['mapped_sw'],
+                g["mapped_sw"],
                 port,
-                getattr(representative_r, 'capec_id', None) or getattr(base_r, 'capec_id', None) or '',
-                cwe_id or '',
-                getattr(representative_r, 'description', None) or getattr(base_r, 'description', None) or ''
+                getattr(representative_r, "capec_id", None) or getattr(base_r, "capec_id", None) or "",
+                cwe_id or "",
+                getattr(representative_r, "description", None) or getattr(base_r, "description", None) or "",
             )
-            
-            js_data.append({
-                "id": i,
-                "cve": cves_joined,  
-                "cwe": cwe_id or 'CWE-Неизвестно',
-                "cwe_desc": cwe_desc, # Передаем описание CWE в JavaScript
-                "capec": getattr(representative_r, 'capec_id', None) or getattr(base_r, 'capec_id', None) or 'CAPEC-Неизвестно',
-                "mitre": mitre_raw,
-                "name": names_joined,
-                "sw": g['mapped_sw'], 
-                "port": port,
-                "feas": worst_feas,
-                "sev": max_sev,
-                "desc": getattr(representative_r, 'description', None) or 'Описание отсутствует.',
-                "rec": getattr(representative_r, 'recommendation', None) or 'Специфичных рекомендаций нет.',
-                "reason": feasibility_explanation,  # Подробные пояснения реализуемости
-                "feasibility_trace": representative_trace,
-                "count": g['count'], 
-                "found_by": found_by_joined,
-                "tools": tools,
-                "steps": steps,
-                "sw_category": sw_ctx["category"],
-                "sw_purpose": sw_ctx["purpose"],
-                "sw_impact": sw_ctx["impact"],
-                "sw_scope": sw_ctx["scope"],
-            })
 
-        # 2. Готовим сырые данные для динамической агрегации и расширенного меню
+            js_data.append(
+                {
+                    "id": i,
+                    "cve": cves_joined,
+                    "cwe": cwe_id or "CWE-Неизвестно",
+                    "cwe_desc": cwe_desc,
+                    "capec": getattr(representative_r, "capec_id", None) or getattr(base_r, "capec_id", None) or "CAPEC-Неизвестно",
+                    "mitre": mitre_raw,
+                    "name": names_joined,
+                    "sw": g["mapped_sw"],
+                    "port": port,
+                    "feas": worst_feas,
+                    "sev": max_sev,
+                    "desc": getattr(representative_r, "description", None) or "Описание отсутствует.",
+                    "rec": getattr(representative_r, "recommendation", None) or "Специфичных рекомендаций нет.",
+                    "reason": feasibility_explanation,
+                    "feasibility_trace": representative_trace,
+                    "count": g["count"],
+                    "found_by": found_by_joined,
+                    "tools": tools,
+                    "steps": steps,
+                    "sw_category": sw_ctx["category"],
+                    "sw_purpose": sw_ctx["purpose"],
+                    "sw_impact": sw_ctx["impact"],
+                    "sw_scope": sw_ctx["scope"],
+                }
+            )
+
         raw_findings_data = []
         raw_js_data = []
-        for idx, r in enumerate(self.raw_results):
-            cve_str = getattr(r, 'cve_id', 'N/A')
-            cve_list = [c.strip() for c in cve_str.split(',')] if cve_str else ["N/A"]
+        for idx, r in enumerate(correlation_results or []):
+            cve_str = getattr(r, "cve_id", "N/A")
+            cve_list = [c.strip() for c in cve_str.split(",")] if cve_str else ["N/A"]
 
-            port_raw = getattr(r, 'target_port', None)
+            port_raw = getattr(r, "target_port", None)
             if port_raw in (None, "None", "null", "", 0, "0"):
                 port = "Локальный"
             else:
                 port = str(port_raw)
 
-            # ИСПОЛЬЗУЕМ НОВЫЙ АЛГОРИТМ ДЛЯ СЫРЫХ ДАННЫХ
             real_sw = self.sw_enricher.identify_real_software(r, port)
             cwe_raw_row = getattr(r, "cwe_id", "") or ""
             cwe_tokens_row = self._canonical_cwe_list(cwe_raw_row)
@@ -1137,68 +1190,68 @@ class ReportGenerator:
             sw_ctx_raw = self._build_software_context(
                 real_sw,
                 port,
-                getattr(r, 'capec_id', ''),
+                getattr(r, "capec_id", ""),
                 cwe_display_row,
-                getattr(r, 'description', '')
+                getattr(r, "description", ""),
             )
             cwe_desc_raw = self._get_cwe_description(cwe_raw_row)
-            found_by_raw = getattr(r, 'found_by', 'Сервер') if hasattr(r, 'found_by') else 'Сервер'
+            found_by_raw = getattr(r, "found_by", "Сервер") if hasattr(r, "found_by") else "Сервер"
             _trace = getattr(r, "feasibility_trace", None) or {}
             if not isinstance(_trace, dict):
                 _trace = {}
-            raw_findings_data.append({
-                "raw_id": idx,
-                "cve": cve_str if cve_str else "N/A",
-                "cwe": cwe_display_row,
-                "cwe_desc": cwe_desc_raw,
-                "capec": getattr(r, 'capec_id', None) or 'CAPEC-Неизвестно',
-                "mitre": getattr(r, "mitre_technique", None) or "",
-                "name": getattr(r, 'attack_name', None) or 'Атака',
-                "sw": real_sw,
-                "port": port,
-                "feas": normalize_feasibility(self._get_worst_feas([getattr(r, 'feasibility', 'UNKNOWN')])),
-                "sev": normalize_severity(getattr(r, 'severity', 'INFO')),
-                "desc": getattr(r, 'description', None) or 'Описание отсутствует.',
-                "rec": getattr(r, 'recommendation', None) or 'Специфичных рекомендаций нет.',
-                "reason": getattr(r, 'reason', None) or 'Подробные пояснения недоступны.',
-                "count": 1,
-                "found_by": found_by_raw,
-                "tools": getattr(r, 'attack_software', None) or "Burp Suite, SQLMap, Nmap",
-                "steps": getattr(r, 'attack_steps', None) or "1. Анализ порта.\\n2. Идентификация службы.\\n3. Подбор эксплоита.",
-                "sw_category": sw_ctx_raw["category"],
-                "sw_purpose": sw_ctx_raw["purpose"],
-                "sw_impact": sw_ctx_raw["impact"],
-                "sw_scope": sw_ctx_raw["scope"],
-                "feasibility_trace": _trace,
-            })
-
-            for single_cve in cve_list:
-                if single_cve == "N/A" and len(cve_list) > 1:
-                    continue
-
-                raw_js_data.append({
-                    "cve": single_cve,
-                    "sev": getattr(r, 'severity', 'INFO'),
+            raw_findings_data.append(
+                {
+                    "raw_id": idx,
+                    "cve": cve_str if cve_str else "N/A",
+                    "cwe": cwe_display_row,
+                    "cwe_desc": cwe_desc_raw,
+                    "capec": getattr(r, "capec_id", None) or "CAPEC-Неизвестно",
+                    "mitre": getattr(r, "mitre_technique", None) or "",
+                    "name": getattr(r, "attack_name", None) or "Атака",
                     "sw": real_sw,
                     "port": port,
-                    "capec": getattr(r, 'capec_id', 'N/A'),
+                    "feas": normalize_feasibility(self._get_worst_feas([getattr(r, "feasibility", "UNKNOWN")])),
+                    "sev": normalize_severity(getattr(r, "severity", "INFO")),
+                    "desc": getattr(r, "description", None) or "Описание отсутствует.",
+                    "rec": getattr(r, "recommendation", None) or "Специфичных рекомендаций нет.",
+                    "reason": getattr(r, "reason", None) or "Подробные пояснения недоступны.",
+                    "count": 1,
+                    "found_by": found_by_raw,
+                    "tools": getattr(r, "attack_software", None) or "Burp Suite, SQLMap, Nmap",
+                    "steps": getattr(r, "attack_steps", None) or "1. Анализ порта.\\n2. Идентификация службы.\\n3. Подбор эксплоита.",
                     "sw_category": sw_ctx_raw["category"],
                     "sw_purpose": sw_ctx_raw["purpose"],
                     "sw_impact": sw_ctx_raw["impact"],
                     "sw_scope": sw_ctx_raw["scope"],
-                })
+                    "feasibility_trace": _trace,
+                }
+            )
 
-        # 3. Готовим данные для перечней CVE/CWE/CAPEC/ПО
+            for single_cve in cve_list:
+                if single_cve == "N/A" and len(cve_list) > 1:
+                    continue
+                raw_js_data.append(
+                    {
+                        "cve": single_cve,
+                        "sev": getattr(r, "severity", "INFO"),
+                        "sw": real_sw,
+                        "port": port,
+                        "capec": getattr(r, "capec_id", "N/A"),
+                        "sw_category": sw_ctx_raw["category"],
+                        "sw_purpose": sw_ctx_raw["purpose"],
+                        "sw_impact": sw_ctx_raw["impact"],
+                        "sw_scope": sw_ctx_raw["scope"],
+                    }
+                )
+
         summary_data = self._build_summary_data(js_data, raw_js_data)
-
-        # 4. Готовим данные для раздела атак и защиты
         atk_def_data = self._build_atk_def_data(js_data)
-            
+
         sys_data = {
-            "hostname": self.system_summary.get('hostname', 'Целевой Сервер'),
-            "os": self.system_summary.get('os', 'Неизвестная ОС'),
-            "ips": ", ".join(self.system_summary.get('ip_addresses', [])),
-            "ports_count": self.system_summary.get('open_ports_count', 0)
+            "hostname": self.system_summary.get("hostname", "Целевой Сервер"),
+            "os": self.system_summary.get("os", "Неизвестная ОС"),
+            "ips": ", ".join(self.system_summary.get("ip_addresses", [])),
+            "ports_count": self.system_summary.get("open_ports_count", 0),
         }
 
         capec_ids = set()
@@ -1313,19 +1366,61 @@ class ReportGenerator:
                 "related_capec": related_capec[:80] if isinstance(related_capec, list) else [],
                 "requires_service": requires_service[:80] if isinstance(requires_service, list) else [],
             }
-        
+
+        return {
+            "reportData": js_data,
+            "rawFindingsData": raw_findings_data,
+            "rawCveData": raw_js_data,
+            "sysData": sys_data,
+            "summaryData": summary_data,
+            "atkDefData": atk_def_data,
+            "statusMeta": report_status_meta(),
+            "capecMeta": capec_meta,
+            "cveMeta": cve_meta,
+            "mitreMeta": mitre_meta,
+        }
+
+    def generate_html(self, filepath):
+        try:
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        except Exception:
+            pass
+
+        payload_default = self._build_template_payload(self.raw_results, self.aggregated_groups)
+        profiles_json = "null"
+        default_id_json = json.dumps("")
+
+        if self.correlation_results_by_profile:
+            profiles_bundle = {}
+            for pid, results in self.correlation_results_by_profile.items():
+                groups = self._build_aggregated_groups(results)
+                payload = self._build_template_payload(results, groups)
+                payload["meta"] = self.profiles_meta.get(pid, {"id": pid, "name": pid})
+                profiles_bundle[pid] = payload
+
+            if profiles_bundle:
+                if self.default_profile_id and self.default_profile_id in profiles_bundle:
+                    payload_default = profiles_bundle[self.default_profile_id]
+                else:
+                    self.default_profile_id = next(iter(profiles_bundle.keys()))
+                    payload_default = profiles_bundle[self.default_profile_id]
+                profiles_json = json.dumps(profiles_bundle, ensure_ascii=False)
+                default_id_json = json.dumps(self.default_profile_id, ensure_ascii=False)
+
         with open(filepath, "w", encoding="utf-8") as f:
-            html = HTML_TEMPLATE.replace('__REPORT_DATA__', json.dumps(js_data, ensure_ascii=False))
-            html = html.replace('__RAW_FINDINGS_DATA__', json.dumps(raw_findings_data, ensure_ascii=False))
-            html = html.replace('__RAW_CVE_DATA__', json.dumps(raw_js_data, ensure_ascii=False))
-            html = html.replace('__SYS_DATA__', json.dumps(sys_data, ensure_ascii=False))
-            html = html.replace('__SUMMARY_DATA__', json.dumps(summary_data, ensure_ascii=False))
-            html = html.replace('__ATK_DEF_DATA__', json.dumps(atk_def_data, ensure_ascii=False))
-            html = html.replace('__CAPEC_META__', json.dumps(capec_meta, ensure_ascii=False))
-            html = html.replace('__CVE_META__', json.dumps(cve_meta, ensure_ascii=False))
-            html = html.replace('__MITRE_META__', json.dumps(mitre_meta, ensure_ascii=False))
-            html = html.replace('__STATUS_META__', json.dumps(report_status_meta(), ensure_ascii=False))
-            html = html.replace('__SERVER_PORT__', str(SERVER_PORT))
+            html = HTML_TEMPLATE.replace("__REPORT_DATA__", json.dumps(payload_default["reportData"], ensure_ascii=False))
+            html = html.replace("__RAW_FINDINGS_DATA__", json.dumps(payload_default["rawFindingsData"], ensure_ascii=False))
+            html = html.replace("__RAW_CVE_DATA__", json.dumps(payload_default["rawCveData"], ensure_ascii=False))
+            html = html.replace("__SYS_DATA__", json.dumps(payload_default["sysData"], ensure_ascii=False))
+            html = html.replace("__SUMMARY_DATA__", json.dumps(payload_default["summaryData"], ensure_ascii=False))
+            html = html.replace("__ATK_DEF_DATA__", json.dumps(payload_default["atkDefData"], ensure_ascii=False))
+            html = html.replace("__CAPEC_META__", json.dumps(payload_default["capecMeta"], ensure_ascii=False))
+            html = html.replace("__CVE_META__", json.dumps(payload_default["cveMeta"], ensure_ascii=False))
+            html = html.replace("__MITRE_META__", json.dumps(payload_default["mitreMeta"], ensure_ascii=False))
+            html = html.replace("__STATUS_META__", json.dumps(payload_default["statusMeta"], ensure_ascii=False))
+            html = html.replace("__PROFILES_DATA__", profiles_json)
+            html = html.replace("__DEFAULT_PROFILE_ID__", default_id_json)
+            html = html.replace("__SERVER_PORT__", str(SERVER_PORT))
             f.write(html)
 
         return filepath

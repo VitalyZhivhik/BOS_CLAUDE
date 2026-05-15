@@ -80,6 +80,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         /* Фильтры и селектор карт */
         .controls-bar { display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px; background: #010409; padding: 15px; border-radius: 8px; border: 1px solid var(--border); }
+        .profile-bar { display: none; align-items: center; gap: 12px; margin: 12px 0 15px 0; background: #010409; padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border); }
+        .profile-bar label { font-size: 12px; color: #8b949e; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em; }
+        .profile-bar select { flex: 1; padding: 10px; background: var(--card); color: #c9d1d9; border: 1px solid var(--border); border-radius: 6px; outline: none; font-size: 14px; cursor: pointer; }
+        .profile-bar select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(88,166,255,0.15); }
         .aggregation-bar { display: flex; flex-direction: column; gap: 10px; background: #161b22; padding: 12px; border-radius: 6px; border: 1px solid #30363d; }
         .aggregation-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
         .aggregation-title { font-size: 13px; color: #58a6ff; font-weight: bold; text-transform: uppercase; }
@@ -244,6 +248,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <body>
     <div class="container">
         <h1 style="margin-top: 20px;">🛡️ Интерактивная Карта Поверхности Атаки SOC</h1>
+
+        <div id="profile-bar" class="profile-bar">
+            <label for="profile-select">Профиль корреляции</label>
+            <select id="profile-select"></select>
+        </div>
         
         <div class="stats">
             <div class="stat-box"><div class="title" id="st-total-title">Записей в отчете</div><div class="num" id="st-total" style="color: #58a6ff;">0</div></div>
@@ -455,6 +464,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         var capecMeta = __CAPEC_META__;
         var cveMeta = __CVE_META__;
         var mitreMeta = __MITRE_META__;
+        var profilesData = __PROFILES_DATA__;
+        var defaultProfileId = __DEFAULT_PROFILE_ID__;
         var API_BASE = "http://127.0.0.1:__SERVER_PORT__";
         var network = null;
         var detailsMapRows = {};
@@ -923,6 +934,71 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             applyRawCveFilter();
             renderSummaryPanels();
             renderAtkDefSection();
+        }
+
+        function loadProfile(profileId) {
+            if (!profilesData || typeof profilesData !== "object") return;
+            var p = profilesData[profileId];
+            if (!p) return;
+            reportData = p.reportData || [];
+            reportDataSeed = Array.isArray(reportData) ? reportData.slice() : [];
+            rawFindingsData = p.rawFindingsData || [];
+            rawCveData = p.rawCveData || [];
+            summaryData = p.summaryData || {};
+            atkDefData = p.atkDefData || {};
+            capecMeta = p.capecMeta || {};
+            cveMeta = p.cveMeta || {};
+            mitreMeta = p.mitreMeta || {};
+            if (p.statusMeta) statusMeta = p.statusMeta;
+            if (network) {
+                try { network.destroy(); } catch (e) {}
+                network = null;
+            }
+            detailsMapRows = {};
+            detailsMapNodes = {};
+            atkDefIndex = {};
+            atkDefCache = {};
+            atkDefKeyByCve = {};
+            atkDefInitDone = false;
+            atkDefSaveTimers = {};
+            atkExpandedCves = {};
+            atkEditCves = {};
+            atkDefPendingSync = {};
+            init();
+        }
+
+        function initProfileSelector() {
+            var bar = document.getElementById("profile-bar");
+            var sel = document.getElementById("profile-select");
+            if (!bar || !sel) {
+                init();
+                return;
+            }
+            if (!profilesData || typeof profilesData !== "object") {
+                bar.style.display = "none";
+                init();
+                return;
+            }
+            var keys = Object.keys(profilesData || {});
+            if (!keys.length) {
+                bar.style.display = "none";
+                init();
+                return;
+            }
+            bar.style.display = "flex";
+            sel.innerHTML = "";
+            keys.forEach(function(k) {
+                var meta = (profilesData[k] || {}).meta || {};
+                var name = meta.name || k;
+                var opt = document.createElement("option");
+                opt.value = k;
+                opt.textContent = name;
+                sel.appendChild(opt);
+            });
+            var initial = defaultProfileId && profilesData[defaultProfileId] ? defaultProfileId : keys[0];
+            sel.value = initial;
+            sel.onchange = function() { loadProfile(sel.value); };
+            loadProfile(initial);
         }
 
         function renderSummaryPanels() {
@@ -3368,7 +3444,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             holder.innerHTML = html;
         }
 
-        window.onload = init;
+        window.onload = initProfileSelector;
     </script>
 </body>
 </html>
