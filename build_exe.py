@@ -39,6 +39,12 @@ def check_deps():
     except ImportError:
         print("[!] PyQt6 не установлен — pip install PyQt6")
         ok = False
+    try:
+        import requests
+        print(f"[+] requests {requests.__version__}")
+    except ImportError:
+        print("[!] requests не установлен — pip install requests")
+        ok = False
     return ok
 
 

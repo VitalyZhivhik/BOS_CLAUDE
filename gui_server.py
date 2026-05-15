@@ -14,16 +14,21 @@
 import sys, os, json, socket, threading, webbrowser, ctypes
 from datetime import datetime
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QTextEdit, QGroupBox, QSpinBox,
-    QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
-    QFrame, QMessageBox, QStatusBar, QProgressBar, QFileDialog,
-    QComboBox, QListWidget, QListWidgetItem, QSplitter,
-    QScrollArea, QDialog, QDialogButtonBox, QFormLayout, QLineEdit, QAbstractItemView
-)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont, QColor, QTextCursor
+try:
+    from PyQt6.QtWidgets import (
+        QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+        QLabel, QPushButton, QTextEdit, QGroupBox, QSpinBox,
+        QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
+        QFrame, QMessageBox, QStatusBar, QProgressBar, QFileDialog,
+        QComboBox, QListWidget, QListWidgetItem, QSplitter,
+        QScrollArea, QDialog, QDialogButtonBox, QFormLayout, QLineEdit, QAbstractItemView
+    )
+    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
+    from PyQt6.QtGui import QFont, QColor, QTextCursor
+except Exception:
+    print("GUI не может запуститься: PyQt6 не установлен или недоступен.")
+    print("Установите зависимости: pip install -r requirements.txt")
+    sys.exit(1)
 _BOOT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _BOOT_DIR)
 from common.config import SERVER_HOST, SERVER_PORT
@@ -1830,9 +1835,33 @@ class ServerGUI(QMainWindow):
         self.trivy_progress.setVisible(False)
         
         if summary.get("error"):
-            self.trivy_status_label.setText(f"❌ Ошибка: {summary['error']}")
+            err = str(summary.get("error") or "")
+            err_low = err.lower()
+            is_db_net = ("failed to download" in err_low) or ("db error" in err_low) or ("connection attempt failed" in err_low) or ("connectex" in err_low)
+            if is_db_net:
+                self.trivy_status_label.setText("⚠️ Trivy недоступен (нет доступа к DB). Продолжаем без Trivy.")
+                self.trivy_status_label.setStyleSheet("color:#d29922;font-size:11px;padding:4px;")
+                QMessageBox.information(
+                    self,
+                    "Trivy (офлайн)",
+                    "Trivy не смог скачать/обновить базу уязвимостей (скорее всего нет доступа к ghcr.io / ecr / gcr).\n\n"
+                    "Сканирование Trivy будет пропущено, корреляция продолжит работать без подтверждения Trivy."
+                )
+                self.trivy_summary = {"error": err, "skipped": True}
+                self.trivy_result = None
+                try:
+                    from server.api_server import state
+                    state.trivy_result = None
+                except ImportError:
+                    pass
+                if self.system_info and self.vuln_db:
+                    self.btn_server.setEnabled(True)
+                self.btn_trivy_scan.setText("3б. Сканирование Trivy (пропущено)")
+                self.btn_trivy_scan.setEnabled(True)
+                return
+            self.trivy_status_label.setText(f"❌ Ошибка: {err}")
             self.trivy_status_label.setStyleSheet("color:#b55;font-size:11px;padding:4px;")
-            QMessageBox.warning(self, "Ошибка Trivy", f"Не удалось завершить сканирование:\n{summary['error']}")
+            QMessageBox.warning(self, "Ошибка Trivy", f"Не удалось завершить сканирование:\n{err}")
             self.btn_trivy_scan.setText("3б. Сканирование Trivy (ошибка)")
             self.btn_trivy_scan.setEnabled(True)
             return

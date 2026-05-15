@@ -26,6 +26,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .filter-input { background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 8px 10px; font-size: 13px; outline: none; }
         .filter-input:focus { border-color: #58a6ff; box-shadow: 0 0 0 2px rgba(88,166,255,0.15); }
         textarea.filter-input { font-family: "Consolas", monospace; }
+        .mini-btn { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: 0.15s; }
+        .mini-btn:hover { background: #30363d; }
+        .mini-btn.primary { border-color: #58a6ff; color: #58a6ff; }
+        .mini-btn.success { border-color: #238636; color: #3fb950; }
 
         /* Улучшенные рекомендации и карточки защиты */
         .rec-structured { background: #0d1117; border-radius: 6px; padding: 15px; margin-top: 15px; border: 1px solid #30363d; border-left: 4px solid #238636; }
@@ -130,6 +134,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .part-real { background: rgba(210, 153, 34, 0.15); color: #e3b341; border: 1px solid #d29922; }
         .noreal { background: rgba(35, 134, 54, 0.15); color: #3fb950; border: 1px solid #238636; }
         .feas-unk { background: rgba(139, 148, 158, 0.15); color: #8b949e; border: 1px solid #8b949e; }
+        .verified { background: rgba(35, 134, 54, 0.15); color: #3fb950; border: 1px solid #238636; }
+        .not-verified { background: rgba(139, 148, 158, 0.15); color: #8b949e; border: 1px solid #8b949e; }
         .stats-explain { font-size: 12px; color: #8b949e; margin: -6px 0 18px 0; line-height: 1.55; padding: 10px 12px; background: #0d1117; border: 1px solid var(--border); border-radius: 6px; }
         .trace-pre { max-height: 340px; overflow: auto; font-size: 11px; }
         .trace-human { font-size: 13px; color: #c9d1d9; line-height: 1.55; }
@@ -423,6 +429,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 </div>
         </div>
     </div>
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeEditModal()">&times;</span>
+            <div class="modal-header">
+                <h3 style="margin:0; color:#fff;">Редактор шага (Киберполигон)</h3>
+            </div>
+            <div class="modal-body" id="edit-modal-body"></div>
+            <div class="modal-toolbar" style="justify-content:flex-end;">
+                <button type="button" class="mini-btn" onclick="closeEditModal()">Отмена</button>
+                <button type="button" class="mini-btn primary" onclick="saveEditModal()">Сохранить в БД</button>
+            </div>
+        </div>
+    </div>
 
     <script type="text/javascript">
         var reportData = __REPORT_DATA__;
@@ -436,6 +455,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         var capecMeta = __CAPEC_META__;
         var cveMeta = __CVE_META__;
         var mitreMeta = __MITRE_META__;
+        var API_BASE = "http://127.0.0.1:__SERVER_PORT__";
         var network = null;
         var detailsMapRows = {};
         var detailsMapNodes = {};
@@ -939,16 +959,78 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         var atkDefIndex = {};
         var atkDefCache = {};
+        var atkDefKeyByCve = {};
         var atkDefInitDone = false;
         var atkDefSaveTimers = {};
         var atkExpandedCves = {};
         var atkEditCves = {};
+
+        function _isUsefulVectorId(vectorId) {
+            var s = String(vectorId || "").trim();
+            if (!s || s.toUpperCase() === "N/A") return false;
+            var parts = {};
+            s.split("|").forEach(function (p) {
+                var ix = String(p || "").indexOf("=");
+                if (ix === -1) return;
+                var k = String(p.slice(0, ix) || "").trim().toUpperCase();
+                var v = String(p.slice(ix + 1) || "").trim();
+                if (k) parts[k] = v;
+            });
+            var sw = String(parts["SW"] || "").trim();
+            var cwe = String(parts["CWE"] || "").trim();
+            var capec = String(parts["CAPEC"] || "").trim();
+            var badSw = !sw || /неидентифицирован/i.test(sw) || sw === "—";
+            var badCwe = !cwe || /неизвестно/i.test(cwe);
+            var badCapec = !capec || /неизвестно/i.test(capec) || /нет capec/i.test(capec);
+            return !(badSw && badCwe && badCapec);
+        }
+
+        function _playbookKeyFor(cve, vectorId) {
+            var c = String(cve || "").toUpperCase().trim();
+            var v = String(vectorId || "").trim();
+            if (v && _isUsefulVectorId(v)) return "vector:" + v;
+            return "cve:" + c;
+        }
+
+        function _playbookKeyForCve(cve) {
+            cve = String(cve || "").toUpperCase();
+            var cached = atkDefKeyByCve[cve];
+            if (cached) return cached;
+            var v = atkDefIndex[cve] || {};
+            var k = _playbookKeyFor(cve, v.vector_id || "");
+            atkDefKeyByCve[cve] = k;
+            return k;
+        }
+
+        function _playbookKind(pbKey) {
+            return String(pbKey || "").indexOf("vector:") === 0 ? "vector" : "cve";
+        }
+
+        function _playbookId(pbKey) {
+            pbKey = String(pbKey || "");
+            if (pbKey.indexOf("vector:") === 0) return pbKey.slice("vector:".length);
+            if (pbKey.indexOf("cve:") === 0) return pbKey.slice("cve:".length);
+            return pbKey;
+        }
+
+        function _playbookStorageKey(pbKey) {
+            return "atkPlaybook:" + encodeURIComponent(String(pbKey || ""));
+        }
+
+        function _ensurePlaybookForCve(cve) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var pbKey = _playbookKeyForCve(cve);
+            atkDefCache[pbKey] = atkDefCache[pbKey] || { attacks: [], defenses: [], meta: {} };
+            return atkDefCache[pbKey];
+        }
 
         function ensureAtkDefInit() {
             if (atkDefInitDone) return;
             atkDefInitDone = true;
             atkDefIndex = {};
             atkDefCache = {};
+            atkDefKeyByCve = {};
             try {
                 var saved = localStorage.getItem("atkApiBase") || "";
                 if (!saved) saved = "http://127.0.0.1:8443";
@@ -958,21 +1040,45 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 var cve = String(v.cve_id || "").toUpperCase();
                 if (!cve) return;
                 atkDefIndex[cve] = v;
-                atkDefCache[cve] = {
-                    attacks: normalizeAtkList(v.attacks || []),
-                    defenses: normalizeDefList(v.defenses || []),
-                    meta: {
-                        recommendation: v.recommendation || "",
-                        source: v.source || {},
+                var pbKey = _playbookKeyFor(cve, v.vector_id || "");
+                atkDefKeyByCve[cve] = pbKey;
+                if (!atkDefCache[pbKey]) {
+                    atkDefCache[pbKey] = {
+                        attacks: normalizeAtkList(v.attacks || []),
+                        defenses: normalizeDefList(v.defenses || []),
+                        meta: {
+                            recommendation: v.recommendation || "",
+                            source: v.source || {},
+                        }
+                    };
+                } else {
+                    if (atkDefCache[pbKey].meta && !atkDefCache[pbKey].meta.recommendation && v.recommendation) {
+                        atkDefCache[pbKey].meta.recommendation = v.recommendation;
                     }
-                };
+                }
                 try {
-                    var ls = localStorage.getItem("atkPlaybook:" + cve);
+                    var sk = _playbookStorageKey(pbKey);
+                    var ls = localStorage.getItem(sk);
+                    if (!ls) {
+                        var legacy = localStorage.getItem("atkPlaybook:" + cve);
+                        if (legacy) {
+                            ls = legacy;
+                            try { localStorage.setItem(sk, legacy); } catch (_) {}
+                        }
+                    }
+                    if (!ls && _playbookKind(pbKey) === "vector") {
+                        var legacyCveKey = _playbookStorageKey("cve:" + cve);
+                        var legacy2 = localStorage.getItem(legacyCveKey);
+                        if (legacy2) {
+                            ls = legacy2;
+                            try { localStorage.setItem(sk, legacy2); } catch (_) {}
+                        }
+                    }
                     if (ls) {
                         var parsed = JSON.parse(ls);
                         if (parsed && typeof parsed === "object") {
-                            if (Array.isArray(parsed.attacks)) atkDefCache[cve].attacks = normalizeAtkList(parsed.attacks);
-                            if (Array.isArray(parsed.defenses)) atkDefCache[cve].defenses = normalizeDefList(parsed.defenses);
+                            if (Array.isArray(parsed.attacks)) atkDefCache[pbKey].attacks = normalizeAtkList(parsed.attacks);
+                            if (Array.isArray(parsed.defenses)) atkDefCache[pbKey].defenses = normalizeDefList(parsed.defenses);
                         }
                     }
                 } catch (_) {}
@@ -1055,65 +1161,81 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         function scheduleAtkSave(cve) {
+            ensureAtkDefInit();
             cve = String(cve || "").toUpperCase();
             if (!cve) return;
-            if (atkDefSaveTimers[cve]) clearTimeout(atkDefSaveTimers[cve]);
+            var pbKey = _playbookKeyForCve(cve);
+            if (!pbKey) return;
+            if (atkDefSaveTimers[pbKey]) clearTimeout(atkDefSaveTimers[pbKey]);
             setAtkSaveStatus("⏳ Сохранение…", "info");
-            atkDefSaveTimers[cve] = setTimeout(function() { saveAtkPlaybook(cve); }, 700);
+            atkDefSaveTimers[pbKey] = setTimeout(function() { saveAtkPlaybook(pbKey); }, 700);
         }
 
-        async function saveAtkPlaybook(cve) {
+        function _applyDbSourceForKey(pbKey) {
+            var kind = _playbookKind(pbKey);
+            var val = kind === "vector" ? "db:vector" : "db:cve";
+            Object.keys(atkDefIndex || {}).forEach(function (cve) {
+                if (_playbookKeyForCve(cve) !== pbKey) return;
+                var v = atkDefIndex[cve];
+                if (v && v.source) {
+                    v.source.attacks = val;
+                    v.source.defenses = val;
+                }
+            });
+        }
+
+        async function saveAtkPlaybook(pbKey) {
             ensureAtkDefInit();
             var apiBase = getAtkApiBase();
-            var pb = atkDefCache[cve];
+            pbKey = String(pbKey || "");
+            var pb = atkDefCache[pbKey];
             if (!pb) return;
             try {
+                var payload = { playbook: pb };
+                if (_playbookKind(pbKey) === "vector") payload.vector_id = _playbookId(pbKey);
+                else payload.cve_id = _playbookId(pbKey);
                 var res = await fetch(apiBase + "/playbooks", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ cve_id: cve, playbook: pb })
+                    body: JSON.stringify(payload)
                 });
                 if (!res.ok) {
                     var t = "";
                     try { t = await res.text(); } catch (_) {}
                     throw new Error("HTTP " + res.status + (t ? (": " + t) : ""));
                 }
-                setAtkSaveStatus("✅ Сохранено в БД: " + cve, "ok");
-                var v = atkDefIndex[cve];
-                if (v && v.source) {
-                    v.source.attacks = "db";
-                    v.source.defenses = "db";
-                }
-                try { localStorage.setItem("atkPlaybook:" + cve, JSON.stringify(pb)); } catch (_) {}
+                var kindLabel = _playbookKind(pbKey) === "vector" ? "вектор" : "CVE";
+                setAtkSaveStatus("✅ Сохранено в БД (" + kindLabel + "): " + _playbookId(pbKey), "ok");
+                _applyDbSourceForKey(pbKey);
+                try { localStorage.setItem(_playbookStorageKey(pbKey), JSON.stringify(pb)); } catch (_) {}
             } catch (e) {
-                setAtkSaveStatus("❌ Не удалось сохранить (" + cve + "): " + String(e && e.message ? e.message : e), "err");
-                try { localStorage.setItem("atkPlaybook:" + cve, JSON.stringify(pb)); } catch (_) {}
+                setAtkSaveStatus("❌ Не удалось сохранить (" + _playbookId(pbKey) + "): " + String(e && e.message ? e.message : e), "err");
+                try { localStorage.setItem(_playbookStorageKey(pbKey), JSON.stringify(pb)); } catch (_) {}
             }
         }
 
-        async function loadAtkPlaybookFromApi(cve) {
+        async function loadAtkPlaybookFromApi(pbKey) {
             ensureAtkDefInit();
-            cve = String(cve || "").toUpperCase();
-            if (!cve) return;
+            pbKey = String(pbKey || "");
+            if (!pbKey) return;
             var apiBase = getAtkApiBase();
             try {
-                var res = await fetch(apiBase + "/playbooks?cve=" + encodeURIComponent(cve), { method: "GET" });
+                var url = apiBase + "/playbooks";
+                if (_playbookKind(pbKey) === "vector") url += "?vector=" + encodeURIComponent(_playbookId(pbKey));
+                else url += "?cve=" + encodeURIComponent(_playbookId(pbKey));
+                var res = await fetch(url, { method: "GET" });
                 if (!res.ok) return;
                 var data = await res.json();
                 if (!data || typeof data !== "object") return;
                 var pb = data.playbook;
                 if (!pb || typeof pb !== "object") return;
                 if (!Array.isArray(pb.attacks) && !Array.isArray(pb.defenses)) return;
-                atkDefCache[cve] = atkDefCache[cve] || { attacks: [], defenses: [], meta: {} };
-                if (Array.isArray(pb.attacks)) atkDefCache[cve].attacks = normalizeAtkList(pb.attacks);
-                if (Array.isArray(pb.defenses)) atkDefCache[cve].defenses = normalizeDefList(pb.defenses);
-                atkDefCache[cve].meta = atkDefCache[cve].meta || {};
-                try { localStorage.setItem("atkPlaybook:" + cve, JSON.stringify(atkDefCache[cve])); } catch (_) {}
-                var v = atkDefIndex[cve];
-                if (v && v.source) {
-                    v.source.attacks = "db";
-                    v.source.defenses = "db";
-                }
+                atkDefCache[pbKey] = atkDefCache[pbKey] || { attacks: [], defenses: [], meta: {} };
+                if (Array.isArray(pb.attacks)) atkDefCache[pbKey].attacks = normalizeAtkList(pb.attacks);
+                if (Array.isArray(pb.defenses)) atkDefCache[pbKey].defenses = normalizeDefList(pb.defenses);
+                atkDefCache[pbKey].meta = atkDefCache[pbKey].meta || {};
+                try { localStorage.setItem(_playbookStorageKey(pbKey), JSON.stringify(atkDefCache[pbKey])); } catch (_) {}
+                _applyDbSourceForKey(pbKey);
             } catch (_) {}
         }
 
@@ -1121,9 +1243,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             ensureAtkDefInit();
             var cves = Object.keys(atkDefIndex || {});
             if (!cves.length) return;
+            var keys = {};
+            cves.forEach(function (cve) { keys[_playbookKeyForCve(cve)] = true; });
+            var pbKeys = Object.keys(keys);
             setAtkSaveStatus("⏳ Загрузка плейбуков из БД…", "info");
-            for (var i = 0; i < cves.length; i++) {
-                await loadAtkPlaybookFromApi(cves[i]);
+            for (var i = 0; i < pbKeys.length; i++) {
+                await loadAtkPlaybookFromApi(pbKeys[i]);
             }
             setAtkSaveStatus("✅ Плейбуки загружены", "ok");
         }
@@ -1149,7 +1274,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         String((v.capecs || []).join(" ")),
                         String((v.cwes || []).join(" ")),
                     ].join(" ").toLowerCase();
-                    var pb = atkDefCache[String(v.cve_id).toUpperCase()] || {};
+                    var pb = _ensurePlaybookForCve(String(v.cve_id).toUpperCase()) || {};
                     (pb.attacks || []).forEach(function(a) {
                         hay += " " + String(a.name || "").toLowerCase();
                         (a.steps || []).forEach(function(st) {
@@ -1160,7 +1285,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     if (hay.indexOf(s) === -1) return false;
                 }
                 if (onlyVerified) {
-                    var pb2 = atkDefCache[String(v.cve_id).toUpperCase()] || {};
+                    var pb2 = _ensurePlaybookForCve(String(v.cve_id).toUpperCase()) || {};
                     var anyV = (pb2.attacks || []).some(function(a) { return !!a.verified; });
                     if (!anyV) return false;
                 }
@@ -1185,23 +1310,35 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 listEl.innerHTML = '<p style="color:#484f58;text-align:center;padding:20px;">Нет данных по выбранным фильтрам.</p>';
                 return;
             }
+
             var html = "";
-            vulns.forEach(function(v, idx) {
-                var cve = String(v.cve_id || "").toUpperCase();
+            vulns.forEach(function(v) {
+                var cve = String(v && v.cve_id ? v.cve_id : "").toUpperCase();
+                if (!cve) return;
                 var cveDom = String(cve).replace(/[^a-zA-Z0-9_-]/g, "_");
-                var pb = atkDefCache[cve] || { attacks: [], defenses: [], meta: {} };
+                var pbKey = _playbookKeyForCve(cve);
+                var pb = _ensurePlaybookForCve(cve) || { attacks: [], defenses: [], meta: {} };
                 var sevClass = getSevClass(v.sev);
                 var feasClass = v.feas === "РЕАЛИЗУЕМА" ? "real" : (String(v.feas || "").includes("ЧАСТИЧНО") ? "part-real" : "noreal");
+
+                var isEdit = !!atkEditCves[cve];
+
                 var attacks = (pb.attacks || []).slice();
-                attacks.sort(function(a, b) { return (b.verified === a.verified) ? String(a.name || "").localeCompare(String(b.name || "")) : (b.verified ? 1 : -1); });
+                attacks.sort(function(a, b) {
+                    return (b.verified === a.verified)
+                        ? String(a.name || "").localeCompare(String(b.name || ""))
+                        : (b.verified ? 1 : -1);
+                });
                 if (onlyVerified) attacks = attacks.filter(function(a) { return !!a.verified; });
-                var anyAttacks = attacks.length > 0;
 
                 html += '<div class="atk-def-item">';
                 html += '<div class="atk-def-header" onclick="toggleAtkDefItemByCve(\\'' + escapeHtml(cve) + '\\')" style="background:#161b22;">';
                 html += '<div><span class="badge ' + sevClass + '" style="margin-right:8px;">' + escapeHtml(v.sev) + '</span>';
                 html += '<span class="badge ' + feasClass + '" style="margin-right:8px;">' + escapeHtml(v.feas) + '</span>';
                 html += '<strong style="color:#fff;">' + escapeHtml(cve) + '</strong>';
+                if (v.vector_id) {
+                    html += ' <span style="color:#8b949e;"> · Вектор: <span style="color:#58a6ff;">' + escapeHtml(String(v.vector_id)) + '</span></span>';
+                }
                 html += ' <span style="color:#8b949e;"> — ПО: ' + escapeHtml((v.sws || []).slice(0, 2).join(" / ") || "—") + ((v.sws || []).length > 2 ? (" +" + ((v.sws || []).length - 2)) : "") + '</span></div>';
                 html += '<span style="color:#58a6ff;font-size:12px;">▼ Раскрыть</span>';
                 html += '</div>';
@@ -1209,12 +1346,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 html += '<div class="atk-def-body" id="atk-def-body-' + cveDom + '" style="display:' + (atkExpandedCves[cve] ? "block" : "none") + ';">';
                 html += '<div style="display:flex; gap:10px; flex-wrap:wrap; font-size:12px; color:#8b949e; margin: 8px 0 12px 0;">';
                 html += '<div>Источник: атаки=' + escapeHtml(((v.source || {}).attacks || "auto")) + ', защита=' + escapeHtml(((v.source || {}).defenses || "auto")) + '</div>';
+                html += '<div>Привязка сценариев: <span style="color:#58a6ff;">' + escapeHtml((_playbookKind(pbKey) === "vector") ? "вектор" : "CVE") + '</span></div>';
                 if (v.capecs && v.capecs.length) html += '<div>CAPEC: <span style="color:#58a6ff;">' + escapeHtml(v.capecs.join(", ")) + '</span></div>';
                 if (v.cwes && v.cwes.length) html += '<div>CWE: <span style="color:#d29922;">' + escapeHtml(v.cwes.join(", ")) + '</span></div>';
                 html += '</div>';
 
                 html += '<div class="atk-section">';
-                var isEdit = !!atkEditCves[cve];
                 html += '<div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">';
                 html += '<h4 style="color:#da3633;margin:0;font-size:16px;">🥷 Атаки (Red Team)</h4>';
                 html += '<button class="' + (isEdit ? "btn-ghost" : "btn-toggle") + '" style="padding:8px 12px;" onclick="event.stopPropagation(); toggleAtkEdit(\\'' + escapeHtml(cve) + '\\')">' + (isEdit ? "✅ Готово" : "✏️ Редактировать") + '</button>';
@@ -1223,10 +1360,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
                 html += '</div>';
 
-                if (!anyAttacks) {
+                if (!attacks.length) {
                     html += '<p style="color:#484f58;font-size:13px;">Атаки не найдены.</p>';
                 } else {
-                    attacks.forEach(function(a, ai) {
+                    attacks.forEach(function(a) {
                         html += '<div class="step-card">';
                         if (isEdit) {
                             html += '<div class="step-header" style="gap:10px; align-items:center;">';
@@ -1276,6 +1413,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 html += '<h4 style="color:#3fb950;margin:0;font-size:16px;">🛡️ Меры противодействия (Blue Team)</h4>';
                 if (isEdit) html += '<button class="btn-toggle" style="padding:8px 12px;" onclick="event.stopPropagation(); addDefItem(\\'' + escapeHtml(cve) + '\\')">+ Добавить меру</button>';
                 html += '</div>';
+
                 var defs = (pb.defenses || []).slice();
                 defs.sort(function(a, b) { return String(a.priority || "").localeCompare(String(b.priority || "")); });
                 if (!defs.length) {
@@ -1297,6 +1435,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             html += '</div>';
                             html += '</div>';
                         }
+
                         html += '<div style="margin-top:10px;">';
                         if (isEdit) {
                             html += '<div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">';
@@ -1325,9 +1464,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (v.recommendation) {
                     html += parseAndFormatRecommendations(v.recommendation);
                 }
+
                 html += '</div>';
-                html += '</div></div>';
+                html += '</div>';
+                html += '</div>';
             });
+
             listEl.innerHTML = html;
         }
 
@@ -1351,12 +1493,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         function findAtk(cve, aid) {
-            var pb = atkDefCache[cve];
+            var pb = _ensurePlaybookForCve(cve);
             if (!pb) return null;
             return (pb.attacks || []).find(function(a) { return String(a.id) === String(aid); }) || null;
         }
         function findDef(cve, did) {
-            var pb = atkDefCache[cve];
+            var pb = _ensurePlaybookForCve(cve);
             if (!pb) return null;
             return (pb.defenses || []).find(function(d) { return String(d.id) === String(did); }) || null;
         }
@@ -1364,7 +1506,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function addAtkAttack(cve) {
             ensureAtkDefInit();
             cve = String(cve || "").toUpperCase();
-            var pb = atkDefCache[cve];
+            var pb = _ensurePlaybookForCve(cve);
             if (!pb) return;
             var id = "a" + (pb.attacks.length + 1) + "_" + Date.now();
             pb.attacks.push({ id: id, name: "", verified: false, steps: [{ id: "s1", name: "", text: "" }], notes: "", tags: [] });
@@ -1374,7 +1516,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function removeAtkAttack(cve, aid) {
             ensureAtkDefInit();
             cve = String(cve || "").toUpperCase();
-            var pb = atkDefCache[cve];
+            var pb = _ensurePlaybookForCve(cve);
             if (!pb) return;
             pb.attacks = (pb.attacks || []).filter(function(a) { return String(a.id) !== String(aid); });
             scheduleAtkSave(cve);
@@ -1440,7 +1582,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function addDefItem(cve) {
             ensureAtkDefInit();
             cve = String(cve || "").toUpperCase();
-            var pb = atkDefCache[cve];
+            var pb = _ensurePlaybookForCve(cve);
             if (!pb) return;
             var id = "d" + (pb.defenses.length + 1) + "_" + Date.now();
             pb.defenses.push({ id: id, name: "", priority: "", verified: false, steps: [{ id: "s1", name: "", text: "" }], notes: "", tags: [] });
@@ -1450,7 +1592,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function removeDefItem(cve, did) {
             ensureAtkDefInit();
             cve = String(cve || "").toUpperCase();
-            var pb = atkDefCache[cve];
+            var pb = _ensurePlaybookForCve(cve);
             if (!pb) return;
             pb.defenses = (pb.defenses || []).filter(function(d) { return String(d.id) !== String(did); });
             scheduleAtkSave(cve);
@@ -1510,6 +1652,239 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (!s) return;
             s.text = String(val || "");
             scheduleAtkSave(cve);
+        }
+
+        async function postJson(url, data) {
+            const res = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data || {})
+            });
+            const text = await res.text();
+            let parsed = {};
+            try { parsed = JSON.parse(text); } catch (e) { parsed = { raw: text }; }
+            if (!res.ok) {
+                const msg = parsed && parsed.error ? parsed.error : ("HTTP " + res.status);
+                throw new Error(msg);
+            }
+            return parsed;
+        }
+
+        var editState = null;
+        function openEditModal(team, idx, toolIdx) {
+            editState = { team: team, idx: idx, toolIdx: toolIdx };
+            var item = atkDefData[idx] || {};
+            var tool = (team === "red" ? (item.attack_tools || [])[toolIdx] : (item.defense_tools || [])[toolIdx]) || {};
+            var cmds = Array.isArray(tool.commands) ? tool.commands.join("\\n") : String(tool.commands || "");
+            var name = String(tool.name || "");
+            var desc = String(tool.desc || "");
+            var verified = Boolean(tool.verified);
+            var h = '';
+            h += '<div class="grid-info" style="grid-template-columns: 1fr 1fr; margin-bottom: 14px;">';
+            h += '<div class="grid-item"><span>Команда</span><strong>' + (team === "red" ? "Red Team" : "Blue Team") + '</strong></div>';
+            h += '<div class="grid-item"><span>CVE</span><strong>' + escapeHtml(item.cve_primary || "N/A") + '</strong></div>';
+            h += '</div>';
+            h += '<div style="display:flex; flex-direction:column; gap:10px;">';
+            h += '<div><label style="font-size:12px;color:#8b949e;font-weight:bold;text-transform:uppercase;">Название шага</label>';
+            h += '<input id="edit_name" style="width:100%; margin-top:6px; background:#161b22; border:1px solid #30363d; color:#c9d1d9; padding:10px; border-radius:6px;" value="' + escapeHtml(name) + '"></div>';
+            h += '<div><label style="font-size:12px;color:#8b949e;font-weight:bold;text-transform:uppercase;">Описание</label>';
+            h += '<textarea id="edit_desc" style="width:100%; margin-top:6px; background:#161b22; border:1px solid #30363d; color:#c9d1d9; padding:10px; border-radius:6px; min-height:80px;">' + escapeHtml(desc) + '</textarea></div>';
+            h += '<div><label style="font-size:12px;color:#8b949e;font-weight:bold;text-transform:uppercase;">Команды (по строкам)</label>';
+            h += '<textarea id="edit_cmds" style="width:100%; margin-top:6px; background:#010409; border:1px solid #30363d; color:#c9d1d9; padding:10px; border-radius:6px; min-height:200px; font-family:Consolas,monospace; font-size:12px;">' + escapeHtml(cmds) + '</textarea></div>';
+            h += '<div style="display:flex; align-items:center; gap:10px;">';
+            h += '<input id="edit_verified" type="checkbox" ' + (verified ? "checked" : "") + ' style="transform:scale(1.15); accent-color:#3fb950;">';
+            h += '<label for="edit_verified" style="font-size:13px;color:#c9d1d9;cursor:pointer;">Отметить как проверено</label>';
+            h += '</div>';
+            h += '</div>';
+            document.getElementById("edit-modal-body").innerHTML = h;
+            document.getElementById("editModal").style.display = "block";
+        }
+
+        function closeEditModal() {
+            document.getElementById("editModal").style.display = "none";
+            editState = null;
+        }
+
+        async function saveEditModal() {
+            if (!editState) return;
+            var team = editState.team;
+            var idx = editState.idx;
+            var toolIdx = editState.toolIdx;
+            var item = atkDefData[idx] || {};
+            var tool = (team === "red" ? (item.attack_tools || [])[toolIdx] : (item.defense_tools || [])[toolIdx]) || {};
+            var cveId = String(item.cve_primary || "").trim();
+            var name = document.getElementById("edit_name").value || "";
+            var desc = document.getElementById("edit_desc").value || "";
+            var cmds = document.getElementById("edit_cmds").value || "";
+            var verified = Boolean(document.getElementById("edit_verified").checked);
+            var commands = cmds.split("\\n").map(function (l) { return l.replace(/\\r/g, ""); });
+
+            if (team === "red") {
+                var toolId = tool.tool_id || "";
+                if (toolId) {
+                    await postJson(API_BASE + "/polygon/update_attack_tool", {
+                        tool_id: toolId,
+                        cve_id: cveId,
+                        name: name,
+                        description: desc,
+                        commands: commands,
+                        verified: verified
+                    });
+                    tool.name = name;
+                    tool.desc = desc;
+                    tool.commands = commands;
+                    tool.verified = verified;
+                } else {
+                    var res = await postJson(API_BASE + "/polygon/add_attack_tool", {
+                        cve_id: cveId,
+                        name: name,
+                        description: desc,
+                        commands: commands,
+                        verified: verified
+                    });
+                    tool.tool_id = res.tool_id;
+                    tool.cve_id = cveId;
+                    tool.name = name;
+                    tool.desc = desc;
+                    tool.commands = commands;
+                    tool.verified = verified;
+                }
+            } else {
+                await postJson(API_BASE + "/polygon/update_defense_tool", {
+                    defense_id: tool.defense_id,
+                    tool_index: tool.tool_index,
+                    cve_id: cveId,
+                    tool_name: name,
+                    tool_description: desc,
+                    commands: commands,
+                    verified: verified
+                });
+                tool.name = name;
+                tool.desc = desc;
+                tool.commands = commands;
+                tool.verified = verified;
+            }
+
+            item.attack_verified = (item.attack_tools || []).length > 0 && (item.attack_tools || []).every(function (t) { return Boolean(t.verified); });
+            item.defense_verified = (item.defense_tools || []).length > 0 && (item.defense_tools || []).every(function (t) { return Boolean(t.verified); });
+            renderAtkDefSection();
+            closeEditModal();
+        }
+
+        async function toggleStepVerified(team, idx, toolIdx) {
+            var item = atkDefData[idx] || {};
+            var cveId = String(item.cve_primary || "").trim();
+            if (!cveId) return;
+            if (team === "red") {
+                var tool = (item.attack_tools || [])[toolIdx];
+                if (!tool) return;
+                var next = !Boolean(tool.verified);
+                await postJson(API_BASE + "/polygon/update_attack_tool", {
+                    tool_id: tool.tool_id,
+                    cve_id: cveId,
+                    verified: next
+                });
+                tool.verified = next;
+            } else {
+                var dt = (item.defense_tools || [])[toolIdx];
+                if (!dt) return;
+                var nextB = !Boolean(dt.verified);
+                await postJson(API_BASE + "/polygon/update_defense_tool", {
+                    defense_id: dt.defense_id,
+                    tool_index: dt.tool_index,
+                    cve_id: cveId,
+                    verified: nextB
+                });
+                dt.verified = nextB;
+            }
+            item.attack_verified = (item.attack_tools || []).length > 0 && (item.attack_tools || []).every(function (t) { return Boolean(t.verified); });
+            item.defense_verified = (item.defense_tools || []).length > 0 && (item.defense_tools || []).every(function (t) { return Boolean(t.verified); });
+            renderAtkDefSection();
+        }
+
+        async function toggleVerifiedAll(idx, team) {
+            var item = atkDefData[idx] || {};
+            var cveId = String(item.cve_primary || "").trim();
+            if (!cveId) return;
+            if (team === "red") {
+                var tools = item.attack_tools || [];
+                var next = !(tools.length > 0 && tools.every(function (t) { return Boolean(t.verified); }));
+                for (var i = 0; i < tools.length; i++) {
+                    var t = tools[i];
+                    if (!t || !t.tool_id) continue;
+                    await postJson(API_BASE + "/polygon/update_attack_tool", { tool_id: t.tool_id, cve_id: cveId, verified: next });
+                    t.verified = next;
+                }
+            } else {
+                var dtools = item.defense_tools || [];
+                var nextB = !(dtools.length > 0 && dtools.every(function (t) { return Boolean(t.verified); }));
+                for (var j = 0; j < dtools.length; j++) {
+                    var dt = dtools[j];
+                    if (!dt || !dt.defense_id) continue;
+                    await postJson(API_BASE + "/polygon/update_defense_tool", { defense_id: dt.defense_id, tool_index: dt.tool_index, cve_id: cveId, verified: nextB });
+                    dt.verified = nextB;
+                }
+            }
+            item.attack_verified = (item.attack_tools || []).length > 0 && (item.attack_tools || []).every(function (t) { return Boolean(t.verified); });
+            item.defense_verified = (item.defense_tools || []).length > 0 && (item.defense_tools || []).every(function (t) { return Boolean(t.verified); });
+            renderAtkDefSection();
+        }
+
+        async function addNewStep(idx, team) {
+            var item = atkDefData[idx] || {};
+            var cveId = String(item.cve_primary || "").trim();
+            if (!cveId) return;
+            if (team === "red") {
+                var name = prompt("Название шага атаки (инструмент/действие):", "Новый шаг");
+                if (!name) return;
+                var desc = prompt("Короткое описание шага:", "");
+                var cmds = prompt("Команды (можно много строк, разделяйте через \\n):", "");
+                var res = await postJson(API_BASE + "/polygon/add_attack_tool", {
+                    cve_id: cveId,
+                    name: name,
+                    description: desc || "",
+                    commands: cmds || ""
+                });
+                (item.attack_tools || (item.attack_tools = [])).push({
+                    tool_id: res.tool_id,
+                    cve_id: cveId,
+                    name: name,
+                    desc: desc || "",
+                    commands: (cmds || "").split("\\n").map(function (l) { return l.replace(/\\r/g, ""); }),
+                    verified: false,
+                    order: 0
+                });
+            } else {
+                var defName = prompt("Название метода защиты:", "Новый метод защиты");
+                if (!defName) return;
+                var defDesc = prompt("Описание метода защиты:", "");
+                var toolName = prompt("Название шага/инструмента защиты:", "Шаг 1");
+                if (!toolName) return;
+                var cmdsB = prompt("Команды/конфигурация (можно много строк, разделяйте через \\n):", "");
+                var resB = await postJson(API_BASE + "/polygon/add_defense_entry", {
+                    cve_id: cveId,
+                    name: defName,
+                    description: defDesc || "",
+                    tool_name: toolName,
+                    tool_description: "",
+                    commands: cmdsB || ""
+                });
+                (item.defense_tools || (item.defense_tools = [])).push({
+                    defense_id: resB.defense_id,
+                    tool_index: 0,
+                    cve_id: cveId,
+                    name: toolName,
+                    desc: "",
+                    priority: "",
+                    commands: (cmdsB || "").split("\\n").map(function (l) { return l.replace(/\\r/g, ""); }),
+                    verified: false,
+                    order: 0,
+                    tool_order: 0
+                });
+            }
+            item.attack_verified = (item.attack_tools || []).length > 0 && (item.attack_tools || []).every(function (t) { return Boolean(t.verified); });
+            item.defense_verified = (item.defense_tools || []).length > 0 && (item.defense_tools || []).every(function (t) { return Boolean(t.verified); });
+            renderAtkDefSection();
         }
 
         function parseAndFormatRecommendations(text) {

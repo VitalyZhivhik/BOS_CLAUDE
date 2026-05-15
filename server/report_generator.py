@@ -3,6 +3,7 @@ import os
 import re
 
 from common.models import normalize_feasibility, normalize_severity, report_status_meta
+from common.config import SERVER_PORT
 from server.report_template import HTML_TEMPLATE
 
 class SoftwareEnricher:
@@ -913,7 +914,7 @@ class ReportGenerator:
                         attack_tools.append({
                             "id": str(t.get("tool_id") or t.get("tool_name") or "").strip() or "",
                             "name": t.get("tool_name", ""),
-                            "verified": False,
+                            "verified": bool(t.get("verified", False)),
                             "steps": as_step_list(t.get("commands", [])),
                             "notes": str(t.get("description") or ""),
                             "tags": [],
@@ -925,7 +926,7 @@ class ReportGenerator:
                             "id": str(d.get("defense_id") or d.get("tool_name") or "").strip() or "",
                             "name": d.get("tool_name", ""),
                             "priority": d.get("priority", ""),
-                            "verified": False,
+                            "verified": bool(d.get("verified", False)),
                             "steps": as_step_list(d.get("commands", [])),
                             "notes": str(d.get("defense_description") or d.get("tool_description") or ""),
                             "tags": [],
@@ -1324,6 +1325,7 @@ class ReportGenerator:
             html = html.replace('__CVE_META__', json.dumps(cve_meta, ensure_ascii=False))
             html = html.replace('__MITRE_META__', json.dumps(mitre_meta, ensure_ascii=False))
             html = html.replace('__STATUS_META__', json.dumps(report_status_meta(), ensure_ascii=False))
+            html = html.replace('__SERVER_PORT__', str(SERVER_PORT))
             f.write(html)
 
         return filepath
