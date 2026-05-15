@@ -964,6 +964,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         var atkDefSaveTimers = {};
         var atkExpandedCves = {};
         var atkEditCves = {};
+        var atkDefPendingSync = {};
 
         function _isUsefulVectorId(vectorId) {
             var s = String(vectorId || "").trim();
@@ -1032,9 +1033,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             atkDefCache = {};
             atkDefKeyByCve = {};
             try {
-                var saved = localStorage.getItem("atkApiBase") || "";
-                if (!saved) saved = "http://127.0.0.1:8443";
-                localStorage.setItem("atkApiBase", saved);
+                var base = "";
+                try { base = String((typeof API_BASE !== "undefined" ? API_BASE : "") || "").trim(); } catch (_) {}
+                if (!base) base = "http://127.0.0.1:8443";
+                localStorage.setItem("atkApiBase", base);
             } catch (_) {}
             (atkDefData || []).forEach(function(v) {
                 var cve = String(v.cve_id || "").toUpperCase();
@@ -1080,6 +1082,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             if (Array.isArray(parsed.attacks)) atkDefCache[pbKey].attacks = normalizeAtkList(parsed.attacks);
                             if (Array.isArray(parsed.defenses)) atkDefCache[pbKey].defenses = normalizeDefList(parsed.defenses);
                         }
+                        atkDefCache[pbKey]._dirty = true;
+                        atkDefPendingSync[pbKey] = true;
                     }
                 } catch (_) {}
             });
@@ -1145,6 +1149,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             var v = "";
             if (!v) {
                 try {
+                    v = String((typeof API_BASE !== "undefined" ? API_BASE : "") || "").trim();
+                } catch (_) {}
+            }
+            if (!v) {
+                try {
                     v = String(localStorage.getItem("atkApiBase") || "").trim();
                 } catch (_) {}
             }
@@ -1207,10 +1216,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 var kindLabel = _playbookKind(pbKey) === "vector" ? "вектор" : "CVE";
                 setAtkSaveStatus("✅ Сохранено в БД (" + kindLabel + "): " + _playbookId(pbKey), "ok");
                 _applyDbSourceForKey(pbKey);
-                try { localStorage.setItem(_playbookStorageKey(pbKey), JSON.stringify(pb)); } catch (_) {}
+                try { localStorage.removeItem(_playbookStorageKey(pbKey)); } catch (_) {}
+                if (_playbookKind(pbKey) === "cve") {
+                    try { localStorage.removeItem("atkPlaybook:" + String(_playbookId(pbKey)).toUpperCase()); } catch (_) {}
+                }
+                pb._dirty = false;
+                delete atkDefPendingSync[pbKey];
             } catch (e) {
                 setAtkSaveStatus("❌ Не удалось сохранить (" + _playbookId(pbKey) + "): " + String(e && e.message ? e.message : e), "err");
                 try { localStorage.setItem(_playbookStorageKey(pbKey), JSON.stringify(pb)); } catch (_) {}
+                pb._dirty = true;
+                atkDefPendingSync[pbKey] = true;
             }
         }
 
@@ -1231,12 +1247,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (!pb || typeof pb !== "object") return;
                 if (!Array.isArray(pb.attacks) && !Array.isArray(pb.defenses)) return;
                 atkDefCache[pbKey] = atkDefCache[pbKey] || { attacks: [], defenses: [], meta: {} };
-                if (Array.isArray(pb.attacks)) atkDefCache[pbKey].attacks = normalizeAtkList(pb.attacks);
-                if (Array.isArray(pb.defenses)) atkDefCache[pbKey].defenses = normalizeDefList(pb.defenses);
+                if (!atkDefCache[pbKey]._dirty) {
+                    if (Array.isArray(pb.attacks)) atkDefCache[pbKey].attacks = normalizeAtkList(pb.attacks);
+                    if (Array.isArray(pb.defenses)) atkDefCache[pbKey].defenses = normalizeDefList(pb.defenses);
+                }
                 atkDefCache[pbKey].meta = atkDefCache[pbKey].meta || {};
-                try { localStorage.setItem(_playbookStorageKey(pbKey), JSON.stringify(atkDefCache[pbKey])); } catch (_) {}
                 _applyDbSourceForKey(pbKey);
             } catch (_) {}
+        }
+
+        async function syncAtkDefToDbIfNeeded() {
+            ensureAtkDefInit();
+            var keys = Object.keys(atkDefPendingSync || {});
+            if (!keys.length) return;
+            setAtkSaveStatus("⏳ Синхронизация правок в БД…", "info");
+            for (var i = 0; i < keys.length; i++) {
+                await saveAtkPlaybook(keys[i]);
+            }
         }
 
         async function hydrateAtkDefFromApi() {
@@ -1250,6 +1277,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             for (var i = 0; i < pbKeys.length; i++) {
                 await loadAtkPlaybookFromApi(pbKeys[i]);
             }
+            await syncAtkDefToDbIfNeeded();
             setAtkSaveStatus("✅ Плейбуки загружены", "ok");
         }
 
