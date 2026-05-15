@@ -304,6 +304,7 @@ class ReportGenerator:
         self.capec_db = self._load_local_db("databases/capec_database.json")
         self.cve_db = self._load_local_db("databases/cve_database.json")
         self.mitre_db = self._load_local_db("databases/mitre_attack.json")
+        self.playbooks_db = self._load_local_db("databases/attack_playbooks.json")
         self.defense_db = self._load_local_db("databases/defense_database.json")
 
         self.raw_results = correlation_results
@@ -766,80 +767,225 @@ class ReportGenerator:
 
     def _build_atk_def_data(self, js_data):
         """Строит данные для раздела атак и защиты."""
-        atk_def_list = []
+        def sev_rank(s: str) -> int:
+            s = (s or "INFO").upper()
+            if s == "CRITICAL":
+                return 4
+            if s == "HIGH":
+                return 3
+            if s == "MEDIUM":
+                return 2
+            if s == "LOW":
+                return 1
+            return 0
 
-        for item in js_data:
-            cves_str = item.get('cve', '')
-            cve_list = [c.strip() for c in cves_str.split(',') if c.strip() and c.strip() != 'Нет CVE']
+        def as_step_list(commands: list) -> list[dict]:
+            out = []
+            if not isinstance(commands, list):
+                return out
+            for i, c in enumerate(commands):
+                t = str(c or "").rstrip()
+                if not t:
+                    continue
+                out.append({"id": f"s{i+1}", "name": "", "text": t})
+            return out
 
-            attack_tools = []
-            defense_tools = []
+        def normalize_attack(a: dict, fallback_id: str) -> dict:
+            a = a if isinstance(a, dict) else {}
+            aid = str(a.get("id") or fallback_id or "").strip() or fallback_id
+            steps = a.get("steps", [])
+            if isinstance(steps, list) and steps and isinstance(steps[0], str):
+                steps = [{"id": f"s{i+1}", "name": "", "text": str(x)} for i, x in enumerate(steps)]
+            if not isinstance(steps, list):
+                steps = []
+            return {
+                "id": aid,
+                "name": str(a.get("name") or "").strip(),
+                "verified": bool(a.get("verified", False)),
+                "steps": steps,
+                "notes": str(a.get("notes") or "").strip(),
+                "tags": a.get("tags", []) if isinstance(a.get("tags", []), list) else [],
+                "updated_at": str(a.get("updated_at") or "").strip(),
+            }
 
-            if self.toolkit:
-                # Ищем инструменты атаки по CVE
-                for cve_id in cve_list[:5]:  # Ограничиваем для производительности
+        def normalize_defense(d: dict, fallback_id: str) -> dict:
+            d = d if isinstance(d, dict) else {}
+            did = str(d.get("id") or fallback_id or "").strip() or fallback_id
+            steps = d.get("steps", d.get("commands", []))
+            if isinstance(steps, list) and steps and isinstance(steps[0], str):
+                steps = [{"id": f"s{i+1}", "name": "", "text": str(x)} for i, x in enumerate(steps)]
+            if not isinstance(steps, list):
+                steps = []
+            return {
+                "id": did,
+                "name": str(d.get("name") or "").strip(),
+                "priority": str(d.get("priority") or "").strip(),
+                "verified": bool(d.get("verified", False)),
+                "steps": steps,
+                "notes": str(d.get("notes") or "").strip(),
+                "tags": d.get("tags", []) if isinstance(d.get("tags", []), list) else [],
+                "updated_at": str(d.get("updated_at") or "").strip(),
+            }
+
+        playbooks = {}
+        if isinstance(self.playbooks_db, dict):
+            playbooks = self.playbooks_db if isinstance(self.playbooks_db, dict) else {}
+
+        by_cve: dict[str, dict] = {}
+        for item in (js_data or []):
+            cves_str = item.get("cve", "")
+            cve_list = [c.strip().upper() for c in str(cves_str).split(",") if c.strip() and c.strip() != "Нет CVE" and c.strip().upper().startswith("CVE-")]
+            if not cve_list:
+                continue
+            for cve_id in cve_list:
+                v = by_cve.get(cve_id)
+                if not v:
+                    v = {
+                        "cve_id": cve_id,
+                        "sev": item.get("sev", "INFO"),
+                        "feas": item.get("feas", "UNKNOWN"),
+                        "sws": set(),
+                        "capecs": set(),
+                        "cwes": set(),
+                        "recommendations": set(),
+                        "attacks": [],
+                        "defenses": [],
+                        "source": {"attacks": "auto", "defenses": "auto"},
+                    }
+                    by_cve[cve_id] = v
+                if sev_rank(item.get("sev", "INFO")) > sev_rank(v.get("sev", "INFO")):
+                    v["sev"] = item.get("sev", "INFO")
+                if item.get("feas") == "РЕАЛИЗУЕМА":
+                    v["feas"] = "РЕАЛИЗУЕМА"
+                sw = str(item.get("sw") or "").strip()
+                port = str(item.get("port") or "").strip()
+                if sw:
+                    v["sws"].add(f"{sw} ({port})" if port else sw)
+                cap = str(item.get("capec") or "").strip()
+                cwe = str(item.get("cwe") or "").strip()
+                if cap:
+                    for part in cap.split(","):
+                        t = part.strip()
+                        if t:
+                            v["capecs"].add(t)
+                if cwe:
+                    for part in cwe.split(","):
+                        t = part.strip()
+                        if t:
+                            v["cwes"].add(t)
+                rec = str(item.get("rec") or "").strip()
+                if rec:
+                    v["recommendations"].add(rec)
+
+        out = []
+        for cve_id, v in by_cve.items():
+            vectors = playbooks.get("vectors", {}) if isinstance(playbooks.get("vectors", {}), dict) else {}
+            cves_pb = playbooks.get("cves", {}) if isinstance(playbooks.get("cves", {}), dict) else {}
+
+            sw_label = sorted(list(v["sws"]))[0] if v.get("sws") else ""
+            cwe_label = sorted(list(v["cwes"]))[0] if v.get("cwes") else ""
+            capec_label = sorted(list(v["capecs"]))[0] if v.get("capecs") else ""
+
+            def _norm_part(x: str) -> str:
+                s = str(x or "").strip()
+                s = " ".join(s.split())
+                s = s.replace("|", "/")
+                return s
+
+            vector_id = f"SW={_norm_part(sw_label)}|CWE={_norm_part(cwe_label)}|CAPEC={_norm_part(capec_label)}"
+
+            pb = vectors.get(vector_id, {}) if isinstance(vectors, dict) else {}
+            pb_source = "vector"
+            if not (isinstance(pb, dict) and (pb.get("attacks") or pb.get("defenses"))):
+                pb = cves_pb.get(cve_id, {}) if isinstance(cves_pb, dict) else {}
+                pb_source = "cve"
+
+            if isinstance(pb, dict) and (pb.get("attacks") or pb.get("defenses")):
+                v["attacks"] = [normalize_attack(a, f"a{i+1}") for i, a in enumerate(pb.get("attacks", []) if isinstance(pb.get("attacks", []), list) else [])]
+                v["defenses"] = [normalize_defense(d, f"d{i+1}") for i, d in enumerate(pb.get("defenses", []) if isinstance(pb.get("defenses", []), list) else [])]
+                v["source"] = {"attacks": f"db:{pb_source}", "defenses": f"db:{pb_source}"}
+            else:
+                attack_tools = []
+                defense_tools = []
+                if self.toolkit:
                     tools = self.toolkit.get_attack_commands(cve_id)
-                    for tool in tools:
+                    for t in tools:
                         attack_tools.append({
-                            "name": tool.get('tool_name', ''),
-                            "desc": tool.get('description', ''),
-                            "skill": tool.get('skill_level', ''),
-                            "commands": tool.get('commands', []),
+                            "id": str(t.get("tool_id") or t.get("tool_name") or "").strip() or "",
+                            "name": t.get("tool_name", ""),
+                            "verified": False,
+                            "steps": as_step_list(t.get("commands", [])),
+                            "notes": str(t.get("description") or ""),
+                            "tags": [],
+                            "updated_at": "",
                         })
-
                     defenses = self.toolkit.get_defense_tools(cve_id)
                     for d in defenses:
                         defense_tools.append({
-                            "name": d.get('tool_name', ''),
-                            "desc": d.get('defense_description', d.get('tool_description', '')),
-                            "priority": d.get('priority', ''),
-                            "commands": d.get('commands', []),
+                            "id": str(d.get("defense_id") or d.get("tool_name") or "").strip() or "",
+                            "name": d.get("tool_name", ""),
+                            "priority": d.get("priority", ""),
+                            "verified": False,
+                            "steps": as_step_list(d.get("commands", [])),
+                            "notes": str(d.get("defense_description") or d.get("tool_description") or ""),
+                            "tags": [],
+                            "updated_at": "",
                         })
-
-            # Если нет инструментов из toolkit, ищем в локальных БД
-            if not attack_tools and isinstance(self.tools_db, list):
-                for cve_id in cve_list[:5]:
+                if not attack_tools and isinstance(self.tools_db, list):
                     for tool in self.tools_db:
-                        if cve_id in tool.get('applicable_cve', []):
-                            cmds = tool.get('commands', {}).get(cve_id, [])
-                            if not cmds:
-                                cmds = tool.get('commands', {}).get('default', [])
-                            attack_tools.append({
-                                "name": tool.get('name', ''),
-                                "desc": tool.get('description', ''),
-                                "skill": tool.get('skill_level', ''),
-                                "commands": cmds,
-                            })
-
-            if not defense_tools and isinstance(self.defense_db, list):
-                for cve_id in cve_list[:5]:
+                        if cve_id not in tool.get("applicable_cve", []):
+                            continue
+                        cmds = tool.get("commands", {}).get(cve_id, []) or tool.get("commands", {}).get("default", [])
+                        attack_tools.append({
+                            "id": str(tool.get("id") or tool.get("name") or "").strip(),
+                            "name": tool.get("name", ""),
+                            "verified": bool(tool.get("verified", False)),
+                            "steps": as_step_list(cmds),
+                            "notes": str(tool.get("description") or ""),
+                            "tags": tool.get("phases", []) if isinstance(tool.get("phases", []), list) else [],
+                            "updated_at": "",
+                        })
+                if not defense_tools and isinstance(self.defense_db, list):
                     for defense in self.defense_db:
-                        if cve_id in defense.get('cve_ids', []):
-                            for dt in defense.get('tools', []):
-                                defense_tools.append({
-                                    "name": dt.get('name', ''),
-                                    "desc": dt.get('description', ''),
-                                    "priority": defense.get('priority', ''),
-                                    "commands": dt.get('commands', []),
-                                })
+                        if cve_id not in defense.get("cve_ids", []):
+                            continue
+                        for dt in defense.get("tools", []):
+                            defense_tools.append({
+                                "id": str(defense.get("id") or dt.get("name") or "").strip(),
+                                "name": dt.get("name", ""),
+                                "priority": str(defense.get("priority") or ""),
+                                "verified": bool(dt.get("verified", False)),
+                                "steps": as_step_list(dt.get("commands", [])),
+                                "notes": str(dt.get("description") or ""),
+                                "tags": [],
+                                "updated_at": "",
+                            })
+                v["attacks"] = [normalize_attack(a, f"a{i+1}") for i, a in enumerate(attack_tools)]
+                v["defenses"] = [normalize_defense(d, f"d{i+1}") for i, d in enumerate(defense_tools)]
+                v["source"] = {"attacks": "auto", "defenses": "auto"}
 
-            cve_short = cve_list[0] if cve_list else 'N/A'
-            if len(cve_list) > 1:
-                cve_short += f" +{len(cve_list)-1}"
-
-            atk_def_list.append({
-                "sw": item.get('sw', ''),
-                "capec": item.get('capec', ''),
-                "cwe": item.get('cwe', ''),
-                "cve_short": cve_short,
-                "sev": item.get('sev', 'INFO'),
-                "feas": item.get('feas', 'UNKNOWN'),
-                "recommendation": item.get('rec', ''),
-                "attack_tools": attack_tools,
-                "defense_tools": defense_tools,
+            rec_joined = " / ".join(sorted(v["recommendations"])) if v["recommendations"] else ""
+            out.append({
+                "cve_id": cve_id,
+                "vector_id": vector_id,
+                "vector_label": {
+                    "sw": sw_label,
+                    "cwe": cwe_label,
+                    "capec": capec_label,
+                },
+                "sev": v["sev"],
+                "feas": v["feas"],
+                "sws": sorted(list(v["sws"])),
+                "capecs": sorted(list(v["capecs"])),
+                "cwes": sorted(list(v["cwes"])),
+                "recommendation": rec_joined,
+                "attacks": v["attacks"],
+                "defenses": v["defenses"],
+                "source": v["source"],
             })
 
-        return atk_def_list
+        out.sort(key=lambda x: (sev_rank(x.get("sev", "INFO")) * -1, x.get("cve_id", "")))
+        return out
 
     def generate_json(self, filepath):
         try:

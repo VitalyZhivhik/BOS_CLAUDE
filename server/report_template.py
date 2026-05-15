@@ -20,6 +20,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .btn-toggle:hover { background: #3182ce; }
         .btn-danger { background: #da3633; }
         .btn-danger:hover { background: #b32a28; }
+        .btn-ghost { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 10px 14px; border-radius: 5px; font-weight: 600; cursor: pointer; font-size: 13px; transition: 0.2s; }
+        .btn-ghost:hover { background: #30363d; }
+
+        .filter-input { background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 8px 10px; font-size: 13px; outline: none; }
+        .filter-input:focus { border-color: #58a6ff; box-shadow: 0 0 0 2px rgba(88,166,255,0.15); }
+        textarea.filter-input { font-family: "Consolas", monospace; }
 
         /* Улучшенные рекомендации и карточки защиты */
         .rec-structured { background: #0d1117; border-radius: 6px; padding: 15px; margin-top: 15px; border: 1px solid #30363d; border-left: 4px solid #238636; }
@@ -51,6 +57,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .cmd-block { background: #010409; color: #00dd00; padding: 12px; border-radius: 6px; font-family: "Consolas", monospace; font-size: 13px; overflow-x: auto; white-space: pre-wrap; margin: 10px 0; border: 1px solid #21262d; line-height: 1.6; }
         .cmd-comment { color: #8b949e; }
         .cmd-highlight { color: #00dd00; }
+
+        .atk-step-title { color: #8b949e; font-size: 12px; margin: 8px 0 4px 0; }
+        .atk-verified-badge { display:inline-flex; align-items:center; gap:6px; padding: 2px 8px; border-radius: 999px; border: 1px solid #238636; background: rgba(35,134,54,0.15); color:#3fb950; font-size:12px; font-weight:600; }
         
         /* Обратная связь (комментарии) */
         .step-feedback { margin-top: 12px; display: flex; gap: 10px; align-items: center; background: #0d1117; padding: 10px; border-radius: 6px; border: 1px dashed #30363d; }
@@ -380,6 +389,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
             <div id="atk-def-container" style="display:none;">
                 <button class="btn-report-bugs" onclick="generateBugReport()">🐞 Сгенерировать отчёт об ошибках в сценариях (Markdown)</button>
+                <div class="filters" style="margin-top:12px;">
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                        <input id="atk-search" class="filter-input" style="min-width:260px;" placeholder="Поиск: CVE / атака / шаг..." oninput="applyAtkDefFilters()" />
+                        <select id="atk-sev" onchange="applyAtkDefFilters()">
+                            <option value="all">-- Любая критичность --</option>
+                            <option value="CRITICAL">CRITICAL</option>
+                            <option value="HIGH">HIGH</option>
+                            <option value="MEDIUM">MEDIUM</option>
+                            <option value="LOW">LOW</option>
+                            <option value="INFO">INFO</option>
+                        </select>
+                        <label style="font-size:12px;color:#8b949e; display:flex; gap:6px; align-items:center;">
+                            <input type="checkbox" id="atk-only-feasible" onchange="applyAtkDefFilters()" />
+                            Только реализуемые
+                        </label>
+                        <label style="font-size:12px;color:#8b949e; display:flex; gap:6px; align-items:center;">
+                            <input type="checkbox" id="atk-only-verified" onchange="applyAtkDefFilters()" />
+                            Только проверенные атаки
+                        </label>
+                    </div>
+                    <div id="atk-save-status" style="margin-top:8px; color:#8b949e; font-size:12px;"></div>
+                </div>
                 <div id="atk-def-list"></div>
             </div>
         </div>
@@ -906,118 +937,579 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             el.style.display = el.style.display === "none" ? "block" : "none";
         }
 
+        var atkDefIndex = {};
+        var atkDefCache = {};
+        var atkDefInitDone = false;
+        var atkDefSaveTimers = {};
+        var atkExpandedCves = {};
+        var atkEditCves = {};
+
+        function ensureAtkDefInit() {
+            if (atkDefInitDone) return;
+            atkDefInitDone = true;
+            atkDefIndex = {};
+            atkDefCache = {};
+            try {
+                var saved = localStorage.getItem("atkApiBase") || "";
+                if (!saved) saved = "http://127.0.0.1:8443";
+                localStorage.setItem("atkApiBase", saved);
+            } catch (_) {}
+            (atkDefData || []).forEach(function(v) {
+                var cve = String(v.cve_id || "").toUpperCase();
+                if (!cve) return;
+                atkDefIndex[cve] = v;
+                atkDefCache[cve] = {
+                    attacks: normalizeAtkList(v.attacks || []),
+                    defenses: normalizeDefList(v.defenses || []),
+                    meta: {
+                        recommendation: v.recommendation || "",
+                        source: v.source || {},
+                    }
+                };
+                try {
+                    var ls = localStorage.getItem("atkPlaybook:" + cve);
+                    if (ls) {
+                        var parsed = JSON.parse(ls);
+                        if (parsed && typeof parsed === "object") {
+                            if (Array.isArray(parsed.attacks)) atkDefCache[cve].attacks = normalizeAtkList(parsed.attacks);
+                            if (Array.isArray(parsed.defenses)) atkDefCache[cve].defenses = normalizeDefList(parsed.defenses);
+                        }
+                    }
+                } catch (_) {}
+            });
+        }
+
+        function normalizeAtkList(list) {
+            var out = [];
+            (Array.isArray(list) ? list : []).forEach(function(a, idx) {
+                a = (a && typeof a === "object") ? a : {};
+                var steps = a.steps;
+                if (!Array.isArray(steps)) steps = [];
+                steps = steps.map(function(s, si) {
+                    if (typeof s === "string") return { id: "s" + (si + 1), text: String(s) };
+                    s = (s && typeof s === "object") ? s : {};
+                    return { id: String(s.id || ("s" + (si + 1))), name: String(s.name || s.title || ""), text: String(s.text || "") };
+                });
+                out.push({
+                    id: String(a.id || ("a" + (idx + 1))),
+                    name: String(a.name || ""),
+                    verified: !!a.verified,
+                    steps: steps,
+                    notes: String(a.notes || ""),
+                    tags: Array.isArray(a.tags) ? a.tags : [],
+                });
+            });
+            return out;
+        }
+
+        function normalizeDefList(list) {
+            var out = [];
+            (Array.isArray(list) ? list : []).forEach(function(d, idx) {
+                d = (d && typeof d === "object") ? d : {};
+                var steps = d.steps || d.commands;
+                if (!Array.isArray(steps)) steps = [];
+                steps = steps.map(function(s, si) {
+                    if (typeof s === "string") return { id: "s" + (si + 1), text: String(s) };
+                    s = (s && typeof s === "object") ? s : {};
+                    return { id: String(s.id || ("s" + (si + 1))), name: String(s.name || s.title || ""), text: String(s.text || "") };
+                });
+                out.push({
+                    id: String(d.id || ("d" + (idx + 1))),
+                    name: String(d.name || ""),
+                    priority: String(d.priority || ""),
+                    verified: !!d.verified,
+                    steps: steps,
+                    notes: String(d.notes || ""),
+                    tags: Array.isArray(d.tags) ? d.tags : [],
+                });
+            });
+            return out;
+        }
+
+        function setAtkSaveStatus(text, kind) {
+            var el = document.getElementById("atk-save-status");
+            if (!el) return;
+            el.textContent = text || "";
+            if (kind === "ok") el.style.color = "#3fb950";
+            else if (kind === "err") el.style.color = "#da3633";
+            else el.style.color = "#8b949e";
+        }
+
+        function getAtkApiBase() {
+            var v = "";
+            if (!v) {
+                try {
+                    v = String(localStorage.getItem("atkApiBase") || "").trim();
+                } catch (_) {}
+            }
+            if (!v) {
+                try {
+                    if (window && window.location && (window.location.protocol === "http:" || window.location.protocol === "https:")) {
+                        v = window.location.origin;
+                    }
+                } catch (_) {}
+            }
+            if (!v) v = "http://127.0.0.1:8443";
+            try { localStorage.setItem("atkApiBase", v); } catch (_) {}
+            return v.replace(/\/+$/, "");
+        }
+
+        function scheduleAtkSave(cve) {
+            cve = String(cve || "").toUpperCase();
+            if (!cve) return;
+            if (atkDefSaveTimers[cve]) clearTimeout(atkDefSaveTimers[cve]);
+            setAtkSaveStatus("⏳ Сохранение…", "info");
+            atkDefSaveTimers[cve] = setTimeout(function() { saveAtkPlaybook(cve); }, 700);
+        }
+
+        async function saveAtkPlaybook(cve) {
+            ensureAtkDefInit();
+            var apiBase = getAtkApiBase();
+            var pb = atkDefCache[cve];
+            if (!pb) return;
+            try {
+                var res = await fetch(apiBase + "/playbooks", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ cve_id: cve, playbook: pb })
+                });
+                if (!res.ok) {
+                    var t = "";
+                    try { t = await res.text(); } catch (_) {}
+                    throw new Error("HTTP " + res.status + (t ? (": " + t) : ""));
+                }
+                setAtkSaveStatus("✅ Сохранено в БД: " + cve, "ok");
+                var v = atkDefIndex[cve];
+                if (v && v.source) {
+                    v.source.attacks = "db";
+                    v.source.defenses = "db";
+                }
+                try { localStorage.setItem("atkPlaybook:" + cve, JSON.stringify(pb)); } catch (_) {}
+            } catch (e) {
+                setAtkSaveStatus("❌ Не удалось сохранить (" + cve + "): " + String(e && e.message ? e.message : e), "err");
+                try { localStorage.setItem("atkPlaybook:" + cve, JSON.stringify(pb)); } catch (_) {}
+            }
+        }
+
+        async function loadAtkPlaybookFromApi(cve) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            if (!cve) return;
+            var apiBase = getAtkApiBase();
+            try {
+                var res = await fetch(apiBase + "/playbooks?cve=" + encodeURIComponent(cve), { method: "GET" });
+                if (!res.ok) return;
+                var data = await res.json();
+                if (!data || typeof data !== "object") return;
+                var pb = data.playbook;
+                if (!pb || typeof pb !== "object") return;
+                if (!Array.isArray(pb.attacks) && !Array.isArray(pb.defenses)) return;
+                atkDefCache[cve] = atkDefCache[cve] || { attacks: [], defenses: [], meta: {} };
+                if (Array.isArray(pb.attacks)) atkDefCache[cve].attacks = normalizeAtkList(pb.attacks);
+                if (Array.isArray(pb.defenses)) atkDefCache[cve].defenses = normalizeDefList(pb.defenses);
+                atkDefCache[cve].meta = atkDefCache[cve].meta || {};
+                try { localStorage.setItem("atkPlaybook:" + cve, JSON.stringify(atkDefCache[cve])); } catch (_) {}
+                var v = atkDefIndex[cve];
+                if (v && v.source) {
+                    v.source.attacks = "db";
+                    v.source.defenses = "db";
+                }
+            } catch (_) {}
+        }
+
+        async function hydrateAtkDefFromApi() {
+            ensureAtkDefInit();
+            var cves = Object.keys(atkDefIndex || {});
+            if (!cves.length) return;
+            setAtkSaveStatus("⏳ Загрузка плейбуков из БД…", "info");
+            for (var i = 0; i < cves.length; i++) {
+                await loadAtkPlaybookFromApi(cves[i]);
+            }
+            setAtkSaveStatus("✅ Плейбуки загружены", "ok");
+        }
+
+        function applyAtkDefFilters() {
+            ensureAtkDefInit();
+            var s = (document.getElementById("atk-search") || {}).value || "";
+            s = String(s || "").trim().toLowerCase();
+            var sev = (document.getElementById("atk-sev") || {}).value || "all";
+            sev = String(sev || "all").toUpperCase();
+            var onlyFeasible = !!((document.getElementById("atk-only-feasible") || {}).checked);
+            var onlyVerified = !!((document.getElementById("atk-only-verified") || {}).checked);
+
+            var list = (atkDefData || []).slice();
+            list = list.filter(function(v) {
+                if (!v || !v.cve_id) return false;
+                if (sev !== "ALL" && String(v.sev || "").toUpperCase() !== sev) return false;
+                if (onlyFeasible && String(v.feas || "") !== "РЕАЛИЗУЕМА") return false;
+                if (s) {
+                    var hay = [
+                        String(v.cve_id || ""),
+                        String((v.sws || []).join(" ")),
+                        String((v.capecs || []).join(" ")),
+                        String((v.cwes || []).join(" ")),
+                    ].join(" ").toLowerCase();
+                    var pb = atkDefCache[String(v.cve_id).toUpperCase()] || {};
+                    (pb.attacks || []).forEach(function(a) {
+                        hay += " " + String(a.name || "").toLowerCase();
+                        (a.steps || []).forEach(function(st) {
+                            hay += " " + String(st.name || "").toLowerCase();
+                            hay += " " + String(st.text || "").toLowerCase();
+                        });
+                    });
+                    if (hay.indexOf(s) === -1) return false;
+                }
+                if (onlyVerified) {
+                    var pb2 = atkDefCache[String(v.cve_id).toUpperCase()] || {};
+                    var anyV = (pb2.attacks || []).some(function(a) { return !!a.verified; });
+                    if (!anyV) return false;
+                }
+                return true;
+            });
+            renderAtkDefSection(list, { onlyVerified: onlyVerified });
+        }
+
         function renderAtkDefSection() {
-            var list = document.getElementById("atk-def-list");
-            if (!atkDefData || atkDefData.length === 0) {
-                list.innerHTML = '<p style="color:#484f58;text-align:center;padding:20px;">Нет данных об атаках и защите. Загрузите базу инструментов.</p>';
+            ensureAtkDefInit();
+            hydrateAtkDefFromApi().finally(function() {
+                applyAtkDefFilters();
+            });
+        }
+
+        function renderAtkDefSection(vulns, opts) {
+            opts = opts || {};
+            var onlyVerified = !!opts.onlyVerified;
+            var listEl = document.getElementById("atk-def-list");
+            if (!listEl) return;
+            if (!vulns || vulns.length === 0) {
+                listEl.innerHTML = '<p style="color:#484f58;text-align:center;padding:20px;">Нет данных по выбранным фильтрам.</p>';
                 return;
             }
             var html = "";
-            atkDefData.forEach(function(item, idx) {
-                var feasClass = item.feas === "РЕАЛИЗУЕМА" ? "real" : (item.feas.includes("ЧАСТИЧНО") ? "part-real" : "noreal");
-                var sevClass = getSevClass(item.sev);
+            vulns.forEach(function(v, idx) {
+                var cve = String(v.cve_id || "").toUpperCase();
+                var cveDom = String(cve).replace(/[^a-zA-Z0-9_-]/g, "_");
+                var pb = atkDefCache[cve] || { attacks: [], defenses: [], meta: {} };
+                var sevClass = getSevClass(v.sev);
+                var feasClass = v.feas === "РЕАЛИЗУЕМА" ? "real" : (String(v.feas || "").includes("ЧАСТИЧНО") ? "part-real" : "noreal");
+                var attacks = (pb.attacks || []).slice();
+                attacks.sort(function(a, b) { return (b.verified === a.verified) ? String(a.name || "").localeCompare(String(b.name || "")) : (b.verified ? 1 : -1); });
+                if (onlyVerified) attacks = attacks.filter(function(a) { return !!a.verified; });
+                var anyAttacks = attacks.length > 0;
+
                 html += '<div class="atk-def-item">';
-                html += '<div class="atk-def-header" onclick="toggleAtkDefItem(' + idx + ')" style="background:#161b22;">';
-                html += '<div><span class="badge ' + sevClass + '" style="margin-right:8px;">' + escapeHtml(item.sev) + '</span>';
-                html += '<span class="badge ' + feasClass + '" style="margin-right:8px;">' + escapeHtml(item.feas) + '</span>';
-                html += '<strong style="color:#fff;">' + escapeHtml(item.sw) + '</strong>';
-                html += ' <span style="color:#8b949e;"> — ' + escapeHtml(item.capec) + ' (' + escapeHtml(item.cve_short) + ')</span></div>';
-                html += '<span style="color:#58a6ff;font-size:12px;">▼ Раскрыть сценарий</span>';
+                html += '<div class="atk-def-header" onclick="toggleAtkDefItemByCve(\\'' + escapeHtml(cve) + '\\')" style="background:#161b22;">';
+                html += '<div><span class="badge ' + sevClass + '" style="margin-right:8px;">' + escapeHtml(v.sev) + '</span>';
+                html += '<span class="badge ' + feasClass + '" style="margin-right:8px;">' + escapeHtml(v.feas) + '</span>';
+                html += '<strong style="color:#fff;">' + escapeHtml(cve) + '</strong>';
+                html += ' <span style="color:#8b949e;"> — ПО: ' + escapeHtml((v.sws || []).slice(0, 2).join(" / ") || "—") + ((v.sws || []).length > 2 ? (" +" + ((v.sws || []).length - 2)) : "") + '</span></div>';
+                html += '<span style="color:#58a6ff;font-size:12px;">▼ Раскрыть</span>';
                 html += '</div>';
-                html += '<div class="atk-def-body" id="atk-def-body-' + idx + '">';
 
-                // --- RED TEAM (Атака) ---
+                html += '<div class="atk-def-body" id="atk-def-body-' + cveDom + '" style="display:' + (atkExpandedCves[cve] ? "block" : "none") + ';">';
+                html += '<div style="display:flex; gap:10px; flex-wrap:wrap; font-size:12px; color:#8b949e; margin: 8px 0 12px 0;">';
+                html += '<div>Источник: атаки=' + escapeHtml(((v.source || {}).attacks || "auto")) + ', защита=' + escapeHtml(((v.source || {}).defenses || "auto")) + '</div>';
+                if (v.capecs && v.capecs.length) html += '<div>CAPEC: <span style="color:#58a6ff;">' + escapeHtml(v.capecs.join(", ")) + '</span></div>';
+                if (v.cwes && v.cwes.length) html += '<div>CWE: <span style="color:#d29922;">' + escapeHtml(v.cwes.join(", ")) + '</span></div>';
+                html += '</div>';
+
                 html += '<div class="atk-section">';
-                html += '<h4 style="color:#da3633;margin:0 0 15px 0;font-size:16px;">🥷 Пошаговый сценарий эксплуатации (Red Team)</h4>';
-                
-                if (item.attack_tools && item.attack_tools.length > 0) {
-                    let stepNum = 1;
-                    item.attack_tools.forEach(function(tool) {
-                        let feedbackId = `fb_red_${idx}_${stepNum}`;
-                        html += '<div class="step-card">';
-                        
-                        html += '<div class="step-header">';
-                        html += '<span class="step-num">Шаг ' + stepNum + '</span>';
-                        html += '<span class="step-title">' + escapeHtml(tool.name) + '</span>';
-                        if (tool.url) html += `<a href="${tool.url}" target="_blank" class="tool-link">🔗 Официальный сайт/Документация</a>`;
-                        if (tool.skill) html += '<span style="color:#8b949e;font-size:11px;margin-left:auto;">Уровень: ' + escapeHtml(tool.skill) + '</span>';
-                        html += '</div>';
-                        
-                        if (tool.desc) html += '<p style="font-size:13px;color:#c9d1d9;margin:8px 0;line-height:1.5;">' + escapeHtml(tool.desc) + '</p>';
-                        
-                        if (tool.commands && tool.commands.length > 0) {
-                            html += '<div class="cmd-block" id="cmd_' + feedbackId + '">';
-                            tool.commands.forEach(function(cmd) {
-                                if (cmd.startsWith("#") || cmd.startsWith("//")) {
-                                    html += '<span class="cmd-comment">' + escapeHtml(cmd) + '</span>\\n';
-                                } else if (cmd.trim() !== "") {
-                                    html += '<span class="cmd-highlight">' + escapeHtml(cmd) + '</span>\\n';
-                                    // Если есть пояснение к команде (имитация из БД)
-                                    if (tool.cmd_explanations && tool.cmd_explanations[cmd]) {
-                                        html += `</div><div class="cmd-explain">ℹ️ <b>Пояснение:</b> ${escapeHtml(tool.cmd_explanations[cmd])}</div><div class="cmd-block">`;
-                                    }
-                                }
-                            });
-                            html += '</div>';
-                        }
-                        
-                        // Обратная связь Red Team
-                        html += '<div class="step-feedback">';
-                        html += '<label>📝 Ошибка в шаге атаки?</label>';
-                        html += `<input type="text" id="${feedbackId}" class="bug-feedback-input" data-team="Red" data-cve="${escapeHtml(item.cve_short)}" data-sw="${escapeHtml(item.sw)}" data-step="${stepNum}" data-tool="${escapeHtml(tool.name)}" placeholder="Напишите, что не так (неверный флаг, нет доступа)...">`;
-                        html += '</div>';
-                        html += '</div>';
-                        stepNum++;
-                    });
-                } else {
-                    html += '<p style="color:#484f58;font-size:13px;">Инструменты атаки не найдены в базе данных.</p>';
+                var isEdit = !!atkEditCves[cve];
+                html += '<div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">';
+                html += '<h4 style="color:#da3633;margin:0;font-size:16px;">🥷 Атаки (Red Team)</h4>';
+                html += '<button class="' + (isEdit ? "btn-ghost" : "btn-toggle") + '" style="padding:8px 12px;" onclick="event.stopPropagation(); toggleAtkEdit(\\'' + escapeHtml(cve) + '\\')">' + (isEdit ? "✅ Готово" : "✏️ Редактировать") + '</button>';
+                if (isEdit) {
+                    html += '<button class="btn-toggle" style="padding:8px 12px;" onclick="event.stopPropagation(); addAtkAttack(\\'' + escapeHtml(cve) + '\\')">+ Добавить атаку</button>';
                 }
                 html += '</div>';
 
-                // --- BLUE TEAM (Защита) ---
-                html += '<div class="def-section">';
-                html += '<h4 style="color:#3fb950;margin:0 0 15px 0;font-size:16px;">🛡️ Меры противодействия (Blue Team)</h4>';
-                
-                if (item.defense_tools && item.defense_tools.length > 0) {
-                    let defStepNum = 1;
-                    item.defense_tools.forEach(function(tool) {
-                        let feedbackId = `fb_blue_${idx}_${defStepNum}`;
-                        html += '<div class="step-card" style="border-left: 3px solid #238636;">';
-                        
-                        html += '<div class="step-header">';
-                        html += '<span class="step-title" style="color:#3fb950;">' + escapeHtml(tool.name) + '</span>';
-                        if (tool.priority) html += '<span style="color:#8b949e;font-size:11px;margin-left:auto;"> Приоритет: ' + escapeHtml(tool.priority) + '</span>';
-                        html += '</div>';
-                        
-                        if (tool.desc) html += '<p style="font-size:13px;color:#c9d1d9;margin:8px 0;">' + escapeHtml(tool.desc) + '</p>';
-                        
-                        if (tool.commands && tool.commands.length > 0) {
-                            html += '<div class="cmd-block" id="cmd_' + feedbackId + '" style="color:#e6edf3; border-color:#238636;">';
-                            tool.commands.forEach(function(cmd) {
-                                html += escapeHtml(cmd) + '\\n';
-                            });
+                if (!anyAttacks) {
+                    html += '<p style="color:#484f58;font-size:13px;">Атаки не найдены.</p>';
+                } else {
+                    attacks.forEach(function(a, ai) {
+                        html += '<div class="step-card">';
+                        if (isEdit) {
+                            html += '<div class="step-header" style="gap:10px; align-items:center;">';
+                            html += '<label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#8b949e;">';
+                            html += '<input type="checkbox" ' + (a.verified ? "checked" : "") + ' onchange="event.stopPropagation(); toggleAtkVerified(\\'' + escapeHtml(cve) + '\\', \\'' + escapeHtml(a.id) + '\\', this.checked)" />';
+                            html += 'проверено</label>';
+                            html += '<input class="filter-input" style="flex:1; min-width:240px;" value="' + escapeHtml(a.name) + '" oninput="event.stopPropagation(); updateAtkName(\\'' + escapeHtml(cve) + '\\', \\'' + escapeHtml(a.id) + '\\', this.value)" placeholder="Название атаки" />';
+                            html += '<button class="btn-clear" style="padding:6px 10px;" onclick="event.stopPropagation(); removeAtkAttack(\\'' + escapeHtml(cve) + '\\', \\'' + escapeHtml(a.id) + '\\')">Удалить</button>';
+                            html += '</div>';
+                        } else {
+                            html += '<div class="step-header" style="justify-content:space-between;">';
+                            html += '<div style="display:flex; gap:10px; align-items:center;">';
+                            html += '<span class="step-title">' + escapeHtml(a.name || "Атака") + '</span>';
+                            if (a.verified) html += '<span class="atk-verified-badge">проверено</span>';
+                            html += '</div>';
                             html += '</div>';
                         }
-                        
-                        // Обратная связь Blue Team
-                        html += '<div class="step-feedback" style="border-color:#238636;">';
-                        html += '<label>📝 Ошибка в конфигурации/команде защиты?</label>';
-                        html += `<input type="text" id="${feedbackId}" class="bug-feedback-input" data-team="Blue" data-cve="${escapeHtml(item.cve_short)}" data-sw="${escapeHtml(item.sw)}" data-step="${defStepNum}" data-tool="${escapeHtml(tool.name)}" placeholder="Например: эта команда ломает прод, нужен другой синтаксис...">`;
+
+                        html += '<div style="margin-top:10px;">';
+                        if (isEdit) {
+                            html += '<div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">';
+                            html += '<span style="color:#8b949e; font-size:12px;">Шаги:</span>';
+                            html += '<button class="btn-toggle" style="padding:6px 10px;" onclick="event.stopPropagation(); addAtkStep(\\'' + escapeHtml(cve) + '\\', \\'' + escapeHtml(a.id) + '\\')">+ Шаг</button>';
+                            html += '</div>';
+                        }
+                        (a.steps || []).forEach(function(st, si) {
+                            var stepLabel = st.name ? String(st.name) : ("Шаг " + (si + 1));
+                            if (isEdit) {
+                                html += '<div style="display:flex; gap:10px; align-items:flex-start; margin-bottom:8px;">';
+                                html += '<input class="filter-input" style="max-width:220px;" value="' + escapeHtml(stepLabel === ("Шаг " + (si + 1)) ? "" : st.name) + '" oninput="event.stopPropagation(); updateAtkStepName(\\'' + escapeHtml(cve) + '\\', \\'' + escapeHtml(a.id) + '\\', \\'' + escapeHtml(st.id) + '\\', this.value)" placeholder="Название шага" />';
+                                html += '<textarea class="filter-input" style="flex:1; min-height:44px; resize:vertical;" oninput="event.stopPropagation(); updateAtkStepText(\\'' + escapeHtml(cve) + '\\', \\'' + escapeHtml(a.id) + '\\', \\'' + escapeHtml(st.id) + '\\', this.value)" placeholder="Команда / действие">' + escapeHtml(st.text || "") + '</textarea>';
+                                html += '<button class="btn-clear" style="padding:6px 10px; height:36px;" onclick="event.stopPropagation(); removeAtkStep(\\'' + escapeHtml(cve) + '\\', \\'' + escapeHtml(a.id) + '\\', \\'' + escapeHtml(st.id) + '\\')">×</button>';
+                                html += '</div>';
+                            } else {
+                                html += '<div class="atk-step-title">' + escapeHtml(stepLabel) + '</div>';
+                                html += '<div class="cmd-block" style="color:#c9d1d9;">' + escapeHtml(String(st.text || "")) + '</div>';
+                            }
+                        });
                         html += '</div>';
                         html += '</div>';
-                        defStepNum++;
                     });
                 }
-                
-                // Умный парсер стены текста рекомендаций
-                if (item.recommendation) {
-                    html += parseAndFormatRecommendations(item.recommendation);
+                html += '</div>';
+
+                html += '<div class="def-section">';
+                html += '<div style="display:flex; align-items:center; gap:10px; margin: 18px 0 10px 0;">';
+                html += '<h4 style="color:#3fb950;margin:0;font-size:16px;">🛡️ Меры противодействия (Blue Team)</h4>';
+                if (isEdit) html += '<button class="btn-toggle" style="padding:8px 12px;" onclick="event.stopPropagation(); addDefItem(\\'' + escapeHtml(cve) + '\\')">+ Добавить меру</button>';
+                html += '</div>';
+                var defs = (pb.defenses || []).slice();
+                defs.sort(function(a, b) { return String(a.priority || "").localeCompare(String(b.priority || "")); });
+                if (!defs.length) {
+                    html += '<p style="color:#484f58;font-size:13px;">Меры защиты не найдены. Добавьте вручную.</p>';
+                } else {
+                    defs.forEach(function(d) {
+                        html += '<div class="step-card" style="border-left: 3px solid #238636;">';
+                        if (isEdit) {
+                            html += '<div class="step-header" style="gap:10px; align-items:center;">';
+                            html += '<input class="filter-input" style="flex:1; min-width:240px;" value="' + escapeHtml(d.name) + '" oninput="event.stopPropagation(); updateDefName(\\'' + escapeHtml(cve) + '\\', \\'' + escapeHtml(d.id) + '\\', this.value)" placeholder="Название меры" />';
+                            html += '<input class="filter-input" style="max-width:140px;" value="' + escapeHtml(d.priority || "") + '" oninput="event.stopPropagation(); updateDefPriority(\\'' + escapeHtml(cve) + '\\', \\'' + escapeHtml(d.id) + '\\', this.value)" placeholder="Приоритет" />';
+                            html += '<button class="btn-clear" style="padding:6px 10px;" onclick="event.stopPropagation(); removeDefItem(\\'' + escapeHtml(cve) + '\\', \\'' + escapeHtml(d.id) + '\\')">Удалить</button>';
+                            html += '</div>';
+                        } else {
+                            html += '<div class="step-header" style="justify-content:space-between;">';
+                            html += '<div style="display:flex; gap:10px; align-items:center;">';
+                            html += '<span class="step-title" style="color:#3fb950;">' + escapeHtml(d.name || "Мера") + '</span>';
+                            if (d.priority) html += '<span style="color:#8b949e; font-size:12px;">Приоритет: ' + escapeHtml(d.priority) + '</span>';
+                            html += '</div>';
+                            html += '</div>';
+                        }
+                        html += '<div style="margin-top:10px;">';
+                        if (isEdit) {
+                            html += '<div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">';
+                            html += '<span style="color:#8b949e; font-size:12px;">Шаги:</span>';
+                            html += '<button class="btn-toggle" style="padding:6px 10px;" onclick="event.stopPropagation(); addDefStep(\\'' + escapeHtml(cve) + '\\', \\'' + escapeHtml(d.id) + '\\')">+ Шаг</button>';
+                            html += '</div>';
+                        }
+                        (d.steps || []).forEach(function(st) {
+                            if (isEdit) {
+                                html += '<div style="display:flex; gap:10px; align-items:flex-start; margin-bottom:8px;">';
+                                html += '<input class="filter-input" style="max-width:220px;" value="' + escapeHtml(st.name || "") + '" oninput="event.stopPropagation(); updateDefStepName(\\'' + escapeHtml(cve) + '\\', \\'' + escapeHtml(d.id) + '\\', \\'' + escapeHtml(st.id) + '\\', this.value)" placeholder="Название шага" />';
+                                html += '<textarea class="filter-input" style="flex:1; min-height:44px; resize:vertical;" oninput="event.stopPropagation(); updateDefStepText(\\'' + escapeHtml(cve) + '\\', \\'' + escapeHtml(d.id) + '\\', \\'' + escapeHtml(st.id) + '\\', this.value)" placeholder="Команда / действие">' + escapeHtml(st.text || "") + '</textarea>';
+                                html += '<button class="btn-clear" style="padding:6px 10px; height:36px;" onclick="event.stopPropagation(); removeDefStep(\\'' + escapeHtml(cve) + '\\', \\'' + escapeHtml(d.id) + '\\', \\'' + escapeHtml(st.id) + '\\')">×</button>';
+                                html += '</div>';
+                            } else {
+                                var stepLabel = st.name ? String(st.name) : "Шаг";
+                                html += '<div class="atk-step-title">' + escapeHtml(stepLabel) + '</div>';
+                                html += '<div class="cmd-block" style="color:#c9d1d9; border-color:#238636;">' + escapeHtml(String(st.text || "")) + '</div>';
+                            }
+                        });
+                        html += '</div>';
+                        html += '</div>';
+                    });
                 }
-                
-                html += '</div>'; // Конец def-section
+
+                if (v.recommendation) {
+                    html += parseAndFormatRecommendations(v.recommendation);
+                }
+                html += '</div>';
                 html += '</div></div>';
             });
-            list.innerHTML = html;
+            listEl.innerHTML = html;
+        }
+
+        function toggleAtkDefItemByCve(cve) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            if (!cve) return;
+            atkExpandedCves[cve] = !atkExpandedCves[cve];
+            var cveDom = String(cve).replace(/[^a-zA-Z0-9_-]/g, "_");
+            var el = document.getElementById("atk-def-body-" + cveDom);
+            if (el) el.style.display = atkExpandedCves[cve] ? "block" : "none";
+        }
+
+        function toggleAtkEdit(cve) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            if (!cve) return;
+            atkEditCves[cve] = !atkEditCves[cve];
+            atkExpandedCves[cve] = true;
+            applyAtkDefFilters();
+        }
+
+        function findAtk(cve, aid) {
+            var pb = atkDefCache[cve];
+            if (!pb) return null;
+            return (pb.attacks || []).find(function(a) { return String(a.id) === String(aid); }) || null;
+        }
+        function findDef(cve, did) {
+            var pb = atkDefCache[cve];
+            if (!pb) return null;
+            return (pb.defenses || []).find(function(d) { return String(d.id) === String(did); }) || null;
+        }
+
+        function addAtkAttack(cve) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var pb = atkDefCache[cve];
+            if (!pb) return;
+            var id = "a" + (pb.attacks.length + 1) + "_" + Date.now();
+            pb.attacks.push({ id: id, name: "", verified: false, steps: [{ id: "s1", name: "", text: "" }], notes: "", tags: [] });
+            scheduleAtkSave(cve);
+            applyAtkDefFilters();
+        }
+        function removeAtkAttack(cve, aid) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var pb = atkDefCache[cve];
+            if (!pb) return;
+            pb.attacks = (pb.attacks || []).filter(function(a) { return String(a.id) !== String(aid); });
+            scheduleAtkSave(cve);
+            applyAtkDefFilters();
+        }
+        function toggleAtkVerified(cve, aid, val) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var a = findAtk(cve, aid);
+            if (!a) return;
+            a.verified = !!val;
+            scheduleAtkSave(cve);
+            applyAtkDefFilters();
+        }
+        function updateAtkName(cve, aid, val) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var a = findAtk(cve, aid);
+            if (!a) return;
+            a.name = String(val || "");
+            scheduleAtkSave(cve);
+        }
+        function addAtkStep(cve, aid) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var a = findAtk(cve, aid);
+            if (!a) return;
+            var sid = "s" + (a.steps.length + 1) + "_" + Date.now();
+            a.steps.push({ id: sid, name: "", text: "" });
+            scheduleAtkSave(cve);
+            applyAtkDefFilters();
+        }
+        function removeAtkStep(cve, aid, sid) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var a = findAtk(cve, aid);
+            if (!a) return;
+            a.steps = (a.steps || []).filter(function(s) { return String(s.id) !== String(sid); });
+            scheduleAtkSave(cve);
+            applyAtkDefFilters();
+        }
+        function updateAtkStepName(cve, aid, sid, val) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var a = findAtk(cve, aid);
+            if (!a) return;
+            var s = (a.steps || []).find(function(x) { return String(x.id) === String(sid); });
+            if (!s) return;
+            s.name = String(val || "");
+            scheduleAtkSave(cve);
+        }
+        function updateAtkStepText(cve, aid, sid, val) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var a = findAtk(cve, aid);
+            if (!a) return;
+            var s = (a.steps || []).find(function(x) { return String(x.id) === String(sid); });
+            if (!s) return;
+            s.text = String(val || "");
+            scheduleAtkSave(cve);
+        }
+
+        function addDefItem(cve) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var pb = atkDefCache[cve];
+            if (!pb) return;
+            var id = "d" + (pb.defenses.length + 1) + "_" + Date.now();
+            pb.defenses.push({ id: id, name: "", priority: "", verified: false, steps: [{ id: "s1", name: "", text: "" }], notes: "", tags: [] });
+            scheduleAtkSave(cve);
+            applyAtkDefFilters();
+        }
+        function removeDefItem(cve, did) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var pb = atkDefCache[cve];
+            if (!pb) return;
+            pb.defenses = (pb.defenses || []).filter(function(d) { return String(d.id) !== String(did); });
+            scheduleAtkSave(cve);
+            applyAtkDefFilters();
+        }
+        function updateDefName(cve, did, val) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var d = findDef(cve, did);
+            if (!d) return;
+            d.name = String(val || "");
+            scheduleAtkSave(cve);
+        }
+        function updateDefPriority(cve, did, val) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var d = findDef(cve, did);
+            if (!d) return;
+            d.priority = String(val || "");
+            scheduleAtkSave(cve);
+        }
+        function addDefStep(cve, did) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var d = findDef(cve, did);
+            if (!d) return;
+            var sid = "s" + (d.steps.length + 1) + "_" + Date.now();
+            d.steps.push({ id: sid, name: "", text: "" });
+            scheduleAtkSave(cve);
+            applyAtkDefFilters();
+        }
+        function removeDefStep(cve, did, sid) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var d = findDef(cve, did);
+            if (!d) return;
+            d.steps = (d.steps || []).filter(function(s) { return String(s.id) !== String(sid); });
+            scheduleAtkSave(cve);
+            applyAtkDefFilters();
+        }
+        function updateDefStepName(cve, did, sid, val) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var d = findDef(cve, did);
+            if (!d) return;
+            var s = (d.steps || []).find(function(x) { return String(x.id) === String(sid); });
+            if (!s) return;
+            s.name = String(val || "");
+            scheduleAtkSave(cve);
+        }
+        function updateDefStepText(cve, did, sid, val) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var d = findDef(cve, did);
+            if (!d) return;
+            var s = (d.steps || []).find(function(x) { return String(x.id) === String(sid); });
+            if (!s) return;
+            s.text = String(val || "");
+            scheduleAtkSave(cve);
         }
 
         function parseAndFormatRecommendations(text) {
@@ -1953,16 +2445,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             var visData = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
             
             // Динамическое расстояние узлов
-            var nodeSpc = viewId === "4" ? 650 : 400;
+            var nodeSpc = viewId === "4" ? 480 : 280;
             var levelSep = 250;
             if (viewId === "4") {
                 levelSep = 350;
             } else if (viewId.startsWith("1_")) {
+                nodeSpc = 260;
                 levelSep = 180; // Сближаем узлы по вертикали, так как теперь 6 уровней (цепочки)
             }
             
             var options = {
-                layout: { hierarchical: { direction: 'UD', sortMethod: 'directed', nodeSpacing: nodeSpc, levelSeparation: levelSep } },
+                layout: { hierarchical: { direction: 'UD', sortMethod: 'directed', nodeSpacing: nodeSpc, levelSeparation: levelSep, treeSpacing: Math.max(nodeSpc, 320), blockShifting: true, edgeMinimization: true, parentCentralization: true } },
                 physics: false,
                 nodes: { borderWidth: 2, shadow: true, margin: 15, font: { face: "Segoe UI" } },
                 edges: { shadow: true, arrows: { to: { enabled: true, scaleFactor: 0.8 } }, smooth: { type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.15 } },

@@ -2144,23 +2144,47 @@ class ServerGUI(QMainWindow):
                 state.trivy_result = getattr(gui, "trivy_result", None)
                 state.ready = bool(state.system_info and state.vuln_db)
 
+            def do_OPTIONS(self):
+                self.send_response(200)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                self.end_headers()
+
             def do_GET(self):
                 ip = self.client_address[0]
                 try:
                     self._sync_state()
                     ss = state.system_summary if isinstance(state.system_summary, dict) else {}
                     hn = ss.get("hostname", "")
-                    if self.path == "/ping":
+                    path_only = self.path.split("?", 1)[0]
+                    if path_only == "/playbooks":
+                        from server import api_server as api
+                        q = {}
+                        if "?" in self.path:
+                            for part in self.path.split("?", 1)[1].split("&"):
+                                if "=" in part:
+                                    k, v = part.split("=", 1)
+                                    q[k] = v
+                        cve_q = (q.get("cve") or "").strip().upper()
+                        with state.playbook_lock:
+                            db = api._load_playbooks()
+                        if cve_q:
+                            entry = (db.get("cves") or {}).get(cve_q, None)
+                            self._r(200, {"cve_id": cve_q, "playbook": entry or {}})
+                        else:
+                            self._r(200, db)
+                    elif path_only == "/ping":
                         if ip not in state.connected_clients:
                             state.connected_clients.append(ip)
                             if state.on_client_connected:
                                 state.on_client_connected(ip)
                         self._r(200, {"status": "pong", "ready": state.ready, "hostname": hn})
-                    elif self.path == "/status":
+                    elif path_only == "/status":
                         self._r(200, {"status": "running", "ready": state.ready, "hostname": hn, "clients": state.connected_clients})
-                    elif self.path == "/system-info":
+                    elif path_only == "/system-info":
                         self._r(200, ss)
-                    elif self.path == "/last-correlation":
+                    elif path_only == "/last-correlation":
                         with state.last_correlation_lock:
                             payload = getattr(state, "last_correlation_payload", None)
                         if payload:
@@ -2174,7 +2198,47 @@ class ServerGUI(QMainWindow):
             def do_POST(self):
                 ip = self.client_address[0]
                 logger.info(f"[API] POST {self.path} от {ip}")
-                if self.path != "/analyze":
+                path_only = self.path.split("?", 1)[0]
+                if path_only == "/playbooks":
+                    from server import api_server as api
+                    try:
+                        ln = int(self.headers.get("Content-Length", 0))
+                        if ln == 0:
+                            self._r(400, {"error": "Пустое тело"})
+                            return
+                        body = self.rfile.read(ln).decode("utf-8")
+                        payload = json.loads(body)
+                        cve_id = str(payload.get("cve_id", "") or "").strip().upper()
+                        playbook = payload.get("playbook", None)
+                        if not cve_id.startswith("CVE-"):
+                            self._r(400, {"error": "Некорректный cve_id"})
+                            return
+                        if not isinstance(playbook, dict):
+                            self._r(400, {"error": "playbook должен быть объектом"})
+                            return
+                        attacks = playbook.get("attacks", [])
+                        defenses = playbook.get("defenses", [])
+                        if not isinstance(attacks, list) or not isinstance(defenses, list):
+                            self._r(400, {"error": "attacks/defenses должны быть списками"})
+                            return
+                        with state.playbook_lock:
+                            db = api._load_playbooks()
+                            cves = db.setdefault("cves", {})
+                            cves[cve_id] = {
+                                "attacks": attacks,
+                                "defenses": defenses,
+                                "meta": playbook.get("meta", {}) if isinstance(playbook.get("meta", {}), dict) else {},
+                                "updated_at": datetime.now().isoformat(),
+                            }
+                            api._save_playbooks(db)
+                        self._r(200, {"status": "ok", "cve_id": cve_id})
+                    except json.JSONDecodeError as e:
+                        self._r(400, {"error": f"Некорректный JSON: {e}"})
+                    except Exception as e:
+                        logger.error(f"[API] Ошибка сохранения playbooks: {e}", exc_info=True)
+                        self._r(500, {"error": str(e)})
+                    return
+                if path_only != "/analyze":
                     self._r(404, {"error": "Not Found"})
                     return
                 self._sync_state()
@@ -2274,6 +2338,8 @@ class ServerGUI(QMainWindow):
                 self.send_response(code)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
                 self.end_headers()
                 self.wfile.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))
             def log_message(self, *a):

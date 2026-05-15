@@ -20,6 +20,7 @@ import threading
 import logging
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
+from urllib.parse import urlparse, parse_qs
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -33,6 +34,8 @@ from server.report_generator import ReportGenerator
 from server.trivy_scanner import TrivyScanResult
 
 logger = get_server_logger()
+
+PLAYBOOK_DB_PATH = "databases/attack_playbooks.json"
 
 
 class ServerState:
@@ -60,9 +63,55 @@ class ServerState:
         self.last_correlation_payload = None
         self.last_correlation_id = None
         self.last_correlation_lock = threading.Lock()
+        self.playbook_lock = threading.Lock()
 
 
 state = ServerState()
+
+def _playbook_path() -> str:
+    base = state.base_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, PLAYBOOK_DB_PATH)
+
+def _load_playbooks() -> dict:
+    path = _playbook_path()
+    try:
+        if not os.path.exists(path):
+            return {"schema_version": 2, "updated_at": "", "cves": {}, "vectors": {}}
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return {"schema_version": 2, "updated_at": "", "cves": {}, "vectors": {}}
+        if "cves" not in data or not isinstance(data.get("cves"), dict):
+            data["cves"] = {}
+        if "vectors" not in data or not isinstance(data.get("vectors"), dict):
+            data["vectors"] = {}
+        if "schema_version" not in data:
+            data["schema_version"] = 2
+        if "updated_at" not in data:
+            data["updated_at"] = ""
+        return data
+    except Exception as e:
+        logger.warning(f"[PLAYBOOK] Ошибка чтения {path}: {e}")
+        return {"schema_version": 2, "updated_at": "", "cves": {}, "vectors": {}}
+
+def _save_playbooks(db: dict) -> None:
+    path = _playbook_path()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+    except Exception:
+        pass
+    db = db if isinstance(db, dict) else {"schema_version": 2, "updated_at": "", "cves": {}, "vectors": {}}
+    if "cves" not in db or not isinstance(db.get("cves"), dict):
+        db["cves"] = {}
+    if "vectors" not in db or not isinstance(db.get("vectors"), dict):
+        db["vectors"] = {}
+    if "schema_version" not in db:
+        db["schema_version"] = 2
+    db["updated_at"] = datetime.now().isoformat()
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(db, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
 
 
 def _safe_hostname() -> str:
@@ -106,11 +155,21 @@ def _save_to_history(results: list, summary: dict, ts: str,
 class RequestHandler(BaseHTTPRequestHandler):
     """Обработчик HTTP-запросов."""
 
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
     def do_GET(self):
         client_ip = self.client_address[0]
         logger.info(f"[HTTP-IN] GET {self.path} от {client_ip}")
         try:
-            if self.path == "/status":
+            u = urlparse(self.path)
+            path = u.path
+            qs = parse_qs(u.query or "")
+            if path == "/status":
                 self._respond(200, {
                     "status": "running",
                     "ready": state.ready,
@@ -119,13 +178,13 @@ class RequestHandler(BaseHTTPRequestHandler):
                     "clients": state.connected_clients,
                 })
 
-            elif self.path == "/system-info":
+            elif path == "/system-info":
                 if state.system_summary and isinstance(state.system_summary, dict):
                     self._respond(200, state.system_summary)
                 else:
                     self._respond(200, {"error": "Система ещё не проанализирована", "ready": False})
 
-            elif self.path == "/ping":
+            elif path == "/ping":
                 # /ping ВСЕГДА возвращает 200
                 if client_ip not in state.connected_clients:
                     state.connected_clients.append(client_ip)
@@ -138,12 +197,27 @@ class RequestHandler(BaseHTTPRequestHandler):
                     "hostname": _safe_hostname(),
                 })
 
-            elif self.path == "/":
+            elif path == "/":
                 self._respond(200, {
                     "message": "Security Assessment Server API v2.1",
                     "ready": state.ready,
                     "endpoints": ["/ping", "/status", "/system-info", "/analyze (POST)"],
                 })
+
+            elif path == "/playbooks":
+                cve_q = (qs.get("cve") or [None])[0]
+                vector_q = (qs.get("vector") or [None])[0]
+                with state.playbook_lock:
+                    db = _load_playbooks()
+                if vector_q:
+                    key = str(vector_q).strip()
+                    entry = (db.get("vectors") or {}).get(key, None)
+                    self._respond(200, {"vector_id": key, "playbook": entry or {}})
+                elif cve_q:
+                    entry = (db.get("cves") or {}).get(str(cve_q).upper(), None)
+                    self._respond(200, {"cve_id": str(cve_q).upper(), "playbook": entry or {}})
+                else:
+                    self._respond(200, db)
 
             else:
                 self._respond(404, {"error": "Не найдено"})
@@ -156,7 +230,66 @@ class RequestHandler(BaseHTTPRequestHandler):
         client_ip = self.client_address[0]
         logger.info(f"[HTTP-IN] POST {self.path} от {client_ip}")
 
-        if self.path == "/analyze":
+        u = urlparse(self.path)
+        path = u.path
+
+        if path == "/playbooks":
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+                if content_length == 0:
+                    self._respond(400, {"error": "Пустое тело запроса"})
+                    return
+                body = self.rfile.read(content_length).decode("utf-8")
+                payload = json.loads(body)
+                vector_id = str(payload.get("vector_id", "") or "").strip()
+                cve_id = str(payload.get("cve_id", "") or "").strip().upper()
+                playbook = payload.get("playbook", None)
+                if not vector_id and not cve_id:
+                    self._respond(400, {"error": "Нужно указать vector_id или cve_id"})
+                    return
+                if cve_id and not cve_id.startswith("CVE-"):
+                    self._respond(400, {"error": "Некорректный cve_id"})
+                    return
+                if vector_id and len(vector_id) > 300:
+                    self._respond(400, {"error": "Слишком длинный vector_id"})
+                    return
+                if not isinstance(playbook, dict):
+                    self._respond(400, {"error": "playbook должен быть объектом"})
+                    return
+                attacks = playbook.get("attacks", [])
+                defenses = playbook.get("defenses", [])
+                if not isinstance(attacks, list) or not isinstance(defenses, list):
+                    self._respond(400, {"error": "attacks/defenses должны быть списками"})
+                    return
+                with state.playbook_lock:
+                    db = _load_playbooks()
+                    entry = {
+                        "attacks": attacks,
+                        "defenses": defenses,
+                        "meta": playbook.get("meta", {}) if isinstance(playbook.get("meta", {}), dict) else {},
+                        "updated_at": datetime.now().isoformat(),
+                    }
+                    if vector_id:
+                        vectors = db.setdefault("vectors", {})
+                        vectors[vector_id] = entry
+                    else:
+                        cves = db.setdefault("cves", {})
+                        cves[cve_id] = entry
+                    _save_playbooks(db)
+                resp = {"status": "ok"}
+                if vector_id:
+                    resp["vector_id"] = vector_id
+                if cve_id:
+                    resp["cve_id"] = cve_id
+                self._respond(200, resp)
+            except json.JSONDecodeError as e:
+                self._respond(400, {"error": f"Некорректный JSON: {e}"})
+            except Exception as e:
+                logger.error(f"[PLAYBOOK] Ошибка сохранения: {e}", exc_info=True)
+                self._respond(500, {"error": str(e)})
+            return
+
+        if path == "/analyze":
             # Проверяем готовность сервера
             if not state.system_info:
                 logger.warning(f"[HTTP-IN] POST /analyze от {client_ip}: НЕ ГОТОВ (анализ системы не выполнен)")
@@ -307,6 +440,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
 
