@@ -10,7 +10,9 @@ class Config:
     TRANSLATION_DELAY = 1.5     # Задержка между запросами к переводчику (сек)
     TRANSLATION_BATCH_SIZE = 20 # Сколько строк отправлять за раз (Google позволяет до ~100)
     TRANSLATION_MAX_RETRIES = 4     # Число повторных попыток при ошибке
-    
+    TRANSLATION_SERVICE = "google" # google или yandex
+    YANDEX_API_KEY = "" # API key Яндекса (если выбран Яндекс)
+     
     # Настройки загрузки
     REQUEST_TIMEOUT = 30
     RETRY_ATTEMPTS = 3
@@ -21,7 +23,13 @@ class Config:
     MAX_CWE_RECORDS = 500
     MAX_CVE_RECORDS = 2000
     MAX_ATTACK_RECORDS = 300
-    
+
+    # AI ENRICHER
+    AI_PROVIDER = "ollama" # ollama, openai
+    AI_MODEL = "qwen2.5:3b" # for ollama: qwen2.5:3b, for openai: gpt-4o-mini
+    AI_API_KEY = "" # only for openai
+    AI_BASE_URL = "http://localhost:11434/v1" # ollama base URL
+
     # Источники данных
     SOURCES = {
         "capec": "https://capec.mitre.org/data/xml/capec_latest.xml",

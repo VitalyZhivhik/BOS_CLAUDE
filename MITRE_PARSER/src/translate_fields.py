@@ -13,10 +13,10 @@ from translator import Translator
 
 # Поля, которые нужно перевести в каждом типе файла
 FIELDS_TO_TRANSLATE = {
-    "capec_database.json": ["name", "description", "prerequisites", "mitigations"],
+    "capec_database.json": ["name", "description", "severity", "prerequisites", "mitigations"],
     "cwe_database.json": ["name", "description", "mitigation", "category", "detection_methods"],
-    "cve_database.json": ["description", "mitigations", "mitigation", "affected_software", "attack_type", "requires_service"],
-    "mitre_attack.json": ["name", "description", "mitigations", "detection", "tactic"]
+    "cve_database.json": ["description", "severity", "mitigations", "mitigation", "affected_software", "attack_type", "requires_service"],
+    "mitre_attack.json": ["name", "description", "requires_service", "mitigations", "detection", "tactic"]
 }
 
 def translate_field(value, translator: Translator):
@@ -49,9 +49,9 @@ def translate_file(filepath: Path, fields: list, translator: Translator):
         if (idx + 1) % 100 == 0:
             print(f"  🔄 Прогресс: {idx+1}/{total_items}")
     
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    print(f"✅ {filepath.name}: переведено элементов — {updated} из {total_items}")
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"✅ {filepath.name}: переведено элементов — {updated} из {total_items}")
 
 def main():
     print("🎯 Выборочный перевод полей JSON-файлов (онлайн-режим)")
