@@ -31,7 +31,13 @@ logger = get_server_logger()
 class AttackCorrelator:
     """Движок корреляции атак с конфигурацией сервера."""
 
-    def __init__(self, system_info: SystemInfo, vuln_db: VulnerabilityDatabase, trivy_result=None):
+    def __init__(
+        self,
+        system_info: SystemInfo,
+        vuln_db: VulnerabilityDatabase,
+        trivy_result=None,
+        correlation_settings: Optional[dict] = None,
+    ):
         self.system_info = system_info
         self.vuln_db = vuln_db
         self.trivy_result = trivy_result  # Результаты сканирования Trivy
@@ -47,15 +53,19 @@ class AttackCorrelator:
         self.trivy_weight = 35
         self.software_weight = 20
         self.scanner_weight = 30
+        self.patch_weight = 10
+        self.protection_weight = 5
         
         # Загружаем настройки из глобального состояния, если они есть
-        self._load_correlation_settings()
+        self._load_correlation_settings(correlation_settings)
     
-    def _load_correlation_settings(self):
+    def _load_correlation_settings(self, settings_override: Optional[dict] = None):
         """Загружает настройки корреляции из глобального состояния."""
         try:
-            from server.api_server import state
-            settings = getattr(state, 'correlation_settings', None)
+            settings = settings_override
+            if settings is None:
+                from server.api_server import state
+                settings = getattr(state, "correlation_settings", None)
             if settings:
                 self.max_score = settings.get('max_score', 100)
                 self.feasible_threshold = settings.get('feasible_threshold', 60)
@@ -65,6 +75,8 @@ class AttackCorrelator:
                 self.trivy_weight = settings.get('trivy_weight', 35)
                 self.software_weight = settings.get('software_weight', 20)
                 self.scanner_weight = settings.get('scanner_weight', 30)
+                self.patch_weight = settings.get("patch_weight", 10)
+                self.protection_weight = settings.get("protection_weight", 5)
         except ImportError:
             pass  # API сервер может быть не запущен
 
@@ -354,7 +366,7 @@ class AttackCorrelator:
         - Снижены требования к средствам защиты
         """
         score = 0
-        max_score = 100
+        max_score = int(self.max_score)
         score_details = []
         blockers = []
         uncertainty_flags = []
@@ -500,25 +512,27 @@ class AttackCorrelator:
                 if not scanner_confirmed:
                     blockers.append("Целевое уязвимое ПО не обнаружено")
         
-        # Фактор 4: Отсутствие патчей/обновлений (10 баллов)
+        # Фактор 4: Отсутствие патчей/обновлений
         if not self.system_info.updates_installed:
-            score += 10
-            patch_points += 10
+            score += self.patch_weight
+            patch_points += self.patch_weight
             score_details.append("Обновления не установлены")
         else:
-            score += 5
-            patch_points += 5
+            awarded = int(self.patch_weight * 0.5)
+            score += awarded
+            patch_points += awarded
             score_details.append("Обновления установлены")
         
-        # Фактор 5: Слабые средства защиты (5 баллов)
-        # Снижаем требования к средствам защиты
+        # Фактор 5: Слабые средства защиты
+        fw_pts = int(round(self.protection_weight * 0.6))
+        av_pts = int(self.protection_weight) - fw_pts
         if not self.system_info.firewall_active:
-            score += 3
-            protection_points += 3
+            score += fw_pts
+            protection_points += fw_pts
             score_details.append("Брандмауэр отключён")
         if not self.system_info.antivirus_active:
-            score += 2
-            protection_points += 2
+            score += av_pts
+            protection_points += av_pts
             score_details.append("Антивирус отключён")
         
         # Определяем реализуемость на основе score с использованием параметров из класса
@@ -604,13 +618,13 @@ class AttackCorrelator:
                         "key": "patches",
                         "label": "Состояние обновлений",
                         "points": int(round(patch_points)),
-                        "max_points": 10,
+                        "max_points": int(self.patch_weight),
                     },
                     {
                         "key": "protection",
                         "label": "Ослабление защиты",
                         "points": int(round(protection_points)),
-                        "max_points": 5,
+                        "max_points": int(self.protection_weight),
                     },
                 ],
             },
