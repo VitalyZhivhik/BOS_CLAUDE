@@ -781,14 +781,115 @@ class ReportGenerator:
             return 0
 
         def as_step_list(commands: list) -> list[dict]:
-            out = []
-            if not isinstance(commands, list):
-                return out
-            for i, c in enumerate(commands):
-                t = str(c or "").rstrip()
-                if not t:
-                    continue
-                out.append({"id": f"s{i+1}", "name": "", "text": t})
+            def _merge_comment_only_steps(steps: list[dict]) -> list[dict]:
+                merged: list[dict] = []
+                carry: list[str] = []
+                for st in steps:
+                    name = str(st.get("name") or "").strip()
+                    text = str(st.get("text") or "").rstrip()
+                    if not name and text.lstrip().startswith("#") and not text.lstrip().startswith("###"):
+                        carry.append(text.lstrip()[1:].strip() or text.strip())
+                        continue
+                    if carry:
+                        if not name:
+                            name = carry[0]
+                        else:
+                            text = ("\n".join(["# " + c for c in carry]) + ("\n" + text if text else ""))
+                        carry = []
+                    merged.append({"id": str(st.get("id") or ""), "name": name, "text": text})
+                if carry:
+                    merged.append({"id": f"s{len(merged)+1}", "name": carry[0], "text": ""})
+                for i, st in enumerate(merged):
+                    st["id"] = f"s{i+1}"
+                return merged
+
+            def _parse_steps(cmds: list) -> list[dict]:
+                if not isinstance(cmds, list):
+                    return []
+                lines: list[str] = []
+                for c in cmds:
+                    if c is None:
+                        continue
+                    s = str(c).replace("\r\n", "\n").replace("\r", "\n")
+                    for ln in s.split("\n"):
+                        lines.append(ln.rstrip("\n"))
+
+                steps: list[dict] = []
+                pending_comments: list[str] = []
+                current: dict | None = None
+                in_block = False
+
+                def flush_current():
+                    nonlocal current
+                    if not current:
+                        return
+                    text = str(current.get("text") or "").rstrip()
+                    name = str(current.get("name") or "").strip()
+                    if name or text:
+                        steps.append({"id": "", "name": name, "text": text})
+                    current = None
+
+                def add_line_to_current(line: str):
+                    nonlocal current
+                    if current is None:
+                        current = {"name": "", "text": ""}
+                    cur_text = str(current.get("text") or "")
+                    current["text"] = (cur_text + ("\n" if cur_text else "") + line) if line != "" else (cur_text + ("\n" if cur_text else ""))
+
+                for raw in lines:
+                    stripped = raw.strip()
+                    if not stripped:
+                        if in_block:
+                            add_line_to_current("")
+                        else:
+                            pending_comments = []
+                        continue
+
+                    if stripped in {"---", "----", "===", "===="}:
+                        if in_block:
+                            add_line_to_current("")
+                        else:
+                            pending_comments = []
+                        continue
+
+                    lstr = raw.lstrip()
+                    if lstr.startswith("###"):
+                        flush_current()
+                        in_block = True
+                        title = lstr[3:].strip()
+                        current = {"name": title, "text": ""}
+                        continue
+
+                    if lstr.startswith("#"):
+                        comment = lstr[1:].strip()
+                        if in_block:
+                            add_line_to_current("# " + comment if comment else "#")
+                        else:
+                            pending_comments.append(comment or raw.strip())
+                        continue
+
+                    if in_block:
+                        add_line_to_current(raw.rstrip())
+                        continue
+
+                    step_name = ""
+                    if pending_comments:
+                        step_name = pending_comments[0]
+                        if len(pending_comments) > 1:
+                            extra = "\n".join(["# " + c for c in pending_comments[1:] if c])
+                            raw = (extra + ("\n" + raw if raw else "")) if extra else raw
+                        pending_comments = []
+                    steps.append({"id": "", "name": step_name, "text": raw.rstrip()})
+
+                flush_current()
+                if pending_comments:
+                    steps.append({"id": "", "name": pending_comments[0], "text": ""})
+
+                for i, st in enumerate(steps):
+                    st["id"] = f"s{i+1}"
+                return _merge_comment_only_steps(steps)
+
+            out = _parse_steps(commands)
             return out
 
         def normalize_attack(a: dict, fallback_id: str) -> dict:
@@ -796,7 +897,7 @@ class ReportGenerator:
             aid = str(a.get("id") or fallback_id or "").strip() or fallback_id
             steps = a.get("steps", [])
             if isinstance(steps, list) and steps and isinstance(steps[0], str):
-                steps = [{"id": f"s{i+1}", "name": "", "text": str(x)} for i, x in enumerate(steps)]
+                steps = as_step_list(steps)
             if not isinstance(steps, list):
                 steps = []
             return {
@@ -814,7 +915,7 @@ class ReportGenerator:
             did = str(d.get("id") or fallback_id or "").strip() or fallback_id
             steps = d.get("steps", d.get("commands", []))
             if isinstance(steps, list) and steps and isinstance(steps[0], str):
-                steps = [{"id": f"s{i+1}", "name": "", "text": str(x)} for i, x in enumerate(steps)]
+                steps = as_step_list(steps)
             if not isinstance(steps, list):
                 steps = []
             return {
@@ -895,10 +996,26 @@ class ReportGenerator:
 
             vector_id = f"SW={_norm_part(sw_label)}|CWE={_norm_part(cwe_label)}|CAPEC={_norm_part(capec_label)}"
 
-            pb = vectors.get(vector_id, {}) if isinstance(vectors, dict) else {}
-            pb_source = "vector"
-            if not (isinstance(pb, dict) and (pb.get("attacks") or pb.get("defenses"))):
-                pb = cves_pb.get(cve_id, {}) if isinstance(cves_pb, dict) else {}
+            pb_vec = vectors.get(vector_id, {}) if isinstance(vectors, dict) else {}
+            pb_cve = cves_pb.get(cve_id, {}) if isinstance(cves_pb, dict) else {}
+
+            def _has_pb(x) -> bool:
+                return isinstance(x, dict) and (x.get("attacks") or x.get("defenses"))
+
+            def _scope(x) -> str:
+                meta = x.get("meta", {}) if isinstance(x, dict) else {}
+                return str(meta.get("scope") or "").strip().lower() if isinstance(meta, dict) else ""
+
+            pb = {}
+            pb_source = ""
+            if _has_pb(pb_cve) and _scope(pb_cve) == "cve":
+                pb = pb_cve
+                pb_source = "cve"
+            elif _has_pb(pb_vec):
+                pb = pb_vec
+                pb_source = "vector"
+            elif _has_pb(pb_cve):
+                pb = pb_cve
                 pb_source = "cve"
 
             if isinstance(pb, dict) and (pb.get("attacks") or pb.get("defenses")):

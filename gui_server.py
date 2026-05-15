@@ -2191,14 +2191,23 @@ class ServerGUI(QMainWindow):
                         from server import api_server as api
                         q = {}
                         if "?" in self.path:
+                            try:
+                                from urllib.parse import unquote_plus
+                            except Exception:
+                                def unquote_plus(x):  # type: ignore
+                                    return x
                             for part in self.path.split("?", 1)[1].split("&"):
                                 if "=" in part:
                                     k, v = part.split("=", 1)
-                                    q[k] = v
+                                    q[k] = unquote_plus(v)
+                        vector_q = (q.get("vector") or "").strip()
                         cve_q = (q.get("cve") or "").strip().upper()
                         with state.playbook_lock:
                             db = api._load_playbooks()
-                        if cve_q:
+                        if vector_q:
+                            entry = (db.get("vectors") or {}).get(vector_q, None)
+                            self._r(200, {"vector_id": vector_q, "playbook": entry or {}})
+                        elif cve_q:
                             entry = (db.get("cves") or {}).get(cve_q, None)
                             self._r(200, {"cve_id": cve_q, "playbook": entry or {}})
                         else:
@@ -2237,10 +2246,17 @@ class ServerGUI(QMainWindow):
                             return
                         body = self.rfile.read(ln).decode("utf-8")
                         payload = json.loads(body)
+                        vector_id = str(payload.get("vector_id", "") or "").strip()
                         cve_id = str(payload.get("cve_id", "") or "").strip().upper()
                         playbook = payload.get("playbook", None)
-                        if not cve_id.startswith("CVE-"):
+                        if not vector_id and not cve_id:
+                            self._r(400, {"error": "Нужно указать vector_id или cve_id"})
+                            return
+                        if cve_id and not cve_id.startswith("CVE-"):
                             self._r(400, {"error": "Некорректный cve_id"})
+                            return
+                        if vector_id and len(vector_id) > 600:
+                            self._r(400, {"error": "Слишком длинный vector_id"})
                             return
                         if not isinstance(playbook, dict):
                             self._r(400, {"error": "playbook должен быть объектом"})
@@ -2250,17 +2266,31 @@ class ServerGUI(QMainWindow):
                         if not isinstance(attacks, list) or not isinstance(defenses, list):
                             self._r(400, {"error": "attacks/defenses должны быть списками"})
                             return
+                        if not hasattr(state, "playbook_lock"):
+                            state.playbook_lock = threading.Lock()
                         with state.playbook_lock:
                             db = api._load_playbooks()
-                            cves = db.setdefault("cves", {})
-                            cves[cve_id] = {
+                            entry = {
                                 "attacks": attacks,
                                 "defenses": defenses,
                                 "meta": playbook.get("meta", {}) if isinstance(playbook.get("meta", {}), dict) else {},
                                 "updated_at": datetime.now().isoformat(),
                             }
+                            if vector_id:
+                                vectors = db.setdefault("vectors", {})
+                                vectors[vector_id] = entry
+                            else:
+                                cves = db.setdefault("cves", {})
+                                cves[cve_id] = entry
                             api._save_playbooks(db)
-                        self._r(200, {"status": "ok", "cve_id": cve_id})
+                        try:
+                            logger.info(f"[PLAYBOOK] Saved: {'vector' if vector_id else 'cve'}={vector_id or cve_id}")
+                        except Exception:
+                            pass
+                        if vector_id:
+                            self._r(200, {"status": "ok", "vector_id": vector_id})
+                        else:
+                            self._r(200, {"status": "ok", "cve_id": cve_id})
                     except json.JSONDecodeError as e:
                         self._r(400, {"error": f"Некорректный JSON: {e}"})
                     except Exception as e:

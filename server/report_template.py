@@ -964,7 +964,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         var atkDefSaveTimers = {};
         var atkExpandedCves = {};
         var atkEditCves = {};
+        var atkEditScope = {};
         var atkDefPendingSync = {};
+
+        function _cvePlaybookKey(cve) {
+            return "cve:" + String(cve || "").toUpperCase().trim();
+        }
+
+        function _vectorPlaybookKey(vectorId) {
+            return "vector:" + String(vectorId || "").trim();
+        }
 
         function _isUsefulVectorId(vectorId) {
             var s = String(vectorId || "").trim();
@@ -986,21 +995,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             return !(badSw && badCwe && badCapec);
         }
 
-        function _playbookKeyFor(cve, vectorId) {
-            var c = String(cve || "").toUpperCase().trim();
-            var v = String(vectorId || "").trim();
-            if (v && _isUsefulVectorId(v)) return "vector:" + v;
-            return "cve:" + c;
-        }
-
-        function _playbookKeyForCve(cve) {
+        function _vectorKeyForCve(cve) {
             cve = String(cve || "").toUpperCase();
-            var cached = atkDefKeyByCve[cve];
-            if (cached) return cached;
             var v = atkDefIndex[cve] || {};
-            var k = _playbookKeyFor(cve, v.vector_id || "");
-            atkDefKeyByCve[cve] = k;
-            return k;
+            var vectorId = String(v.vector_id || "").trim();
+            if (!vectorId || !_isUsefulVectorId(vectorId)) return null;
+            return _vectorPlaybookKey(vectorId);
         }
 
         function _playbookKind(pbKey) {
@@ -1018,12 +1018,59 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             return "atkPlaybook:" + encodeURIComponent(String(pbKey || ""));
         }
 
-        function _ensurePlaybookForCve(cve) {
-            ensureAtkDefInit();
-            cve = String(cve || "").toUpperCase();
-            var pbKey = _playbookKeyForCve(cve);
+        function _ensurePlaybookByKey(pbKey) {
+            pbKey = String(pbKey || "");
+            if (!pbKey) return null;
             atkDefCache[pbKey] = atkDefCache[pbKey] || { attacks: [], defenses: [], meta: {} };
             return atkDefCache[pbKey];
+        }
+
+        function _hasPbContent(pb) {
+            if (!pb || typeof pb !== "object") return false;
+            var a = Array.isArray(pb.attacks) ? pb.attacks : [];
+            var d = Array.isArray(pb.defenses) ? pb.defenses : [];
+            return a.length > 0 || d.length > 0;
+        }
+
+        function _pbScope(pb) {
+            try { return String((pb && pb.meta && pb.meta.scope) || "").trim().toLowerCase(); } catch (_) {}
+            return "";
+        }
+
+        function _effectivePlaybookKeyForCve(cve) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var cveKey = _cvePlaybookKey(cve);
+            var vecKey = _vectorKeyForCve(cve);
+            var pbCve = atkDefCache[cveKey];
+            var pbVec = vecKey ? atkDefCache[vecKey] : null;
+            if (pbCve && _hasPbContent(pbCve) && _pbScope(pbCve) === "cve") return cveKey;
+            if (pbVec && _hasPbContent(pbVec)) return vecKey;
+            if (pbCve && _hasPbContent(pbCve)) return cveKey;
+            if (pbVec) return vecKey;
+            return cveKey;
+        }
+
+        function _ensureEffectivePlaybookForCve(cve) {
+            var key = _effectivePlaybookKeyForCve(cve);
+            return _ensurePlaybookByKey(key);
+        }
+
+        function _editPlaybookKeyForCve(cve) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            var cveKey = _cvePlaybookKey(cve);
+            var vecKey = _vectorKeyForCve(cve);
+            if (!atkEditCves[cve]) return _effectivePlaybookKeyForCve(cve);
+            var scope = String(atkEditScope[cve] || "").toLowerCase();
+            if (scope === "cve") return cveKey;
+            if (scope === "vector") return vecKey || cveKey;
+            return _effectivePlaybookKeyForCve(cve);
+        }
+
+        function _ensureEditPlaybookForCve(cve) {
+            var key = _editPlaybookKeyForCve(cve);
+            return _ensurePlaybookByKey(key);
         }
 
         function ensureAtkDefInit() {
@@ -1042,48 +1089,55 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 var cve = String(v.cve_id || "").toUpperCase();
                 if (!cve) return;
                 atkDefIndex[cve] = v;
-                var pbKey = _playbookKeyFor(cve, v.vector_id || "");
-                atkDefKeyByCve[cve] = pbKey;
-                if (!atkDefCache[pbKey]) {
-                    atkDefCache[pbKey] = {
+                var cveKey = _cvePlaybookKey(cve);
+                var vecKey = _vectorKeyForCve(cve);
+                atkDefKeyByCve[cve] = vecKey || cveKey;
+                if (!atkDefCache[cveKey]) {
+                    atkDefCache[cveKey] = {
                         attacks: normalizeAtkList(v.attacks || []),
                         defenses: normalizeDefList(v.defenses || []),
                         meta: {
                             recommendation: v.recommendation || "",
                             source: v.source || {},
+                            scope: "seed",
                         }
                     };
-                } else {
-                    if (atkDefCache[pbKey].meta && !atkDefCache[pbKey].meta.recommendation && v.recommendation) {
-                        atkDefCache[pbKey].meta.recommendation = v.recommendation;
-                    }
+                }
+                if (vecKey && !atkDefCache[vecKey]) {
+                    atkDefCache[vecKey] = {
+                        attacks: normalizeAtkList(v.attacks || []),
+                        defenses: normalizeDefList(v.defenses || []),
+                        meta: {
+                            recommendation: v.recommendation || "",
+                            source: v.source || {},
+                            scope: "seed",
+                        }
+                    };
                 }
                 try {
-                    var sk = _playbookStorageKey(pbKey);
-                    var ls = localStorage.getItem(sk);
-                    if (!ls) {
-                        var legacy = localStorage.getItem("atkPlaybook:" + cve);
-                        if (legacy) {
-                            ls = legacy;
-                            try { localStorage.setItem(sk, legacy); } catch (_) {}
+                    var keysToCheck = [cveKey];
+                    if (vecKey) keysToCheck.push(vecKey);
+                    for (var ki = 0; ki < keysToCheck.length; ki++) {
+                        var pbKey = keysToCheck[ki];
+                        var sk = _playbookStorageKey(pbKey);
+                        var ls = localStorage.getItem(sk);
+                        if (!ls && pbKey === cveKey) {
+                            var legacy = localStorage.getItem("atkPlaybook:" + cve);
+                            if (legacy) {
+                                ls = legacy;
+                                try { localStorage.setItem(sk, legacy); } catch (_) {}
+                            }
                         }
-                    }
-                    if (!ls && _playbookKind(pbKey) === "vector") {
-                        var legacyCveKey = _playbookStorageKey("cve:" + cve);
-                        var legacy2 = localStorage.getItem(legacyCveKey);
-                        if (legacy2) {
-                            ls = legacy2;
-                            try { localStorage.setItem(sk, legacy2); } catch (_) {}
+                        if (ls) {
+                            var parsed = JSON.parse(ls);
+                            if (parsed && typeof parsed === "object") {
+                                if (Array.isArray(parsed.attacks)) atkDefCache[pbKey].attacks = normalizeAtkList(parsed.attacks);
+                                if (Array.isArray(parsed.defenses)) atkDefCache[pbKey].defenses = normalizeDefList(parsed.defenses);
+                                atkDefCache[pbKey].meta = (parsed.meta && typeof parsed.meta === "object") ? parsed.meta : (atkDefCache[pbKey].meta || {});
+                            }
+                            atkDefCache[pbKey]._dirty = true;
+                            atkDefPendingSync[pbKey] = true;
                         }
-                    }
-                    if (ls) {
-                        var parsed = JSON.parse(ls);
-                        if (parsed && typeof parsed === "object") {
-                            if (Array.isArray(parsed.attacks)) atkDefCache[pbKey].attacks = normalizeAtkList(parsed.attacks);
-                            if (Array.isArray(parsed.defenses)) atkDefCache[pbKey].defenses = normalizeDefList(parsed.defenses);
-                        }
-                        atkDefCache[pbKey]._dirty = true;
-                        atkDefPendingSync[pbKey] = true;
                     }
                 } catch (_) {}
             });
@@ -1100,6 +1154,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     s = (s && typeof s === "object") ? s : {};
                     return { id: String(s.id || ("s" + (si + 1))), name: String(s.name || s.title || ""), text: String(s.text || "") };
                 });
+                steps = mergeAtkCommentSteps(steps);
                 out.push({
                     id: String(a.id || ("a" + (idx + 1))),
                     name: String(a.name || ""),
@@ -1123,6 +1178,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     s = (s && typeof s === "object") ? s : {};
                     return { id: String(s.id || ("s" + (si + 1))), name: String(s.name || s.title || ""), text: String(s.text || "") };
                 });
+                steps = mergeAtkCommentSteps(steps);
                 out.push({
                     id: String(d.id || ("d" + (idx + 1))),
                     name: String(d.name || ""),
@@ -1133,6 +1189,40 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     tags: Array.isArray(d.tags) ? d.tags : [],
                 });
             });
+            return out;
+        }
+
+        function mergeAtkCommentSteps(steps) {
+            steps = Array.isArray(steps) ? steps.slice() : [];
+            var out = [];
+            var carry = [];
+            function flushCarryInto(step) {
+                if (!carry.length) return;
+                if (!step.name) step.name = carry[0];
+                else step.text = (carry.map(function(x){return "# " + x;}).join("\\n") + (step.text ? ("\\n" + step.text) : ""));
+                carry = [];
+            }
+            for (var i = 0; i < steps.length; i++) {
+                var st = steps[i] || {};
+                var name = String(st.name || "").trim();
+                var text = String(st.text || "");
+                text = text.replace(/\s+$/g, "");
+                var isCommentOnly = (!name) && text.trim().indexOf("#") === 0 && text.trim().indexOf("###") !== 0;
+                if (isCommentOnly) {
+                    var c = text.trim().slice(1).trim();
+                    carry.push(c || text.trim());
+                    continue;
+                }
+                var next = { id: String(st.id || ""), name: name, text: text };
+                flushCarryInto(next);
+                out.push(next);
+            }
+            if (carry.length) {
+                out.push({ id: "s" + (out.length + 1), name: carry[0], text: "" });
+            }
+            for (var j = 0; j < out.length; j++) {
+                out[j].id = "s" + (j + 1);
+            }
             return out;
         }
 
@@ -1173,18 +1263,58 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             ensureAtkDefInit();
             cve = String(cve || "").toUpperCase();
             if (!cve) return;
-            var pbKey = _playbookKeyForCve(cve);
-            if (!pbKey) return;
-            if (atkDefSaveTimers[pbKey]) clearTimeout(atkDefSaveTimers[pbKey]);
+            if (atkDefSaveTimers[cve]) clearTimeout(atkDefSaveTimers[cve]);
             setAtkSaveStatus("⏳ Сохранение…", "info");
-            atkDefSaveTimers[pbKey] = setTimeout(function() { saveAtkPlaybook(pbKey); }, 700);
+            atkDefSaveTimers[cve] = setTimeout(function() { saveAtkPlaybooksForCve(cve); }, 700);
+        }
+
+        function _clonePb(pb) {
+            try { return JSON.parse(JSON.stringify(pb || {})); } catch (_) {}
+            return { attacks: [], defenses: [], meta: {} };
+        }
+
+        async function saveAtkPlaybooksForCve(cve) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            if (!cve) return;
+            var cveKey = _cvePlaybookKey(cve);
+            var vecKey = _vectorKeyForCve(cve);
+
+            var editKey = _editPlaybookKeyForCve(cve);
+            var srcKind = _playbookKind(editKey);
+            var pbSrc = atkDefCache[editKey] || { attacks: [], defenses: [], meta: {} };
+            var base = _clonePb(pbSrc);
+            if (!base.meta || typeof base.meta !== "object") base.meta = {};
+
+            if (vecKey) {
+                var pbVec = _clonePb(base);
+                if (!pbVec.meta || typeof pbVec.meta !== "object") pbVec.meta = {};
+                pbVec.meta.scope = (srcKind === "vector") ? "vector" : "cve_mirror";
+                pbVec.meta.vector_id = _playbookId(vecKey);
+                atkDefCache[vecKey] = pbVec;
+                atkDefCache[vecKey]._dirty = true;
+                atkDefPendingSync[vecKey] = true;
+            }
+
+            var pbCve = _clonePb(base);
+            if (!pbCve.meta || typeof pbCve.meta !== "object") pbCve.meta = {};
+            pbCve.meta.scope = (srcKind === "cve") ? "cve" : "vector_mirror";
+            if (vecKey) pbCve.meta.vector_id = _playbookId(vecKey);
+            atkDefCache[cveKey] = pbCve;
+            atkDefCache[cveKey]._dirty = true;
+            atkDefPendingSync[cveKey] = true;
+
+            if (vecKey) await saveAtkPlaybook(vecKey);
+            await saveAtkPlaybook(cveKey);
         }
 
         function _applyDbSourceForKey(pbKey) {
             var kind = _playbookKind(pbKey);
             var val = kind === "vector" ? "db:vector" : "db:cve";
             Object.keys(atkDefIndex || {}).forEach(function (cve) {
-                if (_playbookKeyForCve(cve) !== pbKey) return;
+                var cveKey = _cvePlaybookKey(cve);
+                var vecKey = _vectorKeyForCve(cve);
+                if (pbKey !== cveKey && pbKey !== vecKey) return;
                 var v = atkDefIndex[cve];
                 if (v && v.source) {
                     v.source.attacks = val;
@@ -1215,6 +1345,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
                 var kindLabel = _playbookKind(pbKey) === "vector" ? "вектор" : "CVE";
                 setAtkSaveStatus("✅ Сохранено в БД (" + kindLabel + "): " + _playbookId(pbKey), "ok");
+                try { console.log("[PLAYBOOK] saved", { pbKey: pbKey, apiBase: apiBase }); } catch (_) {}
                 _applyDbSourceForKey(pbKey);
                 try { localStorage.removeItem(_playbookStorageKey(pbKey)); } catch (_) {}
                 if (_playbookKind(pbKey) === "cve") {
@@ -1224,6 +1355,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 delete atkDefPendingSync[pbKey];
             } catch (e) {
                 setAtkSaveStatus("❌ Не удалось сохранить (" + _playbookId(pbKey) + "): " + String(e && e.message ? e.message : e), "err");
+                try { console.warn("[PLAYBOOK] save failed", { pbKey: pbKey, apiBase: apiBase, error: String(e && e.message ? e.message : e) }); } catch (_) {}
                 try { localStorage.setItem(_playbookStorageKey(pbKey), JSON.stringify(pb)); } catch (_) {}
                 pb._dirty = true;
                 atkDefPendingSync[pbKey] = true;
@@ -1261,8 +1393,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             var keys = Object.keys(atkDefPendingSync || {});
             if (!keys.length) return;
             setAtkSaveStatus("⏳ Синхронизация правок в БД…", "info");
-            for (var i = 0; i < keys.length; i++) {
-                await saveAtkPlaybook(keys[i]);
+            var cvesToSync = {};
+            Object.keys(atkDefIndex || {}).forEach(function (cve) {
+                var cveKey = _cvePlaybookKey(cve);
+                var vecKey = _vectorKeyForCve(cve);
+                if (atkDefPendingSync[cveKey] || (vecKey && atkDefPendingSync[vecKey])) cvesToSync[cve] = true;
+            });
+            var cves = Object.keys(cvesToSync);
+            for (var i = 0; i < cves.length; i++) {
+                await saveAtkPlaybooksForCve(cves[i]);
             }
         }
 
@@ -1271,7 +1410,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             var cves = Object.keys(atkDefIndex || {});
             if (!cves.length) return;
             var keys = {};
-            cves.forEach(function (cve) { keys[_playbookKeyForCve(cve)] = true; });
+            cves.forEach(function (cve) {
+                keys[_cvePlaybookKey(cve)] = true;
+                var vecKey = _vectorKeyForCve(cve);
+                if (vecKey) keys[vecKey] = true;
+            });
             var pbKeys = Object.keys(keys);
             setAtkSaveStatus("⏳ Загрузка плейбуков из БД…", "info");
             for (var i = 0; i < pbKeys.length; i++) {
@@ -1302,7 +1445,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         String((v.capecs || []).join(" ")),
                         String((v.cwes || []).join(" ")),
                     ].join(" ").toLowerCase();
-                    var pb = _ensurePlaybookForCve(String(v.cve_id).toUpperCase()) || {};
+                    var pb = _ensureEffectivePlaybookForCve(String(v.cve_id).toUpperCase()) || {};
                     (pb.attacks || []).forEach(function(a) {
                         hay += " " + String(a.name || "").toLowerCase();
                         (a.steps || []).forEach(function(st) {
@@ -1313,7 +1456,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     if (hay.indexOf(s) === -1) return false;
                 }
                 if (onlyVerified) {
-                    var pb2 = _ensurePlaybookForCve(String(v.cve_id).toUpperCase()) || {};
+                    var pb2 = _ensureEffectivePlaybookForCve(String(v.cve_id).toUpperCase()) || {};
                     var anyV = (pb2.attacks || []).some(function(a) { return !!a.verified; });
                     if (!anyV) return false;
                 }
@@ -1324,9 +1467,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         function renderAtkDefSection() {
             ensureAtkDefInit();
-            hydrateAtkDefFromApi().finally(function() {
-                applyAtkDefFilters();
-            });
+            applyAtkDefFilters();
+            hydrateAtkDefFromApi().finally(function() { applyAtkDefFilters(); });
         }
 
         function renderAtkDefSection(vulns, opts) {
@@ -1344,14 +1486,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 var cve = String(v && v.cve_id ? v.cve_id : "").toUpperCase();
                 if (!cve) return;
                 var cveDom = String(cve).replace(/[^a-zA-Z0-9_-]/g, "_");
-                var pbKey = _playbookKeyForCve(cve);
-                var pb = _ensurePlaybookForCve(cve) || { attacks: [], defenses: [], meta: {} };
+                var cveKey = _cvePlaybookKey(cve);
+                var vecKey = _vectorKeyForCve(cve);
+                var pbKey = _effectivePlaybookKeyForCve(cve);
+                var pb = _ensurePlaybookByKey(pbKey) || { attacks: [], defenses: [], meta: {} };
+                var scope = _pbScope(pb);
+                var pbLabel = "auto";
+                if (pbKey === cveKey && scope === "cve") pbLabel = "CVE (приоритет)";
+                else if (vecKey && pbKey === vecKey) pbLabel = "вектор";
+                else if (pbKey === cveKey && _hasPbContent(pb)) pbLabel = "CVE";
                 var sevClass = getSevClass(v.sev);
                 var feasClass = v.feas === "РЕАЛИЗУЕМА" ? "real" : (String(v.feas || "").includes("ЧАСТИЧНО") ? "part-real" : "noreal");
 
                 var isEdit = !!atkEditCves[cve];
 
-                var attacks = (pb.attacks || []).slice();
+                var pbView = isEdit ? (_ensurePlaybookByKey(_editPlaybookKeyForCve(cve)) || pb) : pb;
+
+                var attacks = (pbView.attacks || []).slice();
                 attacks.sort(function(a, b) {
                     return (b.verified === a.verified)
                         ? String(a.name || "").localeCompare(String(b.name || ""))
@@ -1374,7 +1525,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 html += '<div class="atk-def-body" id="atk-def-body-' + cveDom + '" style="display:' + (atkExpandedCves[cve] ? "block" : "none") + ';">';
                 html += '<div style="display:flex; gap:10px; flex-wrap:wrap; font-size:12px; color:#8b949e; margin: 8px 0 12px 0;">';
                 html += '<div>Источник: атаки=' + escapeHtml(((v.source || {}).attacks || "auto")) + ', защита=' + escapeHtml(((v.source || {}).defenses || "auto")) + '</div>';
-                html += '<div>Привязка сценариев: <span style="color:#58a6ff;">' + escapeHtml((_playbookKind(pbKey) === "vector") ? "вектор" : "CVE") + '</span></div>';
+                html += '<div>Плейбук: <span style="color:#58a6ff;">' + escapeHtml(pbLabel) + '</span></div>';
+                html += '<div>Сохранение: <span style="color:#58a6ff;">' + escapeHtml(vecKey ? "CVE+вектор" : "CVE") + '</span></div>';
                 if (v.capecs && v.capecs.length) html += '<div>CAPEC: <span style="color:#58a6ff;">' + escapeHtml(v.capecs.join(", ")) + '</span></div>';
                 if (v.cwes && v.cwes.length) html += '<div>CWE: <span style="color:#d29922;">' + escapeHtml(v.cwes.join(", ")) + '</span></div>';
                 html += '</div>';
@@ -1383,6 +1535,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 html += '<div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">';
                 html += '<h4 style="color:#da3633;margin:0;font-size:16px;">🥷 Атаки (Red Team)</h4>';
                 html += '<button class="' + (isEdit ? "btn-ghost" : "btn-toggle") + '" style="padding:8px 12px;" onclick="event.stopPropagation(); toggleAtkEdit(\\'' + escapeHtml(cve) + '\\')">' + (isEdit ? "✅ Готово" : "✏️ Редактировать") + '</button>';
+                if (isEdit && vecKey) {
+                    var es = String(atkEditScope[cve] || "vector").toLowerCase();
+                    html += '<span style="color:#8b949e; font-size:12px;">Редактирование:</span>';
+                    html += '<button class="' + (es === "vector" ? "btn-toggle" : "btn-ghost") + '" style="padding:8px 12px;" onclick="event.stopPropagation(); setAtkEditScope(\\'' + escapeHtml(cve) + '\\', \\'vector\\')">Вектор</button>';
+                    html += '<button class="' + (es === "cve" ? "btn-toggle" : "btn-ghost") + '" style="padding:8px 12px;" onclick="event.stopPropagation(); setAtkEditScope(\\'' + escapeHtml(cve) + '\\', \\'cve\\')">CVE</button>';
+                }
                 if (isEdit) {
                     html += '<button class="btn-toggle" style="padding:8px 12px;" onclick="event.stopPropagation(); addAtkAttack(\\'' + escapeHtml(cve) + '\\')">+ Добавить атаку</button>';
                 }
@@ -1442,7 +1600,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (isEdit) html += '<button class="btn-toggle" style="padding:8px 12px;" onclick="event.stopPropagation(); addDefItem(\\'' + escapeHtml(cve) + '\\')">+ Добавить меру</button>';
                 html += '</div>';
 
-                var defs = (pb.defenses || []).slice();
+                var defs = (pbView.defenses || []).slice();
                 defs.sort(function(a, b) { return String(a.priority || "").localeCompare(String(b.priority || "")); });
                 if (!defs.length) {
                     html += '<p style="color:#484f58;font-size:13px;">Меры защиты не найдены. Добавьте вручную.</p>';
@@ -1516,17 +1674,37 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             cve = String(cve || "").toUpperCase();
             if (!cve) return;
             atkEditCves[cve] = !atkEditCves[cve];
+            if (atkEditCves[cve]) {
+                if (!atkEditScope[cve]) {
+                    var cveKey = _cvePlaybookKey(cve);
+                    var vecKey = _vectorKeyForCve(cve);
+                    var pbCve = atkDefCache[cveKey];
+                    if (pbCve && _pbScope(pbCve) === "cve") atkEditScope[cve] = "cve";
+                    else if (vecKey) atkEditScope[cve] = "vector";
+                    else atkEditScope[cve] = "cve";
+                }
+            }
             atkExpandedCves[cve] = true;
             applyAtkDefFilters();
         }
 
+        function setAtkEditScope(cve, scope) {
+            ensureAtkDefInit();
+            cve = String(cve || "").toUpperCase();
+            scope = String(scope || "").toLowerCase();
+            if (!cve) return;
+            if (scope !== "cve" && scope !== "vector") return;
+            atkEditScope[cve] = scope;
+            applyAtkDefFilters();
+        }
+
         function findAtk(cve, aid) {
-            var pb = _ensurePlaybookForCve(cve);
+            var pb = _ensureEditPlaybookForCve(cve);
             if (!pb) return null;
             return (pb.attacks || []).find(function(a) { return String(a.id) === String(aid); }) || null;
         }
         function findDef(cve, did) {
-            var pb = _ensurePlaybookForCve(cve);
+            var pb = _ensureEditPlaybookForCve(cve);
             if (!pb) return null;
             return (pb.defenses || []).find(function(d) { return String(d.id) === String(did); }) || null;
         }
@@ -1534,7 +1712,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function addAtkAttack(cve) {
             ensureAtkDefInit();
             cve = String(cve || "").toUpperCase();
-            var pb = _ensurePlaybookForCve(cve);
+            var pb = _ensureEditPlaybookForCve(cve);
             if (!pb) return;
             var id = "a" + (pb.attacks.length + 1) + "_" + Date.now();
             pb.attacks.push({ id: id, name: "", verified: false, steps: [{ id: "s1", name: "", text: "" }], notes: "", tags: [] });
@@ -1544,7 +1722,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function removeAtkAttack(cve, aid) {
             ensureAtkDefInit();
             cve = String(cve || "").toUpperCase();
-            var pb = _ensurePlaybookForCve(cve);
+            var pb = _ensureEditPlaybookForCve(cve);
             if (!pb) return;
             pb.attacks = (pb.attacks || []).filter(function(a) { return String(a.id) !== String(aid); });
             scheduleAtkSave(cve);
@@ -1610,7 +1788,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function addDefItem(cve) {
             ensureAtkDefInit();
             cve = String(cve || "").toUpperCase();
-            var pb = _ensurePlaybookForCve(cve);
+            var pb = _ensureEditPlaybookForCve(cve);
             if (!pb) return;
             var id = "d" + (pb.defenses.length + 1) + "_" + Date.now();
             pb.defenses.push({ id: id, name: "", priority: "", verified: false, steps: [{ id: "s1", name: "", text: "" }], notes: "", tags: [] });
@@ -1620,7 +1798,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function removeDefItem(cve, did) {
             ensureAtkDefInit();
             cve = String(cve || "").toUpperCase();
-            var pb = _ensurePlaybookForCve(cve);
+            var pb = _ensureEditPlaybookForCve(cve);
             if (!pb) return;
             pb.defenses = (pb.defenses || []).filter(function(d) { return String(d.id) !== String(did); });
             scheduleAtkSave(cve);
@@ -2008,7 +2186,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         function toggleAtkDef() {
             var el = document.getElementById("atk-def-container");
-            el.style.display = el.style.display === "none" ? "block" : "none";
+            var next = el.style.display === "none" ? "block" : "none";
+            el.style.display = next;
+            if (next === "block") {
+                try { applyAtkDefFilters(); } catch (_) {}
+            }
         }
         function toggleAtkDefItem(idx) {
             var el = document.getElementById("atk-def-body-" + idx);
@@ -3368,7 +3550,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             holder.innerHTML = html;
         }
 
-        window.onload = init;
+        window.onload = function() {
+            try {
+                init();
+            } catch (e) {
+                try {
+                    var msg = "Ошибка в отчёте: " + String(e && e.message ? e.message : e);
+                    var pre = document.createElement("pre");
+                    pre.style.whiteSpace = "pre-wrap";
+                    pre.style.background = "#010409";
+                    pre.style.border = "1px solid #30363d";
+                    pre.style.borderRadius = "8px";
+                    pre.style.padding = "12px";
+                    pre.style.color = "#ff7b72";
+                    pre.textContent = msg;
+                    var root = document.querySelector(".container") || document.body;
+                    root.insertBefore(pre, root.firstChild);
+                } catch (_) {}
+                try { console.error(e); } catch (_) {}
+            }
+        };
     </script>
 </body>
 </html>
