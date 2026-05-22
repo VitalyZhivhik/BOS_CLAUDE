@@ -1,232 +1,255 @@
-# MITRE PARSER
+# MITRE Parser v4 - с графическим интерфейсом
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
+Комплексный инструмент для парсинга, обработки и анализа баз данных MITRE (CAPEC, CWE, CVE, ATT&CK) с удобным веб-интерфейсом.
 
-**MITRE PARSER** — это мощный и гибкий инструмент для автоматического сбора, парсинга, обогащения и перевода данных из ключевых баз знаний в области кибербезопасности:
-- [MITRE ATT&CK®](https://attack.mitre.org/) (техники атак)
-- [CAPEC™](https://capec.mitre.org/) (шаблоны атак)
-- [CWE™](https://cwe.mitre.org/) (слабые места ПО)
-- [CVE®](https://nvd.nist.gov/) (публичные уязвимости)
+## 📋 Возможности
 
-Проект разделён на **три независимых этапа**, что даёт полный контроль над процессом и позволяет гибко настраивать обработку данных. Поддерживается как консольное меню, так и графический интерфейс (GUI) для максимального удобства.
+### 🔹 Парсинг данных
+- **CAPEC** - шаблоны атак
+- **CWE** - типы уязвимостей
+- **CVE** - известные уязвимости
+- **MITRE ATT&CK** - тактики и техники противников
 
-Результатом работы являются **взаимосвязанные JSON-файлы** с заполненными перекрёстными ссылками и рекомендациями по устранению уязвимостей (`mitigations`), готовые для использования в аналитических системах, SIEM, SOAR, Threat Intelligence платформах или собственных исследованиях.
+### 🔹 Обработка данных
+- **Связывание** - автоматическое установление перекрестных ссылок между базами
+- **AI обогащение** - заполнение пустых полей с помощью ИИ (Ollama/OpenAI)
+- **Перевод** - перевод выбранных полей на русский язык (Google/Yandex Translate)
+- **Нормализация** - очистка и стандартизация данных
 
----
+### 🔹 Графический интерфейс
+- **Панель управления** - запуск и мониторинг всех процессов в реальном времени
+- **Редактор баз данных** - просмотр, поиск и редактирование записей
+- **Редактор кэша переводов** - управление переводами
+- **Настройки** - конфигурация всех параметров
 
-## ✨ Возможности
+## 🚀 Быстрый старт
 
-- 🔄 **Автоматическая загрузка** последних версий баз с официальных источников.
-- 🧩 **Глубокий парсинг** исходных форматов (XML, STIX 2.1, JSON).
-- 🔗 **Трёхэтапная архитектура**:
-  1. **Парсинг** — получение чистых данных из источников.
-  2. **Связывание** — заполнение перекрёстных ссылок и распространение мер защиты.
-  3. **Перевод** — выборочный перевод полей через интернет.
-- 🛡️ **Интеллектуальное связывание данных**:
-  - `CAPEC ↔ ATT&CK`
-  - `CVE → CWE → CAPEC → ATT&CK`
-  - Обратное распространение связей и мер защиты.
-- 🌐 **Опциональный перевод** выбранных полей (названия, описания, меры защиты) на русский язык через Google Translate с кэшированием.
-- 🖥️ **Два режима управления**:
-  - Консольное меню для быстрого доступа.
-  - GUI на Tkinter с логом выполнения и настройками.
-- ⚙️ **Гибкая настройка** через конфигурационный файл или переменные окружения (лимиты записей, режим перевода, пути).
-- 📦 **Чистый и структурированный JSON** на выходе, готовый к импорту в БД или аналитику.
-
----
-
-## Структура проекта
-
-```
-MITRE_PARSER_V3/
-├── src/
-│ ├── parsers/ # Парсеры для каждого источника
-│ │ ├── base.py
-│ │ ├── attack_parser.py
-│ │ ├── capec_parser.py
-│ │ ├── cwe_parser.py
-│ │ └── cve_parser.py
-│ ├── config.py # Настройки (поддержка переменных окружения)
-│ ├── loader.py # Загрузка файлов с повторными попытками
-│ ├── cross_linker.py # Логика связывания и обогащения данных
-│ ├── normalizer.py # Очистка и нормализация JSON
-│ ├── translator.py # Онлайн-переводчик (Google Translate) с кэшированием
-│ ├── step1_parse.py # Этап 1: Скачивание и парсинг
-│ ├── step2_link.py # Этап 2: Связывание данных
-│ ├── translate_fields.py # Этап 3: Выборочный перевод полей
-│ ├── menu.py # Консольное меню
-│ └── gui_app.py # Графический интерфейс (Tkinter)
-├── output/ # Результаты работы (создаётся автоматически)
-├── requirements.txt
-├── README.md
-└── .gitignore
-```
-
----
-
-## Установка и запуск
-
-### 1. Клонирование репозитория
+### 1. Установка зависимостей
 
 ```bash
-git clone https://github.com/yourusername/MITRE_PARSER.git
-cd MITRE_PARSER
-```
-
-### 2. Создание виртуального окружения (рекомендуется)
-
-```bash
-python -m venv venv
-source venv/bin/activate      # Linux/Mac
-venv\Scripts\activate         # Windows
-```
-
-### 3. Установка зависимостей
-
-```bash
+# Основные зависимости
 pip install -r requirements.txt
+
+# Зависимости для GUI (опционально)
+pip install -r gui/requirements.txt
 ```
 
-### 4. Настройка (опционально)
+### 2. Настройка (опционально)
 
-Создайте копию .env.example как .env или отредактируйте src/config.py:
+Отредактируйте `src/config.py` для настройки:
+- Источников данных
+- Параметров перевода
+- AI провайдера
+- Ограничений на количество записей
 
-- Включить/выключить перевод (`ENABLE_TRANSLATION`)
-- Параметры перевода (`ENABLE_TRANSLATION`, `TRANSLATE_TO`, задержки и размер батча)
-- Ограничить количество обрабатываемых записей (`MAX_..._RECORDS`)
-- Изменить выходную директорию (`OUTPUT_DIR`)
+### 3. Запуск
 
-### 5. Запуск
+#### Вариант А: Графический интерфейс (рекомендуется)
 
 ```bash
-python src/menu.py # Через консольное меню
-
-# Поэтапно (вручную)
-# Этап 1: скачивание и парсинг (без перевода)
-python src/step1_parse.py
-
-# Этап 2: связывание данных
-python src/step2_link.py
-
-# Этап 3: перевод полей
-python src/translate_fields.py
+python gui/run_gui.py
 ```
 
-После завершения работы в папке `output/` появятся файлы:
+Затем откройте браузер: **http://localhost:5000**
 
-- `capec_database.json`
-- `cwe_database.json`
-- `cve_database.json`
-- `mitre_attack.json`
-- + `translate_cache.json` #Кэш перевода
+#### Вариант Б: Консольное меню
 
----
+```bash
+python src/menu.py
+```
 
-## Конфигурация (`config.py`)
+#### Вариант В: Прямой запуск всех этапов
+
+```bash
+python src/run_all.py
+```
+
+## 📁 Структура проекта
+
+```
+MITRE_PARSER_V4/
+├── src/                        # Исходный код парсера
+│   ├── main.py                # Точка входа
+│   ├── menu.py                # Консольное меню
+│   ├── config.py              # Конфигурация
+│   ├── translator.py          # Модуль перевода
+│   ├── loader.py              # Загрузчик данных
+│   ├── normalizer.py          # Нормализатор
+│   ├── cross_linker.py        # Связыватель баз
+│   ├── ai_enricher.py         # AI обогащение
+│   ├── step1_parse.py         # Этап 1: Парсинг
+│   ├── step2_link.py          # Этап 2: Связывание
+│   ├── step3_enrich_ai.py     # Этап 3: AI обогащение
+│   ├── translate_fields.py    # Перевод полей
+│   ├── run_all.py             # Запуск всех этапов
+│   └── parsers/               # Парсеры для каждой базы
+│       ├── capec_parser.py
+│       ├── cwe_parser.py
+│       ├── cve_parser.py
+│       └── attack_parser.py
+│
+├── gui/                        # Графический интерфейс
+│   ├── app.py                 # Flask приложение
+│   ├── run_gui.py             # Скрипт запуска
+│   ├── requirements.txt       # Зависимости GUI
+│   ├── README.md             # Документация GUI
+│   ├── templates/
+│   │   └── index.html        # Главный шаблон
+│   └── static/
+│       ├── css/
+│       │   └── style.css     # Стили
+│       └── js/
+│           └── app.js        # Клиентский JavaScript
+│
+├── output/                     # Результаты работы
+│   ├── capec_database.json
+│   ├── cwe_database.json
+│   ├── cve_database.json
+│   ├── mitre_attack.json
+│   └── translate_cache.json
+│
+├── requirements.txt           # Основные зависимости
+├── README.md                  # Этот файл
+└── GUI_SETUP.md              # Инструкция по настройке GUI
+```
+
+## 🎯 Подробное описание
+
+### Этапы обработки
+
+1. **Парсинг (Parsing)**
+   - Скачивание актуальных данных из официальных источников MITRE
+   - Разбор XML/JSON форматов
+   - Извлечение ключевых полей
+   - Сохранение в JSON
+
+2. **Связывание (Cross-Linking)**
+   - Анализ перекрестных ссылок между базами
+   - Заполнение полей related_capec, related_cwe, related_mitre
+   - Добавление мер защиты (mitigations)
+
+3. **AI обогащение (AI Enrichment)**
+   - Заполнение пустых полей с помощью ИИ
+   - Генерация описаний, обнаружений, мер защиты
+   - Поддержка локальных (Ollama) и облачных (OpenAI) моделей
+
+4. **Перевод (Translation)**
+   - Перевод выбранных полей на русский язык
+   - Пакетная обработка с кэшированием
+   - Поддержка Google Translate и Yandex Translate
+
+### Графический интерфейс
+
+Веб-интерфейс предоставляет:
+
+- **Дэшборд** с карточками статистики и управлением процессами
+- **Редактор баз данных** с поиском, фильтрацией и пагинацией
+- **Редактор кэша переводов** с возможностью редактирования
+- **Страницу настроеk** для конфигурации всех параметров
+- **Real-time логи** с цветовым кодированием событий
+
+### Консольное меню
+
+Альтернативный интерфейс для управления процессами:
+
+```
+1. Скачать и распарсить базы (без перевода)
+2. Связать данные (заполнить перекрёстные ссылки)
+3. AI-обогащение (заполнить пустые поля)
+4. Перевести выбранные поля
+5. Запустить все этапы последовательно
+6. Выбрать сервис перевода
+7. Очистить кэш перевода
+8. Очистить некачественные переводы из кэша
+9. Настроить параметры перевода
+0. Выход
+```
+
+## ⚙️ Конфигурация
+
+Основные настройки в `src/config.py`:
 
 ```python
-class Config:
-	MAX_CAPEC_RECORDS	Лимит записей CAPEC (0 = все)	0
-	
-	MAX_CWE_RECORDS	Лимит записей CWE	0
-	
-	MAX_CVE_RECORDS	Лимит записей CVE	1500
-	
-	MAX_ATTACK_RECORDS	Лимит записей ATT&CK	0
-	
-	ENABLE_TRANSLATION	Включить перевод (для этапа 3)	False
-	
-	TRANSLATE_TO	Код языка перевода	"ru"
-	
-	TRANSLATION_BATCH_SIZE	Строк в одном запросе к Google	50
-	
-	TRANSLATION_DELAY	Задержка между запросами (сек)	1.0
-	
-	TRANSLATION_MAX_RETRIES	Число повторных попыток	3
-	
-	OUTPUT_DIR	Папка для результатов	output/
+# Перевод
+ENABLE_TRANSLATION = False          # Включить перевод
+TRANSLATE_TO = "ru"                 # Целевой язык
+TRANSLATION_BATCH_SIZE = 25         # Размер батча
+TRANSLATION_DELAY = 1.5             # Задержка между запросами
+TRANSLATION_SERVICE = "google"      # google или yandex
+
+# AI
+AI_PROVIDER = "ollama"              # ollama или openai
+AI_MODEL = "qwen2.5:3b"             # Модель для Ollama
+AI_BASE_URL = "http://localhost:11434/v1"
+
+# Ограничения (0 = все записи)
+MAX_CAPEC_RECORDS = 330
+MAX_CWE_RECORDS = 500
+MAX_CVE_RECORDS = 2000
+MAX_ATTACK_RECORDS = 300
 ```
 
----
+## 🔧 Требования
 
-## 📄 Формат выходных данных
+- **Python** 3.8+
+- **Зависимости**:
+  - requests
+  - deep-translator (для перевода)
+  - Flask, Flask-SocketIO (для GUI)
+  - eventlet (для асинхронности в GUI)
 
-### `mitre_attack.json`
+## 📊 Выходные данные
 
-```json
-{
-  "id": "T1055.011",
-  "name": "Extra Window Memory Injection",
-  "tactic": "Defense Evasion",
-  "description": "...",
-  "platforms": ["Windows"],
-  "related_cwe": [],
-  "related_capec": [],
-  "requires_service": ["api_service", "windows_os"],
-  "detection": "",
-  "mitigations": ["Behavior Prevention on Endpoint ..."]
-}
+После обработки в папке `output/` создаются:
+
+- `capec_database.json` - база шаблонов атак
+- `cwe_database.json` - база типов уязвимостей
+- `cve_database.json` - база известных уязвимостей
+- `mitre_attack.json` - база тактик и техник ATT&CK
+- `translate_cache.json` - кэш переводов
+
+Каждая запись содержит:
+- ID
+- Название
+- Описание
+- Связанные записи из других баз
+- Меры защиты
+- И другие поля в зависимости от типа базы
+
+## 🆘 Решение проблем
+
+### GUI не запускается
+```bash
+pip install -r gui/requirements.txt
 ```
 
-### `capec_database.json`
+### Ошибки при парсинге
+- Проверьте подключение к интернету
+- Увеличьте таймауты в `config.py`
+- Попробуйте запустить с меньшим количеством записей
 
-```json
-{
-  "id": "CAPEC-1",
-  "name": "Accessing Functionality Not Properly Constrained by ACLs",
-  "description": "...",
-  "severity": "HIGH",
-  "related_cwe": ["CWE-276", "CWE-285"],
-  "related_mitre": [],
-  "prerequisites": ["..."],
-  "mitigations": ["In a J2EE setting, administrators can associate a role ..."]
-}
-```
+### Проблемы с переводом
+- Убедитесь, что `ENABLE_TRANSLATION = True`
+- Проверьте API ключ для Yandex (если используется)
+- Уменьшите `TRANSLATION_BATCH_SIZE` при ошибках
 
-### `cwe_database.json`
+### AI не работает
+- Для Ollama: убедитесь, что сервис запущен (`ollama serve`)
+- Для OpenAI: установите `AI_API_KEY` в `config.py`
 
-```json
-{
-  "id": "CWE-1021",
-  "name": "Improper Restriction of Rendered UI Layers or Frames",
-  "description": "...",
-  "category": "unknown",
-  "related_capec": ["CAPEC-103", "CAPEC-181"],
-  "mitigation": "Implementation The use of X-Frame-Options ...",
-  "requires_technology": [],
-  "detection_methods": ["automated_static_analysis..."]
-}
-```
+## 📚 Дополнительная документация
 
-### `cve_database.json`
+- [Настройка GUI](GUI_SETUP.md) - подробная инструкция по графическому интерфейсу
+- [README в gui/](gui/README.md) - документация GUI
 
-```json
-{
-  "id": "CVE-2005-3817",
-  "description": "Multiple SQL injection vulnerabilities ...",
-  "severity": "UNKNOWN",
-  "cvss_score": 7.5,
-  "affected_software": ["softbizscripts web_hosting_directory_script"],
-  "attack_type": "sql_injection",
-  "related_cwe": ["CWE-89"],
-  "related_capec": [],
-  "related_mitre": [],
-  "requires_service": [],
-  "requires_port": [],
-  "prerequisites": [],
-  "mitigations": [
-    "Architecture and Design Libraries or Frameworks Use a vetted library ..."
-  ]
-}
-```
+## 📝 Лицензия
 
----
+Проект создан для образовательных целей. Данные MITRE распространяются под их лицензиями.
 
-## Примечания
+## 🤝 Вклад
 
-- Поля могут оставаться пустыми, если соответствующие связи отсутствуют в исходных базах MITRE/NVD.
-- Для включения перевода на русский язык установите `ENABLE_TRANSLATION = True` в `config.py`. Будет использоваться библиотека `googletrans` (требуется интернет-соединение).
-- При первом запуске рекомендуется установить лимиты записей для тестирования (например, `MAX_CVE_RECORDS = 100`).
+Проект открыт для улучшений. Присылайте pull request'ы и issue.
 
----
+## 📧 Контакты
+
+По вопросам и предложениям создавайте issue в репозитории.

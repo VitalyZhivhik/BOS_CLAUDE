@@ -2,6 +2,7 @@
 import subprocess
 import sys
 import re
+import json
 from pathlib import Path
 from config import Config
 
@@ -14,7 +15,7 @@ def update_config_file(service, api_key=None):
     # Замена TRANSLATION_SERVICE
     content = re.sub(
         r'^(TRANSLATION_SERVICE\s*=\s*).*',
-        f'\\1"{service}"',
+        f'\\g<1>"{service}"',
         content,
         flags=re.MULTILINE
     )
@@ -23,10 +24,48 @@ def update_config_file(service, api_key=None):
     if api_key:
         content = re.sub(
             r'^(YANDEX_API_KEY\s*=\s*).*',
-            f'\\1"{api_key}"',
+            f'\\g<1>"{api_key}"',
             content,
             flags=re.MULTILINE
         )
+
+    with open(config_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+
+    # Перезагружаем Config
+    import importlib
+    import config
+    importlib.reload(config)
+    from config import Config
+    globals()['Config'] = Config
+
+def update_translation_params(batch_size, delay, max_retries):
+    """Обновляет параметры перевода в config.py"""
+    config_path = Path(__file__).parent / 'config.py'
+    with open(config_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # Замена TRANSLATION_BATCH_SIZE
+    content = re.sub(
+        r'^(TRANSLATION_BATCH_SIZE\s*=\s*).*',
+        f'\\g<1>{batch_size}',
+        content,
+        flags=re.MULTILINE
+    )
+    # Замена TRANSLATION_DELAY
+    content = re.sub(
+        r'^(TRANSLATION_DELAY\s*=\s*).*',
+        f'\\g<1>{delay}',
+        content,
+        flags=re.MULTILINE
+    )
+    # Замена TRANSLATION_MAX_RETRIES
+    content = re.sub(
+        r'^(TRANSLATION_MAX_RETRIES\s*=\s*).*',
+        f'\\g<1>{max_retries}',
+        content,
+        flags=re.MULTILINE
+    )
 
     with open(config_path, 'w', encoding='utf-8') as f:
         f.write(content)
@@ -64,6 +103,21 @@ def configure_translation():
     if api_key:
         print("API-ключ Яндекса обновлён.")
 
+def configure_translation_params():
+    """Интерактивная настройка параметров перевода (batch, delay, retries)"""
+    print("\n--- Настройка параметров перевода ---")
+    print(f"Текущие значения: batch_size={Config.TRANSLATION_BATCH_SIZE}, delay={Config.TRANSLATION_DELAY}, max_retries={Config.TRANSLATION_MAX_RETRIES}")
+    try:
+        batch_size = int(input("Размер батча (строк за один запрос, напр. 25): ").strip())
+        delay = float(input("Задержка между запросами в секундах (напр. 1.5): ").strip())
+        max_retries = int(input("Число повторных попыток при ошибке (напр. 5): ").strip())
+    except ValueError:
+        print("Ошибка ввода. Параметры не изменены.")
+        return
+
+    update_translation_params(batch_size, delay, max_retries)
+    print("Параметры перевода обновлены и сохранены в config.py")
+
 def run_script(script_name, extra_args=None):
     script_path = Path(__file__).parent / script_name
     cmd = [sys.executable, str(script_path)]
@@ -79,6 +133,31 @@ def clear_translation_cache():
     else:
         print("📭 Кэш перевода не найден.")
 
+def clear_bad_translations():
+    """Удаляет из кэша записи, где перевод явно некачественный"""
+    cache_file = Config.OUTPUT_DIR / "translate_cache.json"
+    if not cache_file.exists():
+        print("📭 Кэш перевода не найден.")
+        return
+
+    with open(cache_file, "r", encoding="utf-8") as f:
+        cache = json.load(f)
+
+    removed = 0
+    keys_to_remove = []
+    for orig, trans in cache.items():
+        if trans.count('_') > 2 or trans == orig or len(trans.strip()) < 2:
+            keys_to_remove.append(orig)
+
+    for key in keys_to_remove:
+        del cache[key]
+        removed += 1
+
+    with open(cache_file, "w", encoding="utf-8") as f:
+        json.dump(cache, f, ensure_ascii=False, indent=2)
+
+    print(f"🧹 Удалено {removed} некачественных переводов из кэша.")
+
 def main():
     while True:
         service = Config.TRANSLATION_SERVICE
@@ -90,8 +169,10 @@ def main():
         print(f"3. AI-обогащение (заполнить пустые поля)")
         print(f"4. Перевести выбранные поля (текущий сервис: {service})")
         print(f"5. Запустить все этапы последовательно")
-        print(f"6. Настроить сервис перевода")
+        print(f"6. Выбрать сервис перевода")
         print(f"7. Очистить кэш перевода")
+        print(f"8. Очистить некачественные переводы из кэша")
+        print(f"9. Настроить параметры перевода")
         print(f"0. Выход")
         choice = input("Ваш выбор: ").strip()
 
@@ -129,6 +210,10 @@ def main():
             configure_translation()
         elif choice == "7":
             clear_translation_cache()
+        elif choice == "8":
+            clear_bad_translations()
+        elif choice == "9":
+            configure_translation_params()
         elif choice == "0":
             print("Выход.")
             break

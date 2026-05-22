@@ -8,8 +8,8 @@ class Config:
     ENABLE_TRANSLATION = False
     TRANSLATE_TO = "ru" # <- Код языка для Русского
     TRANSLATION_DELAY = 1.5     # Задержка между запросами к переводчику (сек)
-    TRANSLATION_BATCH_SIZE = 20 # Сколько строк отправлять за раз (Google позволяет до ~100)
-    TRANSLATION_MAX_RETRIES = 4     # Число повторных попыток при ошибке
+    TRANSLATION_BATCH_SIZE = 25 # Сколько строк отправлять за раз (Google позволяет до ~100)
+    TRANSLATION_MAX_RETRIES = 5     # Число повторных попыток при ошибке
     TRANSLATION_SERVICE = "google" # google или yandex
     YANDEX_API_KEY = "" # API key Яндекса (если выбран Яндекс)
      

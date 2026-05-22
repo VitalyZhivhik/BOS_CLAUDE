@@ -2,9 +2,18 @@
 import re
 import time
 import json
+import ssl
 from pathlib import Path
 from deep_translator import GoogleTranslator
 from config import Config
+
+# Создаём безопасный SSL-контекст для обхода ошибок SSL EOF
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
 
 class Translator:
     """Онлайн-переводчик через Google Translate с пакетной обработкой, кэшированием и разбиением длинных текстов"""
@@ -14,9 +23,9 @@ class Translator:
     def __init__(self, target_lang: str = None, force_enable: bool = False):
         self.enabled = force_enable or Config.ENABLE_TRANSLATION
         self.target_lang = target_lang or Config.TRANSLATE_TO
-        self.batch_size = getattr(Config, 'TRANSLATION_BATCH_SIZE', 50)
-        self.delay = getattr(Config, 'TRANSLATION_DELAY', 1.0)
-        self.max_retries = getattr(Config, 'TRANSLATION_MAX_RETRIES', 3)
+        self.batch_size = getattr(Config, 'TRANSLATION_BATCH_SIZE', 25)
+        self.delay = getattr(Config, 'TRANSLATION_DELAY', 1.5)
+        self.max_retries = getattr(Config, 'TRANSLATION_MAX_RETRIES', 5)
 
         if self.enabled:
             try:
@@ -56,14 +65,12 @@ class Translator:
         if len(text) <= self.MAX_TEXT_LENGTH:
             return [text]
 
-        # Пробуем разбить по двойным переносам строки (абзацы)
         parts = text.split('\n\n')
         result = []
         for part in parts:
             if len(part) <= self.MAX_TEXT_LENGTH:
                 result.append(part)
             else:
-                # Разбиваем по одиночным переносам или предложениям
                 subparts = re.split(r'(?<=[.!?])\s+', part)
                 current = ""
                 for sub in subparts:
@@ -92,7 +99,15 @@ class Translator:
         if use_cache and text in self._cache:
             return self._cache[text]
 
-        # Разбиваем, если текст слишком длинный
+        # === АВТОЗАМЕНА ПОДЧЁРКИВАНИЙ ПЕРЕД ПЕРЕВОДОМ ===
+        original_text = text
+        if '_' in text:
+            cleaned = text.replace('_', ' ').strip()
+            if cleaned != text:
+                print(f"    🔄 Замена подчёркиваний для '{text[:50]}...'")
+                text = cleaned
+        # =================================================
+
         parts = self._split_long_text(text)
         translated_parts = []
         for part in parts:
@@ -108,11 +123,10 @@ class Translator:
                     print(f"⚠️ Попытка {attempt+1}/{self.max_retries} для '{part[:40]}...' провалена: {e}")
                     time.sleep(2 * (attempt + 1))
             else:
-                # все попытки исчерпаны – оставляем оригинал
                 translated_parts.append(part)
 
         full_translation = " ".join(translated_parts)
-        self._cache[text] = full_translation
+        self._cache[original_text] = full_translation
         if self._request_count % 20 == 0:
             self._save_cache()
         return full_translation
@@ -123,7 +137,6 @@ class Translator:
         if not texts:
             return []
 
-        # Фильтруем и подготавливаем строки
         to_translate = []
         indices = []
         for i, text in enumerate(texts):
@@ -139,7 +152,11 @@ class Translator:
             if text in self._cache:
                 continue
 
-            # Разбиваем длинные строки
+            if '_' in text:
+                cleaned = text.replace('_', ' ').strip()
+                if cleaned != text:
+                    text = cleaned
+
             parts = self._split_long_text(text)
             for part in parts:
                 to_translate.append(part)
@@ -149,7 +166,6 @@ class Translator:
             return texts[:]
 
         results = texts[:]
-        # Разбиваем на батчи
         for start in range(0, len(to_translate), self.batch_size):
             batch = to_translate[start:start+self.batch_size]
             batch_indices = indices[start:start+self.batch_size]
@@ -160,7 +176,6 @@ class Translator:
                         time.sleep(self.delay)
                     translated_batch = self.translator.translate_batch(batch)
                     self._request_count += 1
-                    # Собираем переводы обратно в оригинальные строки
                     temp_results = {}
                     for idx, trans in zip(batch_indices, translated_batch):
                         if idx not in temp_results:

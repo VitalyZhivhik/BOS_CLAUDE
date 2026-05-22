@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MITRE Parser GUI</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <!-- Навигация -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-database-fill-gear"></i> MITRE Parser GUI
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" data-page="dashboard">
+                            <i class="bi bi-speedometer2"></i> Панель управления
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="databasesDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-hdd-stack"></i> Базы данных
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" data-db="capec_database">CAPEC</a></li>
+                            <li><a class="dropdown-item" href="#" data-db="cwe_database">CWE</a></li>
+                            <li><a class="dropdown-item" href="#" data-db="cve_database">CVE</a></li>
+                            <li><a class="dropdown-item" href="#" data-db="mitre_attack">MITRE ATT&CK</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-page="translate-cache">
+                            <i class="bi bi-translate"></i> Кэш переводов
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-page="settings">
+                            <i class="bi bi-gear-fill"></i> Настройки
+                        </a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    <span class="navbar-text me-3" id="connectionStatus">
+                        <span class="badge bg-secondary">Отключено</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Основной контент -->
+    <div class="container-fluid mt-4">
+        <!-- Панель управления -->
+        <div id="dashboardPage" class="page active">
+            <div class="row">
+                <!-- Карточки статистики -->
+                <div class="col-md-3 mb-4">
+                    <div class="card bg-primary text-white h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="bi bi-database"></i> Базы данных
+                            </h5>
+                            <h2 id="totalDatabases">0</h2>
+                            <p class="card-text">Активных баз</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-4">
+                    <div class="card bg-success text-white h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="bi bi-file-earmark-text"></i> Записи
+                            </h5>
+                            <h2 id="totalRecords">0</h2>
+                            <p class="card-text">Всего записей</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-4">
+                    <div class="card bg-info text-white h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="bi bi-translate"></i> Переводы
+                            </h5>
+                            <h2 id="totalTranslations">0</h2>
+                            <p class="card-text">В кэше</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-4">
+                    <div class="card bg-warning text-dark h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="bi bi-link-45deg"></i> Связи
+                            </h5>
+                            <h2 id="totalLinks">0</h2>
+                            <p class="card-text">Перекрестных ссылок</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Панель процессов -->
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-play-circle"></i> Управление процессами</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <!-- Парсинг -->
+                                <div class="col-md-3 mb-3">
+                                    <div class="card h-100 border-primary">
+                                        <div class="card-body">
+                                            <h6 class="card-title">
+                                                <i class="bi bi-download"></i> Парсинг
+                                            </h6>
+                                            <p class="card-text small">Скачивание и обработка баз данных</p>
+                                            <div class="progress mb-2" style="height: 20px;">
+                                                <div id="parsingProgress" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">0%</div>
+                                            </div>
+                                            <div class="btn-group w-100">
+                                                <button class="btn btn-sm btn-primary" onclick="startProcess('parsing')">
+                                                    <i class="bi bi-play"></i> Старт
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" onclick="stopProcess('parsing')">
+                                                    <i class="bi bi-stop"></i> Стоп
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Связывание -->
+                                <div class="col-md-3 mb-3">
+                                    <div class="card h-100 border-success">
+                                        <div class="card-body">
+                                            <h6 class="card-title">
+                                                <i class="bi bi-link-45deg"></i> Связывание
+                                            </h6>
+                                            <p class="card-text small">Установление перекрестных ссылок</p>
+                                            <div class="progress mb-2" style="height: 20px;">
+                                                <div id="linkingProgress" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 0%">0%</div>
+                                            </div>
+                                            <div class="btn-group w-100">
+                                                <button class="btn btn-sm btn-success" onclick="startProcess('linking')">
+                                                    <i class="bi bi-play"></i> Старт
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" onclick="stopProcess('linking')">
+                                                    <i class="bi bi-stop"></i> Стоп
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- AI обогащение -->
+                                <div class="col-md-3 mb-3">
+                                    <div class="card h-100 border-info">
+                                        <div class="card-body">
+                                            <h6 class="card-title">
+                                                <i class="bi bi-robot"></i> AI обогащение
+                                            </h6>
+                                            <p class="card-text small">Заполнение пустых полей</p>
+                                            <div class="progress mb-2" style="height: 20px;">
+                                                <div id="enrichingProgress" class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" style="width: 0%">0%</div>
+                                            </div>
+                                            <div class="btn-group w-100">
+                                                <button class="btn btn-sm btn-info text-white" onclick="startProcess('enriching')">
+                                                    <i class="bi bi-play"></i> Старт
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" onclick="stopProcess('enriching')">
+                                                    <i class="bi bi-stop"></i> Стоп
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Перевод -->
+                                <div class="col-md-3 mb-3">
+                                    <div class="card h-100 border-warning">
+                                        <div class="card-body">
+                                            <h6 class="card-title">
+                                                <i class="bi bi-translate"></i> Перевод
+                                            </h6>
+                                            <p class="card-text small">Перевод полей на русский</p>
+                                            <div class="progress mb-2" style="height: 20px;">
+                                                <div id="translatingProgress" class="progress-bar progress-bar-striped progress-bar-animated bg-warning" role="progressbar" style="width: 0%">0%</div>
+                                            </div>
+                                            <div class="btn-group w-100">
+                                                <button class="btn btn-sm btn-warning" onclick="startProcess('translating')">
+                                                    <i class="bi bi-play"></i> Старт
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" onclick="stopProcess('translating')">
+                                                    <i class="bi bi-stop"></i> Стоп
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Логи процессов -->
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5><i class="bi bi-terminal"></i> Логи процессов</h5>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="clearLogs()">
+                                <i class="bi bi-trash"></i> Очистить
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="log-container" id="processLogs">
+                                <div class="log-entry text-muted">Ожидание событий...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Страница редактора баз данных -->
+        <div id="databasePage" class="page">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 id="databaseTitle">
+                        <i class="bi bi-table"></i> Редактор базы данных
+                    </h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary" onclick="refreshDatabase()">
+                            <i class="bi bi-arrow-clockwise"></i> Обновить
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" onclick="saveDatabase()">
+                            <i class="bi bi-save"></i> Сохранить
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Поиск и фильтрация -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <input type="text" class="form-control" id="databaseSearch" placeholder="Поиск по ID, названию, описанию...">
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" id="recordsPerPage">
+                                <option value="10">10 записей</option>
+                                <option value="25" selected>25 записей</option>
+                                <option value="50">50 записей</option>
+                                <option value="100">100 записей</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <span class="text-muted" id="recordCount">Записей: 0</span>
+                        </div>
+                    </div>
+
+                    <!-- Таблица данных -->
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="databaseTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Название</th>
+                                    <th>Описание</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="databaseTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Пагинация -->
+                    <nav>
+                        <ul class="pagination" id="pagination">
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+
+        <!-- Страница кэша переводов -->
+        <div id="translateCachePage" class="page">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="bi bi-translate"></i> Кэш переводов</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-danger" onclick="clearTranslateCache()">
+                            <i class="bi bi-trash"></i> Очистить кэш
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" onclick="saveTranslateCache()">
+                            <i class="bi bi-save"></i> Сохранить
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <input type="text" class="form-control" id="cacheSearch" placeholder="Поиск переводов...">
+                        </div>
+                        <div class="col-md-6">
+                            <span class="text-muted" id="cacheCount">Записей: 0</span>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="cacheTable">
+                            <thead>
+                                <tr>
+                                    <th style="width: 45%">Оригинал (EN)</th>
+                                    <th style="width: 45%">Перевод (RU)</th>
+                                    <th style="width: 10%">Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cacheTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Страница настроек -->
+        <div id="settingsPage" class="page">
+            <div class="row">
+                <!-- Настройки лимитов парсинга -->
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-sliders"></i> Лимиты парсинга</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small">Ограничение количества записей при парсинге (0 = все записи)</p>
+                            <form id="limitsSettings">
+                                <div class="mb-3">
+                                    <label class="form-label">CAPEC (шаблоны атак)</label>
+                                    <input type="number" class="form-control" name="max_capec" value="330" min="0">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">CWE (типы уязвимостей)</label>
+                                    <input type="number" class="form-control" name="max_cwe" value="500" min="0">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">CVE (известные уязвимости)</label>
+                                    <input type="number" class="form-control" name="max_cve" value="2000" min="0">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">MITRE ATT&CK (тактики)</label>
+                                    <input type="number" class="form-control" name="max_attack" value="300" min="0">
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-save"></i> Сохранить лимиты
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Настройки перевода -->
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-translate"></i> Настройки перевода</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="translationSettings">
+                                <div class="mb-3">
+                                    <label class="form-label">Сервис перевода</label>
+                                    <select class="form-select" name="service">
+                                        <option value="google">Google Translate</option>
+                                        <option value="yandex">Yandex Translate</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Целевой язык</label>
+                                    <select class="form-select" name="target_lang">
+                                        <option value="ru">Русский</option>
+                                        <option value="en">English</option>
+                                        <option value="de">Deutsch</option>
+                                        <option value="fr">Français</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Размер батча (строк)</label>
+                                    <input type="number" class="form-control" name="batch_size" value="25">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Задержка (сек)</label>
+                                    <input type="number" class="form-control" name="delay" value="1.5" step="0.1">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Макс. попыток</label>
+                                    <input type="number" class="form-control" name="max_retries" value="5">
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-save"></i> Сохранить настройки
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI настройки (в разработке) -->
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-robot"></i> AI настройки (в разработке)</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> 
+                                <strong>AI обогащение находится в разработке.</strong> 
+                                Эта функция позволит автоматически заполнять пустые поля в базах данных с помощью искусственного интеллекта.
+                            </div>
+                            <form id="aiSettings">
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">AI провайдер</label>
+                                        <select class="form-select" name="provider">
+                                            <option value="ollama">Ollama (локально)</option>
+                                            <option value="openai">OpenAI</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Модель</label>
+                                        <input type="text" class="form-control" name="model" value="qwen2.5:3b">
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">API URL</label>
+                                        <input type="text" class="form-control" name="base_url" value="http://localhost:11434/v1">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">API ключ</label>
+                                    <input type="password" class="form-control" name="api_key" placeholder="Не требуется для Ollama">
+                                </div>
+                                <button type="submit" class="btn btn-primary" disabled>
+                                    <i class="bi bi-save"></i> Сохранить настройки (скоро)
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования записи -->
+    <div class="modal fade" id="editRecordModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Редактирование записi</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editRecordForm">
+                        <input type="hidden" id="editRecordId">
+                        <input type="hidden" id="editDbName">
+                        <div id="editRecordFields">
+                            <!-- Поля будут добавлены динамически -->
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="saveRecord()">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования перевода -->
+    <div class="modal fade" id="editTranslationModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Редактирование перевода</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Оригинал</label>
+                        <textarea class="form-control" id="editTranslationOriginal" readonly rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Перевод</label>
+                        <textarea class="form-control" id="editTranslationText" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="saveTranslation()">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <!-- DataTables JS -->
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
