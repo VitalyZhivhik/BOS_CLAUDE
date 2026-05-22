@@ -62,6 +62,36 @@ class TrivyScanner:
         self.progress_callback = progress_callback or (lambda percent, text: None)
         self.last_result: Optional[TrivyScanResult] = None
 
+    def _windows_trivy_candidates(self) -> list[str]:
+        if os.name != "nt":
+            return []
+        pf = os.environ.get("ProgramFiles", "")
+        pf86 = os.environ.get("ProgramFiles(x86)", "")
+        local = os.environ.get("LOCALAPPDATA", "")
+        user = os.environ.get("USERPROFILE", "")
+        choco = os.environ.get("ChocolateyInstall", "")
+        programdata = os.environ.get("ProgramData", r"C:\ProgramData")
+        candidates = [
+            os.path.join(pf, "Trivy", "trivy.exe"),
+            os.path.join(pf86, "Trivy", "trivy.exe"),
+            os.path.join(pf, "trivy", "trivy.exe"),
+            os.path.join(pf86, "trivy", "trivy.exe"),
+            os.path.join(local, "Programs", "trivy", "trivy.exe"),
+            os.path.join(local, "Programs", "Trivy", "trivy.exe"),
+            os.path.join(choco, "bin", "trivy.exe") if choco else "",
+            os.path.join(programdata, "chocolatey", "bin", "trivy.exe"),
+            os.path.join(user, "scoop", "shims", "trivy.exe"),
+            os.path.join(user, "scoop", "apps", "trivy", "current", "trivy.exe"),
+        ]
+        out: list[str] = []
+        for p in candidates:
+            s = str(p or "").strip()
+            if not s:
+                continue
+            s = os.path.expandvars(os.path.expanduser(s))
+            out.append(s)
+        return out
+
     def _find_trivy(self) -> str:
         """Поиск исполняемого файла Trivy."""
         base_dir = bundle_resources_root()
@@ -87,6 +117,12 @@ class TrivyScanner:
                 if os.path.isfile(path):
                     logger.info(f"[TRIVY] ✅ Найден (glob): {path}")
                     return path
+
+        for path in self._windows_trivy_candidates():
+            logger.debug(f"[TRIVY] Проверка (Windows): {path}")
+            if os.path.isfile(path):
+                logger.info(f"[TRIVY] ✅ Найден (Windows): {path}")
+                return path
 
         for path in ("trivy.exe", "trivy"):
             logger.debug(f"[TRIVY] Проверка PATH: {path}")

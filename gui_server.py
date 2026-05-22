@@ -122,6 +122,11 @@ NUCLEI_PROFILE_MAP = {
     "Balanced": "Balanced",
     "Accurate": "Accurate",
 }
+
+SCAN_HISTORY_DIR = "data"
+SCAN_HISTORY_SUFFIX = ".json"
+NMAP_HISTORY_PREFIX = "nmap_scan_"
+NUCLEI_HISTORY_PREFIX = "nuclei_scan_"
 # ─────────────────────────────────────────
 #  Стили
 # ─────────────────────────────────────────
@@ -738,6 +743,7 @@ class ServerGUI(QMainWindow):
         self.server_scan_vectors = []    # Результаты Nmap/Nuclei на сервере (векторы)
         self.server_scan_vulns = {"nmap": [], "nuclei": []}  # Сырые находки серверных сканеров
         self._server_scan_running = {"nmap": False, "nuclei": False}
+        self._server_scan_ports = {"nmap": [], "nuclei": []}
         self._correlation_results_by_profile = {}
         self._correlation_summaries_by_profile = {}
         self._correlation_profiles_meta = {}
@@ -776,7 +782,7 @@ class ServerGUI(QMainWindow):
         self._build_software_tab() # НОВАЯ ВКЛАДКА
         self._build_trivy_tab()  # НОВАЯ ВКЛАДКА TRIVY
         self._build_scanners_tab()
-        self._build_trivy_history_tab()  # НОВАЯ ВКЛАДКА ИСТОРИИ TRIVY
+        self._build_scan_history_tab()
         self._build_vuln_tab()
         self._build_correlation_tab()
         self._build_settings_tab()  # НОВАЯ ВКЛАДКА НАСТРОЙКИ
@@ -1234,26 +1240,66 @@ class ServerGUI(QMainWindow):
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        left = QWidget()
-        ll = QVBoxLayout(left)
-        ll.setContentsMargins(0, 0, 0, 0)
-        ll.setSpacing(8)
+        nmap_panel = QWidget()
+        nmap_layout = QVBoxLayout(nmap_panel)
+        nmap_layout.setContentsMargins(0, 0, 0, 0)
+        nmap_layout.setSpacing(8)
+
+        nmap_title = QLabel("🛰️ Nmap (сервер, локально)")
+        nmap_title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        nmap_title.setStyleSheet("color:#888;padding:6px 0;")
+        nmap_layout.addWidget(nmap_title)
+
+        self.server_nmap_status = QLabel("⚪ Nmap не запускался")
+        self.server_nmap_status.setStyleSheet("color:#666;font-size:11px;padding:4px;")
+        nmap_layout.addWidget(self.server_nmap_status)
+
+        self.server_nmap_progress = QProgressBar()
+        self.server_nmap_progress.setFixedHeight(18)
+        self.server_nmap_progress.setVisible(True)
+        self.server_nmap_progress.setValue(0)
+        self.server_nmap_progress.setFormat("—")
+        nmap_layout.addWidget(self.server_nmap_progress)
+
+        self.server_nmap_table = QTableWidget(0, 6)
+        self.server_nmap_table.setHorizontalHeaderLabels(["CVE", "Серьёзность", "Порт", "Сервис", "Script", "Описание"])
+        self.server_nmap_table.horizontalHeader().setStretchLastSection(True)
+        self.server_nmap_table.setColumnWidth(0, 135)
+        self.server_nmap_table.setColumnWidth(1, 90)
+        self.server_nmap_table.setColumnWidth(2, 60)
+        self.server_nmap_table.setColumnWidth(3, 120)
+        self.server_nmap_table.setColumnWidth(4, 180)
+        self.server_nmap_table.verticalHeader().setVisible(False)
+        self.server_nmap_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        nmap_layout.addWidget(self.server_nmap_table, 1)
+
+        self.server_nmap_log = QTextEdit()
+        self.server_nmap_log.setReadOnly(True)
+        self.server_nmap_log.setFixedHeight(180)
+        nmap_layout.addWidget(self.server_nmap_log)
+
+        splitter.addWidget(nmap_panel)
+
+        nuclei_panel = QWidget()
+        nuclei_layout = QVBoxLayout(nuclei_panel)
+        nuclei_layout.setContentsMargins(0, 0, 0, 0)
+        nuclei_layout.setSpacing(8)
 
         nuclei_title = QLabel("🧪 Nuclei (сервер, локально)")
         nuclei_title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         nuclei_title.setStyleSheet("color:#888;padding:6px 0;")
-        ll.addWidget(nuclei_title)
+        nuclei_layout.addWidget(nuclei_title)
 
         self.server_nuclei_status = QLabel("⚪ Nuclei не запускался")
         self.server_nuclei_status.setStyleSheet("color:#666;font-size:11px;padding:4px;")
-        ll.addWidget(self.server_nuclei_status)
+        nuclei_layout.addWidget(self.server_nuclei_status)
 
         self.server_nuclei_progress = QProgressBar()
         self.server_nuclei_progress.setFixedHeight(18)
         self.server_nuclei_progress.setVisible(True)
         self.server_nuclei_progress.setValue(0)
         self.server_nuclei_progress.setFormat("—")
-        ll.addWidget(self.server_nuclei_progress)
+        nuclei_layout.addWidget(self.server_nuclei_progress)
 
         self.server_nuclei_table = QTableWidget(0, 6)
         self.server_nuclei_table.setHorizontalHeaderLabels(["CVE", "CWE", "Серьёзность", "Порт", "Template", "Описание"])
@@ -1265,35 +1311,35 @@ class ServerGUI(QMainWindow):
         self.server_nuclei_table.setColumnWidth(4, 220)
         self.server_nuclei_table.verticalHeader().setVisible(False)
         self.server_nuclei_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        ll.addWidget(self.server_nuclei_table, 1)
+        nuclei_layout.addWidget(self.server_nuclei_table, 1)
 
         self.server_nuclei_log = QTextEdit()
         self.server_nuclei_log.setReadOnly(True)
         self.server_nuclei_log.setFixedHeight(180)
-        ll.addWidget(self.server_nuclei_log)
+        nuclei_layout.addWidget(self.server_nuclei_log)
 
-        splitter.addWidget(left)
+        splitter.addWidget(nuclei_panel)
 
-        right = QWidget()
-        rl = QVBoxLayout(right)
-        rl.setContentsMargins(0, 0, 0, 0)
-        rl.setSpacing(8)
+        trivy_panel = QWidget()
+        trivy_layout = QVBoxLayout(trivy_panel)
+        trivy_layout.setContentsMargins(0, 0, 0, 0)
+        trivy_layout.setSpacing(8)
 
         trivy_title = QLabel("🛡️ Trivy (сервер)")
         trivy_title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         trivy_title.setStyleSheet("color:#888;padding:6px 0;")
-        rl.addWidget(trivy_title)
+        trivy_layout.addWidget(trivy_title)
 
         self.server_trivy_status = QLabel("⚪ Trivy не запущен")
         self.server_trivy_status.setStyleSheet("color:#666;font-size:11px;padding:4px;")
-        rl.addWidget(self.server_trivy_status)
+        trivy_layout.addWidget(self.server_trivy_status)
 
         self.server_trivy_progress = QProgressBar()
         self.server_trivy_progress.setFixedHeight(18)
         self.server_trivy_progress.setVisible(True)
         self.server_trivy_progress.setValue(0)
         self.server_trivy_progress.setFormat("—")
-        rl.addWidget(self.server_trivy_progress)
+        trivy_layout.addWidget(self.server_trivy_progress)
 
         self.server_trivy_table = QTableWidget(0, 7)
         self.server_trivy_table.setHorizontalHeaderLabels([
@@ -1308,55 +1354,122 @@ class ServerGUI(QMainWindow):
         self.server_trivy_table.setColumnWidth(5, 250)
         self.server_trivy_table.verticalHeader().setVisible(False)
         self.server_trivy_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        rl.addWidget(self.server_trivy_table, 1)
+        trivy_layout.addWidget(self.server_trivy_table, 1)
 
         self.server_trivy_log = QTextEdit()
         self.server_trivy_log.setReadOnly(True)
         self.server_trivy_log.setFixedHeight(180)
-        rl.addWidget(self.server_trivy_log)
+        trivy_layout.addWidget(self.server_trivy_log)
 
-        splitter.addWidget(right)
-        splitter.setSizes([800, 800])
+        splitter.addWidget(trivy_panel)
+        splitter.setSizes([700, 700, 700])
         layout.addWidget(splitter)
 
         self.tabs.addTab(tab, "🖥️ Сканеры")
 
-    def _build_trivy_history_tab(self):
-        """Вкладка истории сканирований Trivy"""
-        tht = QWidget()
-        thtl = QVBoxLayout(tht)
-        
-        title = QLabel("📂 История сканирований Trivy")
+    def _build_scan_history_tab(self):
+        tab = QWidget()
+        outer = QVBoxLayout(tab)
+
+        title = QLabel("📂 История сканирований")
         title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         title.setStyleSheet("color:#888;padding:6px 0;")
-        thtl.addWidget(title)
-        
-        ctrl = QHBoxLayout()
-        self.btn_refresh_trivy_hist = QPushButton("🔄 Обновить")
-        self.btn_refresh_trivy_hist.clicked.connect(self._refresh_trivy_history)
-        ctrl.addWidget(self.btn_refresh_trivy_hist)
-        
-        self.btn_load_trivy_hist = QPushButton("📥 Подгрузить выбранное сканирование")
+        outer.addWidget(title)
+
+        top_ctrl = QHBoxLayout()
+        self.btn_refresh_scan_hist = QPushButton("🔄 Обновить")
+        self.btn_refresh_scan_hist.clicked.connect(self._refresh_scan_histories)
+        top_ctrl.addWidget(self.btn_refresh_scan_hist)
+        top_ctrl.addStretch()
+        outer.addLayout(top_ctrl)
+
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        trivy_panel = QWidget()
+        trivy_layout = QVBoxLayout(trivy_panel)
+        trivy_layout.setContentsMargins(0, 0, 0, 0)
+        trivy_layout.setSpacing(8)
+        trivy_layout.addWidget(QLabel("🛡️ Trivy"))
+
+        trivy_ctrl = QHBoxLayout()
+        self.btn_load_trivy_hist = QPushButton("📥 Загрузить")
         self.btn_load_trivy_hist.clicked.connect(self._load_selected_trivy_history)
         self.btn_load_trivy_hist.setEnabled(False)
-        ctrl.addWidget(self.btn_load_trivy_hist)
-
-        self.btn_delete_trivy_hist = QPushButton("🗑️ Удалить выбранное")
+        trivy_ctrl.addWidget(self.btn_load_trivy_hist)
+        self.btn_delete_trivy_hist = QPushButton("🗑️ Удалить")
         self.btn_delete_trivy_hist.clicked.connect(self._delete_selected_trivy_history)
         self.btn_delete_trivy_hist.setEnabled(False)
-        ctrl.addWidget(self.btn_delete_trivy_hist)
-        ctrl.addStretch()
-        thtl.addLayout(ctrl)
-        
+        trivy_ctrl.addWidget(self.btn_delete_trivy_hist)
+        trivy_ctrl.addStretch()
+        trivy_layout.addLayout(trivy_ctrl)
+
         self.trivy_hist_table = QTableWidget(0, 4)
         self.trivy_hist_table.setHorizontalHeaderLabels(["Дата и Время", "Уязвимостей", "Критических", "Файл"])
         self.trivy_hist_table.horizontalHeader().setStretchLastSection(True)
         self.trivy_hist_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.trivy_hist_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.trivy_hist_table.itemSelectionChanged.connect(self._sync_trivy_hist_buttons)
-        thtl.addWidget(self.trivy_hist_table)
-        
-        self.tabs.addTab(tht, "📜 История Trivy")
+        trivy_layout.addWidget(self.trivy_hist_table)
+        splitter.addWidget(trivy_panel)
+
+        nmap_panel = QWidget()
+        nmap_layout = QVBoxLayout(nmap_panel)
+        nmap_layout.setContentsMargins(0, 0, 0, 0)
+        nmap_layout.setSpacing(8)
+        nmap_layout.addWidget(QLabel("🛰️ Nmap"))
+
+        nmap_ctrl = QHBoxLayout()
+        self.btn_load_nmap_hist = QPushButton("📥 Загрузить")
+        self.btn_load_nmap_hist.clicked.connect(self._load_selected_nmap_history)
+        self.btn_load_nmap_hist.setEnabled(False)
+        nmap_ctrl.addWidget(self.btn_load_nmap_hist)
+        self.btn_delete_nmap_hist = QPushButton("🗑️ Удалить")
+        self.btn_delete_nmap_hist.clicked.connect(self._delete_selected_nmap_history)
+        self.btn_delete_nmap_hist.setEnabled(False)
+        nmap_ctrl.addWidget(self.btn_delete_nmap_hist)
+        nmap_ctrl.addStretch()
+        nmap_layout.addLayout(nmap_ctrl)
+
+        self.nmap_hist_table = QTableWidget(0, 4)
+        self.nmap_hist_table.setHorizontalHeaderLabels(["Дата и Время", "Уязвимостей", "CRITICAL/HIGH", "Файл"])
+        self.nmap_hist_table.horizontalHeader().setStretchLastSection(True)
+        self.nmap_hist_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.nmap_hist_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.nmap_hist_table.itemSelectionChanged.connect(self._sync_nmap_hist_buttons)
+        nmap_layout.addWidget(self.nmap_hist_table)
+        splitter.addWidget(nmap_panel)
+
+        nuclei_panel = QWidget()
+        nuclei_layout = QVBoxLayout(nuclei_panel)
+        nuclei_layout.setContentsMargins(0, 0, 0, 0)
+        nuclei_layout.setSpacing(8)
+        nuclei_layout.addWidget(QLabel("🧪 Nuclei"))
+
+        nuclei_ctrl = QHBoxLayout()
+        self.btn_load_nuclei_hist = QPushButton("📥 Загрузить")
+        self.btn_load_nuclei_hist.clicked.connect(self._load_selected_nuclei_history)
+        self.btn_load_nuclei_hist.setEnabled(False)
+        nuclei_ctrl.addWidget(self.btn_load_nuclei_hist)
+        self.btn_delete_nuclei_hist = QPushButton("🗑️ Удалить")
+        self.btn_delete_nuclei_hist.clicked.connect(self._delete_selected_nuclei_history)
+        self.btn_delete_nuclei_hist.setEnabled(False)
+        nuclei_ctrl.addWidget(self.btn_delete_nuclei_hist)
+        nuclei_ctrl.addStretch()
+        nuclei_layout.addLayout(nuclei_ctrl)
+
+        self.nuclei_hist_table = QTableWidget(0, 4)
+        self.nuclei_hist_table.setHorizontalHeaderLabels(["Дата и Время", "Уязвимостей", "CRITICAL/HIGH", "Файл"])
+        self.nuclei_hist_table.horizontalHeader().setStretchLastSection(True)
+        self.nuclei_hist_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.nuclei_hist_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.nuclei_hist_table.itemSelectionChanged.connect(self._sync_nuclei_hist_buttons)
+        nuclei_layout.addWidget(self.nuclei_hist_table)
+        splitter.addWidget(nuclei_panel)
+
+        splitter.setSizes([600, 600, 600])
+        outer.addWidget(splitter, 1)
+
+        self.tabs.addTab(tab, "📜 История сканирований")
 
     def _update_software_tab(self, system_info):
         """Заполнение вкладки реальным ПО"""
@@ -2667,11 +2780,21 @@ class ServerGUI(QMainWindow):
         if self._server_scan_running.get("nmap"):
             return
         self._server_scan_running["nmap"] = True
+        self._server_scan_ports["nmap"] = list(ports or [])
         self.btn_local_nmap.setEnabled(False)
         self.btn_local_parallel_scan.setEnabled(False)
         self.local_nmap_progress.setVisible(True)
         self.local_nmap_progress.setRange(0, 0)
         self.local_nmap_progress.setFormat("Nmap: сканирование...")
+        if hasattr(self, "server_nmap_progress"):
+            self.server_nmap_progress.setRange(0, 0)
+            self.server_nmap_progress.setValue(0)
+            self.server_nmap_progress.setFormat("Сканирование…")
+        if hasattr(self, "server_nmap_status"):
+            self.server_nmap_status.setText("🔄 Nmap: сканирование…")
+        if hasattr(self, "server_nmap_log"):
+            self.server_nmap_log.append(f"🔄 Запуск: портов {len(ports)}")
+            self.server_nmap_log.moveCursor(QTextCursor.MoveOperation.End)
         self._append_scanner_log(f"[LOCAL] Запуск Nmap на сервере (localhost), портов: {len(ports)}")
         self.local_nmap_worker = LocalNmapScanWorker("127.0.0.1", ports)
         self.local_nmap_worker.finished.connect(self._on_local_nmap_done)
@@ -2682,6 +2805,41 @@ class ServerGUI(QMainWindow):
         self.server_scan_vulns["nmap"] = vulns or []
         vectors = self._vectors_from_scanner_vulns(vulns or [], found_by_prefix="Сервер: Nmap")
         self._merge_server_vectors(vectors)
+        if hasattr(self, "server_nmap_progress"):
+            self.server_nmap_progress.setRange(0, 100)
+            self.server_nmap_progress.setValue(100)
+            self.server_nmap_progress.setFormat(f"Готово ({len(vectors)} CVE, {elapsed:.1f}s)")
+        if hasattr(self, "server_nmap_status"):
+            self.server_nmap_status.setText(f"✅ Nmap: {len(vectors)} CVE, {elapsed:.1f}s")
+        if hasattr(self, "server_nmap_log"):
+            self.server_nmap_log.append(f"✅ Завершено: {len(vectors)} CVE-векторов, {elapsed:.1f}s")
+            self.server_nmap_log.moveCursor(QTextCursor.MoveOperation.End)
+        if hasattr(self, "server_nmap_table"):
+            self.server_nmap_table.setRowCount(0)
+            for v in (vulns or []):
+                if not isinstance(v, dict):
+                    continue
+                row = self.server_nmap_table.rowCount()
+                self.server_nmap_table.insertRow(row)
+                self.server_nmap_table.setItem(row, 0, QTableWidgetItem(str(v.get("cve_id", "") or "")))
+                sev = str(v.get("severity", "") or "").upper()
+                sev_item = QTableWidgetItem(sev)
+                sev_color = {"CRITICAL": "#c44", "HIGH": "#a85", "MEDIUM": "#997", "LOW": "#696", "INFO": "#668"}.get(sev, "#888")
+                sev_item.setForeground(QColor(sev_color))
+                self.server_nmap_table.setItem(row, 1, sev_item)
+                self.server_nmap_table.setItem(row, 2, QTableWidgetItem(str(v.get("port", "") or "")))
+                self.server_nmap_table.setItem(row, 3, QTableWidgetItem(str(v.get("service", "") or "")[:120]))
+                self.server_nmap_table.setItem(row, 4, QTableWidgetItem(str(v.get("script", "") or "")[:180]))
+                self.server_nmap_table.setItem(row, 5, QTableWidgetItem(str(v.get("description", "") or "")[:300]))
+        self._save_simple_scanner_history(
+            NMAP_HISTORY_PREFIX,
+            scanner_name="Nmap",
+            target="127.0.0.1",
+            ports=self._server_scan_ports.get("nmap") or [],
+            elapsed=elapsed,
+            vulnerabilities=vulns or [],
+        )
+        self._refresh_scan_histories()
         self.local_nmap_progress.setRange(0, 100)
         self.local_nmap_progress.setValue(100)
         self.local_nmap_progress.setFormat(f"Nmap: готово ({len(vectors)} CVE, {elapsed:.1f}s)")
@@ -2694,6 +2852,15 @@ class ServerGUI(QMainWindow):
     def _on_local_nmap_error(self, e: str):
         self._append_scanner_log(f"[LOCAL] Ошибка Nmap: {e}")
         self.local_nmap_progress.setVisible(False)
+        if hasattr(self, "server_nmap_status"):
+            self.server_nmap_status.setText("❌ Ошибка Nmap")
+        if hasattr(self, "server_nmap_progress"):
+            self.server_nmap_progress.setRange(0, 100)
+            self.server_nmap_progress.setValue(0)
+            self.server_nmap_progress.setFormat("Ошибка")
+        if hasattr(self, "server_nmap_log"):
+            self.server_nmap_log.append(f"❌ {e}")
+            self.server_nmap_log.moveCursor(QTextCursor.MoveOperation.End)
         self._server_scan_running["nmap"] = False
         self.btn_local_nmap.setEnabled(True)
         self.btn_local_parallel_scan.setEnabled(True and not self._server_scan_running.get("nuclei"))
@@ -2714,6 +2881,7 @@ class ServerGUI(QMainWindow):
         self.local_nuclei_progress.setValue(0)
         self.local_nuclei_progress.setFormat("Nuclei: запуск...")
         self._append_scanner_log(f"[LOCAL] Запуск Nuclei на сервере (localhost), портов: {len(ports)}")
+        self._server_scan_ports["nuclei"] = list(ports or [])
         nuclei_settings = self._get_nuclei_settings() if hasattr(self, "nuclei_concurrency_spin") else {}
         self.local_nuclei_worker = ServerNucleiWorker("127.0.0.1", ports, nuclei_settings)
         self.local_nuclei_worker.progress.connect(self._on_local_nuclei_progress)
@@ -2740,6 +2908,15 @@ class ServerGUI(QMainWindow):
         self.server_scan_vulns["nuclei"] = vulns or []
         vectors = self._vectors_from_scanner_vulns(vulns or [], found_by_prefix="Сервер: Nuclei")
         self._merge_server_vectors(vectors)
+        self._save_simple_scanner_history(
+            NUCLEI_HISTORY_PREFIX,
+            scanner_name="Nuclei",
+            target="127.0.0.1",
+            ports=self._server_scan_ports.get("nuclei") or [],
+            elapsed=elapsed,
+            vulnerabilities=vulns or [],
+        )
+        self._refresh_scan_histories()
         self.local_nuclei_progress.setValue(100)
         self.local_nuclei_progress.setFormat(f"Nuclei: готово ({len(vectors)} CVE, {elapsed:.1f}s)")
         self._append_scanner_log(f"[LOCAL] Nuclei завершён: {len(vectors)} CVE-векторов, {elapsed:.1f}s")
@@ -2843,6 +3020,311 @@ class ServerGUI(QMainWindow):
             existing_ids.add(vid)
             merged.append(v)
         self.server_scan_vectors = merged
+
+    def _scan_data_dir(self) -> str:
+        base_dir = PROJECT_DIR or application_base_dir()
+        return os.path.join(base_dir, SCAN_HISTORY_DIR)
+
+    def _severity_counters_from_vulns(self, vulns: list) -> dict:
+        counters = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0, "INFO": 0}
+        for v in vulns or []:
+            if not isinstance(v, dict):
+                continue
+            sev = str(v.get("severity", "") or "UNKNOWN").upper()
+            if sev not in counters:
+                sev = "UNKNOWN"
+            counters[sev] += 1
+        return counters
+
+    def _save_simple_scanner_history(
+        self,
+        prefix: str,
+        scanner_name: str,
+        target: str,
+        ports: list,
+        elapsed: float,
+        vulnerabilities: list,
+    ) -> str:
+        try:
+            data_dir = self._scan_data_dir()
+            os.makedirs(data_dir, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            fname = f"{prefix}{timestamp}{SCAN_HISTORY_SUFFIX}"
+            fpath = os.path.join(data_dir, fname)
+            counters = self._severity_counters_from_vulns(vulnerabilities or [])
+            payload = {
+                "scan_info": {
+                    "timestamp": timestamp,
+                    "scanner": str(scanner_name or ""),
+                    "target": str(target or ""),
+                    "ports": [int(p) for p in (ports or []) if str(p).isdigit()],
+                    "elapsed_seconds": float(elapsed or 0.0),
+                },
+                "summary": {
+                    "total_vulns": int(len(vulnerabilities or [])),
+                    "critical": int(counters.get("CRITICAL", 0)),
+                    "high": int(counters.get("HIGH", 0)),
+                    "medium": int(counters.get("MEDIUM", 0)),
+                    "low": int(counters.get("LOW", 0)),
+                },
+                "vulnerabilities": vulnerabilities or [],
+            }
+            with open(fpath, "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=False, indent=2)
+            return fpath
+        except Exception:
+            return ""
+
+    def _list_simple_scanner_history_records(self, prefix: str) -> list[dict]:
+        out = []
+        data_dir = self._scan_data_dir()
+        if not os.path.isdir(data_dir):
+            return out
+        for fname in sorted(os.listdir(data_dir), reverse=True):
+            if not (fname.startswith(prefix) and fname.endswith(SCAN_HISTORY_SUFFIX)):
+                continue
+            fpath = os.path.join(data_dir, fname)
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if not isinstance(data, dict):
+                    continue
+                summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
+                timestamp = ""
+                scan_info = data.get("scan_info") if isinstance(data.get("scan_info"), dict) else {}
+                timestamp = str(scan_info.get("timestamp", "") or "")
+                if not timestamp:
+                    timestamp = fname[len(prefix) : -len(SCAN_HISTORY_SUFFIX)]
+                total = int(summary.get("total_vulns", 0) or 0)
+                crit = int(summary.get("critical", 0) or 0)
+                high = int(summary.get("high", 0) or 0)
+                out.append(
+                    {
+                        "record_id": fname,
+                        "filename": fname,
+                        "filepath": fpath,
+                        "timestamp": timestamp,
+                        "total_vulns": total,
+                        "critical": crit,
+                        "high": high,
+                    }
+                )
+            except Exception:
+                continue
+        return out
+
+    def _refresh_scan_histories(self):
+        try:
+            self._refresh_trivy_history()
+        except Exception:
+            pass
+        try:
+            self._refresh_nmap_history()
+        except Exception:
+            pass
+        try:
+            self._refresh_nuclei_history()
+        except Exception:
+            pass
+
+    def _refresh_nmap_history(self):
+        if not hasattr(self, "nmap_hist_table"):
+            return
+        self.nmap_hist_table.setRowCount(0)
+        records = self._list_simple_scanner_history_records(NMAP_HISTORY_PREFIX)
+        for rec in records:
+            row = self.nmap_hist_table.rowCount()
+            self.nmap_hist_table.insertRow(row)
+            self.nmap_hist_table.setItem(row, 0, QTableWidgetItem(str(rec.get("timestamp", ""))))
+            self.nmap_hist_table.setItem(row, 1, QTableWidgetItem(str(rec.get("total_vulns", 0))))
+            self.nmap_hist_table.setItem(row, 2, QTableWidgetItem(f"{rec.get('critical', 0)}/{rec.get('high', 0)}"))
+            file_item = QTableWidgetItem(str(rec.get("filename", "")))
+            file_item.setData(Qt.ItemDataRole.UserRole, rec.get("filepath", ""))
+            file_item.setData(Qt.ItemDataRole.UserRole + 1, rec.get("record_id", ""))
+            self.nmap_hist_table.setItem(row, 3, file_item)
+        self._sync_nmap_hist_buttons()
+
+    def _refresh_nuclei_history(self):
+        if not hasattr(self, "nuclei_hist_table"):
+            return
+        self.nuclei_hist_table.setRowCount(0)
+        records = self._list_simple_scanner_history_records(NUCLEI_HISTORY_PREFIX)
+        for rec in records:
+            row = self.nuclei_hist_table.rowCount()
+            self.nuclei_hist_table.insertRow(row)
+            self.nuclei_hist_table.setItem(row, 0, QTableWidgetItem(str(rec.get("timestamp", ""))))
+            self.nuclei_hist_table.setItem(row, 1, QTableWidgetItem(str(rec.get("total_vulns", 0))))
+            self.nuclei_hist_table.setItem(row, 2, QTableWidgetItem(f"{rec.get('critical', 0)}/{rec.get('high', 0)}"))
+            file_item = QTableWidgetItem(str(rec.get("filename", "")))
+            file_item.setData(Qt.ItemDataRole.UserRole, rec.get("filepath", ""))
+            file_item.setData(Qt.ItemDataRole.UserRole + 1, rec.get("record_id", ""))
+            self.nuclei_hist_table.setItem(row, 3, file_item)
+        self._sync_nuclei_hist_buttons()
+
+    def _sync_nmap_hist_buttons(self):
+        has_sel = bool(self.nmap_hist_table.selectedItems()) if hasattr(self, "nmap_hist_table") else False
+        if hasattr(self, "btn_load_nmap_hist"):
+            self.btn_load_nmap_hist.setEnabled(has_sel)
+        if hasattr(self, "btn_delete_nmap_hist"):
+            self.btn_delete_nmap_hist.setEnabled(has_sel)
+
+    def _sync_nuclei_hist_buttons(self):
+        has_sel = bool(self.nuclei_hist_table.selectedItems()) if hasattr(self, "nuclei_hist_table") else False
+        if hasattr(self, "btn_load_nuclei_hist"):
+            self.btn_load_nuclei_hist.setEnabled(has_sel)
+        if hasattr(self, "btn_delete_nuclei_hist"):
+            self.btn_delete_nuclei_hist.setEnabled(has_sel)
+
+    def _load_selected_nmap_history(self):
+        row = self.nmap_hist_table.currentRow()
+        if row < 0:
+            return
+        fpath = self.nmap_hist_table.item(row, 3).data(Qt.ItemDataRole.UserRole)
+        if not fpath or not os.path.exists(fpath):
+            return
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            vulns = data.get("vulnerabilities") if isinstance(data, dict) else None
+            vulns = vulns if isinstance(vulns, list) else []
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить файл:\n{e}")
+            return
+        self.server_scan_vulns["nmap"] = vulns or []
+        vectors = self._vectors_from_scanner_vulns(vulns or [], found_by_prefix="Сервер: Nmap (история)")
+        self._merge_server_vectors(vectors)
+        if hasattr(self, "server_nmap_table"):
+            self.server_nmap_table.setRowCount(0)
+            for v in (vulns or []):
+                if not isinstance(v, dict):
+                    continue
+                r = self.server_nmap_table.rowCount()
+                self.server_nmap_table.insertRow(r)
+                self.server_nmap_table.setItem(r, 0, QTableWidgetItem(str(v.get("cve_id", "") or "")))
+                sev = str(v.get("severity", "") or "").upper()
+                sev_item = QTableWidgetItem(sev)
+                sev_color = {"CRITICAL": "#c44", "HIGH": "#a85", "MEDIUM": "#997", "LOW": "#696", "INFO": "#668"}.get(sev, "#888")
+                sev_item.setForeground(QColor(sev_color))
+                self.server_nmap_table.setItem(r, 1, sev_item)
+                self.server_nmap_table.setItem(r, 2, QTableWidgetItem(str(v.get("port", "") or "")))
+                self.server_nmap_table.setItem(r, 3, QTableWidgetItem(str(v.get("service", "") or "")[:120]))
+                self.server_nmap_table.setItem(r, 4, QTableWidgetItem(str(v.get("script", "") or "")[:180]))
+                self.server_nmap_table.setItem(r, 5, QTableWidgetItem(str(v.get("description", "") or "")[:300]))
+        if hasattr(self, "server_nmap_status"):
+            self.server_nmap_status.setText(f"✅ Nmap (история): {len(vectors)} CVE")
+        if hasattr(self, "server_nmap_progress"):
+            self.server_nmap_progress.setRange(0, 100)
+            self.server_nmap_progress.setValue(100)
+            self.server_nmap_progress.setFormat(f"Загружено ({len(vectors)} CVE)")
+        if hasattr(self, "server_nmap_log"):
+            self.server_nmap_log.append(f"📥 Загружено из истории: {len(vectors)} CVE-векторов")
+            self.server_nmap_log.moveCursor(QTextCursor.MoveOperation.End)
+
+    def _load_selected_nuclei_history(self):
+        row = self.nuclei_hist_table.currentRow()
+        if row < 0:
+            return
+        fpath = self.nuclei_hist_table.item(row, 3).data(Qt.ItemDataRole.UserRole)
+        if not fpath or not os.path.exists(fpath):
+            return
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            vulns = data.get("vulnerabilities") if isinstance(data, dict) else None
+            vulns = vulns if isinstance(vulns, list) else []
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить файл:\n{e}")
+            return
+        self.server_scan_vulns["nuclei"] = vulns or []
+        vectors = self._vectors_from_scanner_vulns(vulns or [], found_by_prefix="Сервер: Nuclei (история)")
+        self._merge_server_vectors(vectors)
+        if hasattr(self, "server_nuclei_table"):
+            self.server_nuclei_table.setRowCount(0)
+            for v in (vulns or []):
+                if not isinstance(v, dict):
+                    continue
+                r = self.server_nuclei_table.rowCount()
+                self.server_nuclei_table.insertRow(r)
+                self.server_nuclei_table.setItem(r, 0, QTableWidgetItem(str(v.get("cve_id", "") or "")))
+                self.server_nuclei_table.setItem(r, 1, QTableWidgetItem(str(v.get("cwe_id", "") or "")))
+                sev = str(v.get("severity", "") or "").upper()
+                sev_item = QTableWidgetItem(sev)
+                sev_color = {"CRITICAL": "#c44", "HIGH": "#a85", "MEDIUM": "#997", "LOW": "#696", "INFO": "#668"}.get(sev, "#888")
+                sev_item.setForeground(QColor(sev_color))
+                self.server_nuclei_table.setItem(r, 2, sev_item)
+                self.server_nuclei_table.setItem(r, 3, QTableWidgetItem(str(v.get("port", "") or "")))
+                self.server_nuclei_table.setItem(r, 4, QTableWidgetItem(str(v.get("template", "") or "")[:200]))
+                self.server_nuclei_table.setItem(r, 5, QTableWidgetItem(str(v.get("description", "") or "")[:300]))
+        if hasattr(self, "server_nuclei_status"):
+            self.server_nuclei_status.setText(f"✅ Nuclei (история): {len(vectors)} CVE")
+        if hasattr(self, "server_nuclei_progress"):
+            self.server_nuclei_progress.setRange(0, 100)
+            self.server_nuclei_progress.setValue(100)
+            self.server_nuclei_progress.setFormat(f"Загружено ({len(vectors)} CVE)")
+        if hasattr(self, "server_nuclei_log"):
+            self.server_nuclei_log.append(f"📥 Загружено из истории: {len(vectors)} CVE-векторов")
+            self.server_nuclei_log.moveCursor(QTextCursor.MoveOperation.End)
+
+    def _delete_selected_nmap_history(self):
+        row = self.nmap_hist_table.currentRow()
+        if row < 0:
+            return
+        item = self.nmap_hist_table.item(row, 3)
+        record_id = item.data(Qt.ItemDataRole.UserRole + 1) if item else None
+        if not record_id:
+            return
+        reply = QMessageBox.question(
+            self,
+            "Удаление",
+            "Удалить выбранную запись из истории Nmap? (Файл будет удалён с диска)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            fpath = self._safe_history_path(record_id, NMAP_HISTORY_PREFIX)
+            if fpath and os.path.exists(fpath):
+                os.remove(fpath)
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось удалить запись:\n{e}")
+            return
+        self._refresh_nmap_history()
+
+    def _delete_selected_nuclei_history(self):
+        row = self.nuclei_hist_table.currentRow()
+        if row < 0:
+            return
+        item = self.nuclei_hist_table.item(row, 3)
+        record_id = item.data(Qt.ItemDataRole.UserRole + 1) if item else None
+        if not record_id:
+            return
+        reply = QMessageBox.question(
+            self,
+            "Удаление",
+            "Удалить выбранную запись из истории Nuclei? (Файл будет удалён с диска)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            fpath = self._safe_history_path(record_id, NUCLEI_HISTORY_PREFIX)
+            if fpath and os.path.exists(fpath):
+                os.remove(fpath)
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось удалить запись:\n{e}")
+            return
+        self._refresh_nuclei_history()
+
+    def _safe_history_path(self, record_id: str, prefix: str) -> str:
+        rid = str(record_id or "").strip()
+        if not rid:
+            return ""
+        if "/" in rid or "\\" in rid:
+            return ""
+        if not (rid.startswith(prefix) and rid.endswith(SCAN_HISTORY_SUFFIX)):
+            return ""
+        fpath = os.path.join(self._scan_data_dir(), rid)
+        return fpath
 
     def _load_trivy_report(self):
         """Загрузка результатов Trivy из сохраненного JSON-файла."""
@@ -3568,7 +4050,7 @@ class ServerGUI(QMainWindow):
         rd = os.path.join(PROJECT_DIR, "reports")
         self.report_history.sync_from_disk(rd)
         self._refresh_history_table()
-        self._refresh_trivy_history()
+        self._refresh_scan_histories()
         self._update_stats()
         
     def _update_stats(self):

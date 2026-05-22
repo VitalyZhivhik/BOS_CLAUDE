@@ -19,6 +19,54 @@ from common.bundle_paths import bundle_resources_root
 
 logger = get_server_logger()
 
+def _expand_candidate_paths(paths: list[str]) -> list[str]:
+    out: list[str] = []
+    for p in paths or []:
+        s = str(p or "").strip()
+        if not s:
+            continue
+        s = os.path.expandvars(os.path.expanduser(s))
+        out.append(s)
+    return out
+
+def _windows_tool_candidates(tool: str) -> list[str]:
+    if os.name != "nt":
+        return []
+    pf = os.environ.get("ProgramFiles", "")
+    pf86 = os.environ.get("ProgramFiles(x86)", "")
+    local = os.environ.get("LOCALAPPDATA", "")
+    user = os.environ.get("USERPROFILE", "")
+    choco = os.environ.get("ChocolateyInstall", "")
+    programdata = os.environ.get("ProgramData", r"C:\ProgramData")
+
+    t = str(tool or "").strip().lower()
+    exe = f"{t}.exe" if not t.endswith(".exe") else t
+
+    candidates: list[str] = []
+
+    if t in ("nmap", "nmap.exe"):
+        candidates.extend([
+            os.path.join(pf, "Nmap", "nmap.exe"),
+            os.path.join(pf86, "Nmap", "nmap.exe"),
+            os.path.join(local, "Programs", "Nmap", "nmap.exe"),
+        ])
+    elif t in ("nuclei", "nuclei.exe"):
+        candidates.extend([
+            os.path.join(pf, "nuclei", "nuclei.exe"),
+            os.path.join(pf86, "nuclei", "nuclei.exe"),
+            os.path.join(local, "Programs", "nuclei", "nuclei.exe"),
+            os.path.join(local, "Programs", "Nuclei", "nuclei.exe"),
+        ])
+
+    candidates.extend([
+        os.path.join(choco, "bin", exe) if choco else "",
+        os.path.join(programdata, "chocolatey", "bin", exe),
+        os.path.join(user, "scoop", "shims", exe),
+        os.path.join(user, "scoop", "apps", t.replace(".exe", ""), "current", exe),
+    ])
+
+    return _expand_candidate_paths(candidates)
+
 def _normalize_location(value: object) -> str:
     s = str(value or "").strip().lower()
     if s in ("server", "srv", "local", "localhost", "сервер"):
@@ -94,6 +142,7 @@ class NmapScanner:
         possible_paths = [
             os.path.join(tools_root, "nmap.exe"),
             os.path.join(tools_root, "nmap", "nmap.exe"),
+            *_windows_tool_candidates("nmap"),
             "nmap",
         ]
         
@@ -262,6 +311,7 @@ class NucleiScanner:
         possible_paths = [
             os.path.join(tools_root, "nuclei.exe"),
             os.path.join(tools_root, "nuclei", "nuclei.exe"),
+            *_windows_tool_candidates("nuclei"),
             "nuclei",
         ]
         
