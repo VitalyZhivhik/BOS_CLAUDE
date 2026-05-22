@@ -324,6 +324,17 @@ class ReportGenerator:
         self.playbooks_db = self._load_local_db("databases/attack_playbooks.json")
         self.defense_db = self._load_local_db("databases/defense_database.json")
 
+        self._cve_index = {}
+        if isinstance(self.cve_db, dict):
+            for k, v in self.cve_db.items():
+                if k:
+                    self._cve_index[str(k).upper()] = v
+        elif isinstance(self.cve_db, list):
+            for v in self.cve_db:
+                cid = (v or {}).get("id") or (v or {}).get("cve_id")
+                if cid:
+                    self._cve_index[str(cid).upper()] = v
+
         if self.correlation_results_by_profile:
             keys = list(self.correlation_results_by_profile.keys())
             if not self.default_profile_id or self.default_profile_id not in self.correlation_results_by_profile:
@@ -380,14 +391,117 @@ class ReportGenerator:
 
         return groups
 
+    def _resolve_local_path(self, path: str) -> str | None:
+        if not path:
+            return None
+        candidates: list[str] = []
+        if os.path.isabs(path):
+            candidates.append(path)
+        else:
+            candidates.append(path)
+            candidates.append(os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")), path))
+            candidates.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), path))
+        for p in candidates:
+            try:
+                if p and os.path.exists(p):
+                    return p
+            except Exception:
+                continue
+        return None
+
     def _load_local_db(self, path):
         try:
-            if os.path.exists(path):
-                with open(path, 'r', encoding='utf-8') as f:
+            resolved = self._resolve_local_path(path)
+            if resolved and os.path.exists(resolved):
+                with open(resolved, "r", encoding="utf-8") as f:
                     return json.load(f)
         except Exception:
             pass
         return {}
+
+    def _normalize_mitre_tokens(self, raw) -> list[str]:
+        tokens: list[str] = []
+        s = str(raw or "")
+        for m in re.findall(r"T\d{4}(?:\.\d{3})?", s.upper()):
+            base = m.split(".", 1)[0]
+            if base not in tokens:
+                tokens.append(base)
+        return tokens
+
+    def _infer_mitre_techniques(self, cwe_ids: list[str], capec_id: str, max_items: int = 3) -> list[str]:
+        cwe_set = set([str(x).upper().strip() for x in (cwe_ids or []) if str(x).strip()])
+        cap = str(capec_id or "").upper().strip()
+        scored: list[tuple[int, str]] = []
+
+        def add_entry(entry: dict, tid: str):
+            nonlocal scored
+            if not tid:
+                return
+            rel_cwe = entry.get("related_cwe", []) or []
+            rel_capec = entry.get("related_capec", []) or []
+            score = 0
+            if cwe_set and isinstance(rel_cwe, list):
+                score += 2 * len(set([str(x).upper().strip() for x in rel_cwe if x]).intersection(cwe_set))
+            if cap and isinstance(rel_capec, list):
+                if cap in set([str(x).upper().strip() for x in rel_capec if x]):
+                    score += 1
+            if score > 0:
+                scored.append((score, tid))
+
+        if isinstance(self.mitre_db, dict):
+            for k, v in self.mitre_db.items():
+                add_entry(v or {}, str(k).upper().strip())
+        elif isinstance(self.mitre_db, list):
+            for v in self.mitre_db:
+                entry = v or {}
+                tid = str(entry.get("id") or entry.get("technique_id") or "").upper().strip()
+                add_entry(entry, tid)
+
+        scored.sort(key=lambda x: (-x[0], x[1]))
+        out: list[str] = []
+        for _score, tid in scored:
+            if tid and tid not in out:
+                out.append(tid)
+            if len(out) >= max_items:
+                break
+        return out
+
+    def _normalize_attack_type(self, v: str) -> str:
+        s = str(v or "").strip().lower()
+        s = re.sub(r"[\s\-]+", "_", s)
+        s = re.sub(r"_+", "_", s)
+        return s
+
+    def _infer_attack_types(self, cve_id: str, cwe_ids: set[str], capec_ids: set[str]) -> set[str]:
+        out: set[str] = set()
+        cve = str(cve_id or "").strip().upper()
+        meta = self._cve_index.get(cve, {}) if cve else {}
+        at = meta.get("attack_type") if isinstance(meta, dict) else ""
+        if at:
+            out.add(self._normalize_attack_type(at))
+
+        cwe_map = {
+            "CWE-89": {"sql_injection"},
+            "CWE-79": {"xss"},
+            "CWE-78": {"blind_command_execution", "remote_code_execution"},
+            "CWE-307": {"brute_force"},
+        }
+        for cwe in (cwe_ids or set()):
+            key = str(cwe).upper().strip()
+            if key in cwe_map:
+                out.update([self._normalize_attack_type(x) for x in cwe_map[key]])
+
+        capec_map = {
+            "CAPEC-66": {"sql_injection"},
+            "CAPEC-248": {"blind_command_execution", "remote_code_execution"},
+            "CAPEC-49": {"brute_force"},
+        }
+        for cap in (capec_ids or set()):
+            key = str(cap).upper().strip()
+            if key in capec_map:
+                out.update([self._normalize_attack_type(x) for x in capec_map[key]])
+
+        return out
 
     def _canonical_cwe_list(self, raw) -> list:
         """
@@ -1101,6 +1215,58 @@ class ReportGenerator:
                                 "tags": [],
                                 "updated_at": "",
                             })
+
+                inferred_types = set()
+                if (not attack_tools or not defense_tools):
+                    inferred_types = self._infer_attack_types(cve_id, v.get("cwes", set()) or set(), v.get("capecs", set()) or set())
+
+                if not attack_tools and inferred_types and isinstance(self.tools_db, list):
+                    for tool in self.tools_db:
+                        ats = tool.get("applicable_attack_types", []) if isinstance(tool, dict) else []
+                        if not isinstance(ats, list) or not ats:
+                            continue
+                        norm_ats = [self._normalize_attack_type(x) for x in ats if x]
+                        if not set(norm_ats).intersection(inferred_types):
+                            continue
+                        cmds = (tool.get("commands", {}) or {}).get(cve_id, []) or (tool.get("commands", {}) or {}).get("default", [])
+                        attack_tools.append({
+                            "id": str(tool.get("id") or tool.get("name") or "").strip(),
+                            "name": tool.get("name", ""),
+                            "verified": bool(tool.get("verified", False)),
+                            "steps": as_step_list(cmds),
+                            "notes": str(tool.get("description") or ""),
+                            "tags": tool.get("phases", []) if isinstance(tool.get("phases", []), list) else [],
+                            "updated_at": "",
+                        })
+                        if len(attack_tools) >= 3:
+                            break
+                    if attack_tools:
+                        v["source"]["attacks"] = "auto:attack_type"
+
+                if not defense_tools and inferred_types and isinstance(self.defense_db, list):
+                    for defense in self.defense_db:
+                        if not isinstance(defense, dict):
+                            continue
+                        at = self._normalize_attack_type(defense.get("attack_type", ""))
+                        if not at or at not in inferred_types:
+                            continue
+                        for dt in defense.get("tools", []) if isinstance(defense.get("tools", []), list) else []:
+                            defense_tools.append({
+                                "id": str(defense.get("id") or dt.get("name") or "").strip(),
+                                "name": dt.get("name", ""),
+                                "priority": str(defense.get("priority") or ""),
+                                "verified": bool(dt.get("verified", False)),
+                                "steps": as_step_list(dt.get("commands", [])),
+                                "notes": str(dt.get("description") or ""),
+                                "tags": [],
+                                "updated_at": "",
+                            })
+                            if len(defense_tools) >= 6:
+                                break
+                        if len(defense_tools) >= 6:
+                            break
+                    if defense_tools:
+                        v["source"]["defenses"] = "auto:attack_type"
                 v["attacks"] = [normalize_attack(a, f"a{i+1}") for i, a in enumerate(attack_tools)]
                 v["defenses"] = [normalize_defense(d, f"d{i+1}") for i, d in enumerate(defense_tools)]
                 v["source"] = {"attacks": "auto", "defenses": "auto"}
@@ -1226,7 +1392,12 @@ class ReportGenerator:
 
             tools = getattr(representative_r, "attack_software", None) or getattr(base_r, "attack_software", None)
             steps = getattr(representative_r, "attack_steps", None) or getattr(base_r, "attack_steps", None)
+            capec_id = getattr(representative_r, "capec_id", None) or getattr(base_r, "capec_id", None) or "CAPEC-Неизвестно"
             mitre_raw = getattr(representative_r, "mitre_technique", None) or getattr(base_r, "mitre_technique", None) or ""
+            mitre_tokens = self._normalize_mitre_tokens(mitre_raw)
+            if not mitre_tokens:
+                mitre_tokens = self._infer_mitre_techniques(cwe_tokens, capec_id)
+            mitre_raw = ", ".join(mitre_tokens) if mitre_tokens else ""
 
             if not tools and self.tools_db and cwe_tokens:
                 db_info = None
@@ -1264,7 +1435,7 @@ class ReportGenerator:
                     "cve": cves_joined,
                     "cwe": cwe_id or "CWE-Неизвестно",
                     "cwe_desc": cwe_desc,
-                    "capec": getattr(representative_r, "capec_id", None) or getattr(base_r, "capec_id", None) or "CAPEC-Неизвестно",
+                    "capec": capec_id,
                     "mitre": mitre_raw,
                     "name": names_joined,
                     "sw": g["mapped_sw"],
@@ -1316,14 +1487,20 @@ class ReportGenerator:
             _trace = getattr(r, "feasibility_trace", None) or {}
             if not isinstance(_trace, dict):
                 _trace = {}
+            capec_raw = getattr(r, "capec_id", None) or "CAPEC-Неизвестно"
+            mitre_raw_row = getattr(r, "mitre_technique", None) or ""
+            mitre_tokens_row = self._normalize_mitre_tokens(mitre_raw_row)
+            if not mitre_tokens_row:
+                mitre_tokens_row = self._infer_mitre_techniques(cwe_tokens_row, capec_raw)
+            mitre_value_row = ", ".join(mitre_tokens_row) if mitre_tokens_row else ""
             raw_findings_data.append(
                 {
                     "raw_id": idx,
                     "cve": cve_str if cve_str else "N/A",
                     "cwe": cwe_display_row,
                     "cwe_desc": cwe_desc_raw,
-                    "capec": getattr(r, "capec_id", None) or "CAPEC-Неизвестно",
-                    "mitre": getattr(r, "mitre_technique", None) or "",
+                    "capec": capec_raw,
+                    "mitre": mitre_value_row,
                     "name": getattr(r, "attack_name", None) or "Атака",
                     "sw": real_sw,
                     "port": port,
@@ -1388,8 +1565,8 @@ class ReportGenerator:
                 elif prefix == "CVE" and up.startswith("CVE-"):
                     out_set.add(up)
                 elif prefix == "MITRE":
-                    if up.startswith("T") and up[1:].isdigit():
-                        out_set.add(up)
+                    for m in re.findall(r"T\d{4}(?:\.\d{3})?", up):
+                        out_set.add(m.split(".", 1)[0])
 
         for it in (raw_findings_data or []):
             _collect_ids(it.get("capec"), "CAPEC", capec_ids)
