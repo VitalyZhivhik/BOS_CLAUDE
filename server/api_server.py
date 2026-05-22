@@ -26,7 +26,7 @@ from urllib.parse import urlparse, parse_qs
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from common.config import SERVER_HOST, SERVER_PORT
-from common.models import from_json_scan_result
+from common.models import from_json_scan_result, AttackVector
 from common.logger import get_server_logger
 from server.system_analyzer import SystemAnalyzer
 from server.vulnerability_db import VulnerabilityDatabase
@@ -444,6 +444,67 @@ class RequestHandler(BaseHTTPRequestHandler):
                         state.on_client_connected(client_ip)
 
                 scan_result = from_json_scan_result(scan_data)
+
+                try:
+                    from nmap_integration import IntegratedScanner
+
+                    ports_attacker = []
+                    for p in getattr(scan_result, "open_ports", []) or []:
+                        try:
+                            port_v = getattr(p, "port", None) if not isinstance(p, dict) else p.get("port", None)
+                            if port_v is None:
+                                continue
+                            ports_attacker.append(int(port_v))
+                        except Exception:
+                            continue
+
+                    ports_local = []
+                    for p in getattr(getattr(state, "system_info", None), "open_ports", []) or []:
+                        try:
+                            ports_local.append(int(getattr(p, "port", 0)))
+                        except Exception:
+                            continue
+
+                    ports_to_scan = sorted(set([p for p in (ports_attacker + ports_local) if isinstance(p, int) and p > 0]))
+
+                    if ports_to_scan:
+                        logger.info(f"[LOCAL-DEEP] Nmap+Nuclei на сервере: localhost, портов={len(ports_to_scan)}")
+                        scanner = IntegratedScanner("127.0.0.1", scanner_location="server")
+                        vulns = scanner.scan_all_vulnerabilities(ports_to_scan)
+
+                        extra_vectors: list[AttackVector] = []
+                        for v in vulns or []:
+                            cve_id = str(v.get("cve_id", "") or "").strip().upper()
+                            if not cve_id.startswith("CVE-"):
+                                continue
+                            src = str(v.get("source", "") or "Scanner")
+                            port = v.get("port", None)
+                            try:
+                                port_int = int(port) if port is not None else None
+                            except Exception:
+                                port_int = None
+                            service = str(v.get("service", "") or "")
+                            sev = str(v.get("severity", "") or "MEDIUM").upper()
+                            desc = str(v.get("description", "") or "")
+                            vector_id = f"AV-SERVER-{src.upper()}-{cve_id}"
+                            extra_vectors.append(AttackVector(
+                                id=vector_id,
+                                name=f"{cve_id} ({src}, Сервер)",
+                                description=f"{desc} (обнаружено на сервере; порт {port_int if port_int is not None else 'N/A'})",
+                                target_port=port_int,
+                                target_service=service,
+                                attack_type="known_vulnerability",
+                                severity=sev,
+                                tools_used=src,
+                                found_by=f"Сервер: {src}",
+                                representative_cve_ids=[cve_id],
+                            ))
+
+                        if extra_vectors:
+                            scan_result.attack_vectors.extend(extra_vectors)
+                            logger.info(f"[LOCAL-DEEP] Добавлено векторов с сервера: {len(extra_vectors)}")
+                except Exception as e:
+                    logger.warning(f"[LOCAL-DEEP] Ошибка серверного Nmap+Nuclei: {e}")
 
                 # Корреляция с прогрессом
                 logger.info(f"[HTTP-IN] Начинаем корреляцию...")

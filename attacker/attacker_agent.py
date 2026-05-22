@@ -896,6 +896,7 @@ class AttackVectorGenerator:
                 attack_type="known_vulnerability",
                 severity=finding['severity'],
                 tools_used="BannerAnalyzer",
+                found_by="Атакующий: BannerAnalyzer",
                 representative_cve_ids=[finding["cve_id"]],
                 inferred_product=infer_product_from_observation(
                     banner=ban, service=ts, port=finding["port"]),
@@ -984,6 +985,7 @@ class AttackVectorGenerator:
                         attack_type="known_vulnerability",
                         severity=cve['severity'],
                         tools_used="CVE-specific exploit",
+                        found_by="Атакующий: CVE detector",
                         inferred_product=infer_product_from_observation(
                             banner=port_info.banner or "",
                             service=service,
@@ -1070,7 +1072,7 @@ def _scan_with_nmap_nuclei(target: str, open_ports: list[OpenPort]) -> list[dict
     ports_to_scan = [p.port for p in open_ports]
 
     # Создаем интегрированный сканер
-    scanner = IntegratedScanner(target)
+    scanner = IntegratedScanner(target, scanner_location="attacker")
 
     # Запускаем сканирование
     vulnerabilities = scanner.scan_all_vulnerabilities(ports_to_scan)
@@ -1126,15 +1128,18 @@ def run_attacker(target_ip: str = None, server_port: int = None,
 
     # 4.5. Добавляем векторы атак на основе результатов Nmap и Nuclei
     for vuln in nmap_nuclei_vulns:
+        cve_id = str(vuln.get("cve_id", "") or "").strip().upper()
         av = AttackVector(
-            id=f"AV-NMAP-{vuln['cve_id']}",
-            name=f"{vuln['cve_id']} (из {vuln['source']})",
-            description=f"{vuln['description']} (обнаружено {vuln['source']} на порту {vuln['port']})",
+            id=f"AV-ATTACKER-{str(vuln.get('source', 'SCAN')).upper()}-{cve_id or 'N/A'}",
+            name=f"{cve_id or vuln.get('cve_id', 'N/A')} ({vuln.get('source', 'scan')}, Атакующий)",
+            description=f"{vuln['description']} (обнаружено атакующим; {vuln.get('source', 'scan')} на порту {vuln['port']})",
             target_port=vuln['port'],
             target_service=vuln.get('service', 'unknown'),
             attack_type="known_vulnerability",
             severity=vuln['severity'],
-            tools_used=vuln['source'],
+            tools_used=str(vuln.get("source", "") or ""),
+            found_by=f"Атакующий: {vuln.get('source', 'scan')}",
+            representative_cve_ids=[cve_id] if cve_id.startswith("CVE-") else [],
             inferred_product=infer_product_from_observation(
                 banner=vuln.get("banner") or "",
                 service=vuln.get("service", "unknown"),

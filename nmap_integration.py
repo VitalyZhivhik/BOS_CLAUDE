@@ -19,6 +19,21 @@ from common.bundle_paths import bundle_resources_root
 
 logger = get_server_logger()
 
+def _normalize_location(value: object) -> str:
+    s = str(value or "").strip().lower()
+    if s in ("server", "srv", "local", "localhost", "сервер"):
+        return "server"
+    if s in ("attacker", "client", "atk", "att", "атакующий", "клиент"):
+        return "attacker"
+    return s or "unknown"
+
+def _location_label(norm_location: str) -> str:
+    if norm_location == "server":
+        return "Сервер"
+    if norm_location == "attacker":
+        return "Атакующий"
+    return norm_location
+
 def _resolve_nuclei_templates_dir() -> str:
     base_dir = bundle_resources_root()
     tools_root = os.path.join(base_dir, "tools")
@@ -65,9 +80,10 @@ def _resolve_nmap_datadir(nmap_exe_path: str) -> str:
 class NmapScanner:
     """Интеграция с Nmap для сканирования уязвимостей."""
 
-    def __init__(self, target: str, settings: Optional[Dict] = None):
+    def __init__(self, target: str, settings: Optional[Dict] = None, scanner_location: str = "unknown"):
         self.target = target
         self.settings = settings or {}
+        self.scanner_location = _normalize_location(scanner_location)
         self.nmap_path = self._find_nmap()
     
     def _find_nmap(self) -> str:
@@ -183,13 +199,17 @@ class NmapScanner:
                         for cve_id in cve_matches:
                             vulnerabilities.append({
                                 "cve_id": f"CVE-{cve_id}",
+                                "cwe_id": "",
                                 "port": int(port_id),
                                 "protocol": protocol,
                                 "service": self._get_service_from_port(port),
                                 "severity": self._determine_severity(script_id),
                                 "description": script_output[:200],
                                 "source": "Nmap",
-                                "script": script_id
+                                "script": script_id,
+                                "scanner_location": self.scanner_location,
+                                "scanner_label": _location_label(self.scanner_location),
+                                "target": ip_address,
                             })
 
         except Exception as e:
@@ -228,9 +248,10 @@ class NmapScanner:
 class NucleiScanner:
     """Интеграция с Nuclei для сканирования уязвимостей."""
 
-    def __init__(self, target: str, settings: Optional[Dict] = None):
+    def __init__(self, target: str, settings: Optional[Dict] = None, scanner_location: str = "unknown"):
         self.target = target
         self.settings = settings or {}
+        self.scanner_location = _normalize_location(scanner_location)
         self.nuclei_path = self._find_nuclei()
     
     def _find_nuclei(self) -> str:
@@ -324,16 +345,60 @@ class NucleiScanner:
                 try:
                     result = json.loads(line)
 
+                    info = result.get("info") or {}
+                    if isinstance(info, list) and info:
+                        info = info[0] if isinstance(info[0], dict) else {}
+                    if not isinstance(info, dict):
+                        info = {}
+
+                    classification = info.get("classification") or {}
+                    if not isinstance(classification, dict):
+                        classification = {}
+
+                    cve_raw = classification.get("cve-id", "")
+                    if isinstance(cve_raw, list):
+                        cve_id = str((cve_raw[0] if cve_raw else "") or "").strip()
+                    else:
+                        cve_id = str(cve_raw or "").strip()
+
+                    cwe_raw = classification.get("cwe-id", "")
+                    cwe_id = ""
+                    if isinstance(cwe_raw, list):
+                        cwe_id = str((cwe_raw[0] if cwe_raw else "") or "").strip()
+                    else:
+                        cwe_id = str(cwe_raw or "").strip()
+
+                    port = None
+                    port_raw = result.get("port", None)
+                    if isinstance(port_raw, int):
+                        port = port_raw
+                    else:
+                        try:
+                            if port_raw is not None and str(port_raw).isdigit():
+                                port = int(str(port_raw))
+                        except Exception:
+                            port = None
+                    if port is None:
+                        host = str(result.get("host", "") or "")
+                        if ":" in host:
+                            tail = host.rsplit(":", 1)[-1]
+                            if tail.isdigit():
+                                port = int(tail)
+
                     # Извлекаем информацию об уязвимости
                     vulnerability = {
-                        "cve_id": result.get("info", {}).get("classification", {}).get("cve-id", [""])[0],
-                        "port": result.get("host", "0").split(":")[-1],
+                        "cve_id": cve_id,
+                        "cwe_id": cwe_id,
+                        "port": port if port is not None else 0,
                         "protocol": "tcp",
                         "service": result.get("service", {}).get("name", "unknown"),
-                        "severity": result.get("info", {}).get("severity", "medium").upper(),
-                        "description": result.get("info", {}).get("name", "Unknown vulnerability"),
+                        "severity": str(info.get("severity", "medium")).upper(),
+                        "description": str(info.get("name", "Unknown vulnerability")),
                         "source": "Nuclei",
-                        "template": result.get("template-id", "")
+                        "template": result.get("template-id", ""),
+                        "scanner_location": self.scanner_location,
+                        "scanner_label": _location_label(self.scanner_location),
+                        "target": str(result.get("host", "") or self.target),
                     }
 
                     # Проверяем, что CVE-ID валиден
@@ -351,11 +416,12 @@ class NucleiScanner:
 class IntegratedScanner:
     """Интегрированный сканер уязвимостей (Nmap + Nuclei)."""
 
-    def __init__(self, target: str, settings: Optional[Dict] = None):
+    def __init__(self, target: str, settings: Optional[Dict] = None, scanner_location: str = "unknown"):
         self.target = target
         settings = settings or {}
-        self.nmap_scanner = NmapScanner(target, settings=settings.get("nmap"))
-        self.nuclei_scanner = NucleiScanner(target, settings=settings.get("nuclei"))
+        self.scanner_location = _normalize_location(scanner_location)
+        self.nmap_scanner = NmapScanner(target, settings=settings.get("nmap"), scanner_location=self.scanner_location)
+        self.nuclei_scanner = NucleiScanner(target, settings=settings.get("nuclei"), scanner_location=self.scanner_location)
 
     def scan_all_vulnerabilities(self, ports: List[int]) -> List[Dict]:
         """

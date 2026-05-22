@@ -633,6 +633,20 @@ class NucleiWorker(QThread):
                                 sev = str(info.get("severity", "MEDIUM")).upper()
                                 pt = item.get("port", "")
                                 pt_int = int(pt) if str(pt).isdigit() else None
+                                classification = info.get("classification") or {}
+                                if not isinstance(classification, dict):
+                                    classification = {}
+                                cve_raw = classification.get("cve-id", "")
+                                cve_ids = []
+                                if isinstance(cve_raw, list):
+                                    for x in cve_raw:
+                                        s = str(x or "").strip().upper()
+                                        if s.startswith("CVE-"):
+                                            cve_ids.append(s)
+                                else:
+                                    s = str(cve_raw or "").strip().upper()
+                                    if s.startswith("CVE-"):
+                                        cve_ids.append(s)
                                 tags = info.get("tags", [])
                                 tag_s = " ".join(tags) if isinstance(tags, list) else ""
                                 nuc_inf = infer_product_from_observation(
@@ -640,12 +654,23 @@ class NucleiWorker(QThread):
                                     service="",
                                     port=pt_int,
                                 )
+                                template_id = str(item.get("template-id", "nuclei-vuln"))[:50]
+                                vector_id = f"AV-ATTACKER-NUCLEI-{cve_ids[0]}" if cve_ids else template_id
+                                svc = ""
+                                svc_obj = item.get("service", {})
+                                if isinstance(svc_obj, dict):
+                                    svc = str(svc_obj.get("name", "") or "")
                                 vectors.append(AttackVector(
-                                    id=str(item.get("template-id", "nuclei-vuln"))[:50],
+                                    id=vector_id,
                                     name=name[:100],
                                     description=str(info.get("description", "Обнаружено Nuclei."))[:500],
+                                    attack_type="known_vulnerability" if cve_ids else "",
                                     severity=sev if sev in ["CRITICAL","HIGH","MEDIUM","LOW","INFO"] else "MEDIUM",
                                     target_port=pt_int,
+                                    target_service=svc,
+                                    tools_used="Nuclei",
+                                    found_by="Атакующий: Nuclei",
+                                    representative_cve_ids=cve_ids,
                                     inferred_product=nuc_inf,
                                 ))
                         except Exception:
@@ -826,11 +851,16 @@ class NmapWorker(QThread):
                                     port=pid,
                                 )
                                 vectors.append(AttackVector(
-                                    id=cve,
+                                    id=f"AV-ATTACKER-NMAP-{cve}",
                                     name=name,
                                     description=desc,
+                                    attack_type="known_vulnerability" if str(cve).upper().startswith("CVE-") else "",
                                     severity=sev,
                                     target_port=pid,
+                                    target_service=service_name,
+                                    tools_used="Nmap",
+                                    found_by="Атакующий: Nmap",
+                                    representative_cve_ids=[str(cve).upper()] if str(cve).upper().startswith("CVE-") else [],
                                     inferred_product=nm_inf,
                                 ))
                                 self.log_msg.emit(f"  🔴 Уязвимость: {cve}  порт {port_id}  [{sev}]")

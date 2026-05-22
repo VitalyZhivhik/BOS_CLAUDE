@@ -11,7 +11,7 @@
   - Интеграция AttackToolkit и ReportHistory
   - Вкладка «Обнаруженное ПО» (показ сырых данных от сканера)
 """
-import sys, os, json, socket, threading, webbrowser, ctypes
+import sys, os, json, socket, threading, webbrowser, ctypes, time, subprocess, re, tempfile
 from datetime import datetime
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 try:
@@ -32,7 +32,7 @@ except Exception:
 _BOOT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _BOOT_DIR)
 from common.config import SERVER_HOST, SERVER_PORT
-from common.bundle_paths import application_base_dir, bundle_resources_root
+from common.bundle_paths import application_base_dir, bundle_resources_root, tools_dir
 from common.models import from_json_scan_result, AttackVector, Severity
 from common.logger import get_server_logger, GUILogHandler
 from server.system_analyzer import SystemAnalyzer
@@ -85,6 +85,36 @@ TRIVY_SCAN_PROFILES = {
 }
 
 TRIVY_PROFILE_MAP = {
+    "Быстрый (Fast)": "Fast",
+    "Сбалансированный (Balanced)": "Balanced",
+    "Точный (Accurate)": "Accurate",
+    "Fast": "Fast",
+    "Balanced": "Balanced",
+    "Accurate": "Accurate",
+}
+
+NUCLEI_SCAN_PROFILES = {
+    "Fast": {
+        "concurrency": 80,
+        "timeout": 2,
+        "retries": 0,
+        "max_host_errors": 100000,
+    },
+    "Balanced": {
+        "concurrency": 50,
+        "timeout": 3,
+        "retries": 1,
+        "max_host_errors": 100000,
+    },
+    "Accurate": {
+        "concurrency": 25,
+        "timeout": 5,
+        "retries": 2,
+        "max_host_errors": 100000,
+    },
+}
+
+NUCLEI_PROFILE_MAP = {
     "Быстрый (Fast)": "Fast",
     "Сбалансированный (Balanced)": "Balanced",
     "Точный (Accurate)": "Accurate",
@@ -246,12 +276,278 @@ class TrivyScanWorker(QThread):
     def run(self):
         try:
             self.progress.emit(0, "Запуск сканирования Trivy...")
-            result = self.system_analyzer.run_trivy_scan(self.trivy_path, self.scan_options)
+            prev_cb = getattr(self.system_analyzer, "progress_callback", None)
+            try:
+                self.system_analyzer.progress_callback = lambda p, m: self.progress.emit(int(p), str(m))
+                result = self.system_analyzer.run_trivy_scan(self.trivy_path, self.scan_options)
+            finally:
+                try:
+                    self.system_analyzer.progress_callback = prev_cb
+                except Exception:
+                    pass
             self.progress.emit(100, "Сканирование Trivy завершено")
             self.finished.emit(result)
         except Exception as e:
             logger.error(f"Ошибка сканирования Trivy: {e}", exc_info=True)
             self.error.emit(str(e))
+
+
+class LocalNmapScanWorker(QThread):
+    finished = pyqtSignal(list, float)  # vulns, elapsed
+    error = pyqtSignal(str)
+
+    def __init__(self, target: str, ports: list[int], settings=None):
+        super().__init__()
+        self.target = target
+        self.ports = [int(p) for p in (ports or []) if isinstance(p, int) and p > 0]
+        self.settings = settings or {}
+
+    def run(self):
+        try:
+            if not self.ports:
+                self.finished.emit([], 0.0)
+                return
+            from nmap_integration import NmapScanner
+            t0 = time.time()
+            try:
+                scanner = NmapScanner(self.target, settings=self.settings, scanner_location="server")
+            except TypeError:
+                scanner = NmapScanner(self.target, settings=self.settings)
+            vulns = scanner.scan_vulnerabilities(self.ports)
+            self.finished.emit(vulns or [], time.time() - t0)
+        except Exception as e:
+            logger.error(f"[LOCAL-NMAP] Ошибка: {e}", exc_info=True)
+            self.error.emit(str(e))
+
+
+class LocalNucleiScanWorker(QThread):
+    finished = pyqtSignal(list, float)  # vulns, elapsed
+    error = pyqtSignal(str)
+
+    def __init__(self, target: str, ports: list[int], settings=None):
+        super().__init__()
+        self.target = target
+        self.ports = [int(p) for p in (ports or []) if isinstance(p, int) and p > 0]
+        self.settings = settings or {}
+
+    def run(self):
+        try:
+            if not self.ports:
+                self.finished.emit([], 0.0)
+                return
+            from nmap_integration import NucleiScanner
+            t0 = time.time()
+            scanner = NucleiScanner(self.target, settings=self.settings, scanner_location="server")
+            vulns = scanner.scan_vulnerabilities(self.ports)
+            self.finished.emit(vulns or [], time.time() - t0)
+        except Exception as e:
+            logger.error(f"[LOCAL-NUCLEI] Ошибка: {e}", exc_info=True)
+            self.error.emit(str(e))
+
+
+class ServerNucleiWorker(QThread):
+    progress = pyqtSignal(str, int)
+    log_msg = pyqtSignal(str)
+    finished = pyqtSignal(list, float)  # vulns, elapsed
+    error = pyqtSignal(str)
+
+    def __init__(self, target: str, ports: list[int], settings=None):
+        super().__init__()
+        self.target = target
+        self.ports = [int(p) for p in (ports or []) if isinstance(p, int) and p > 0]
+        self.settings = settings or {}
+        self.nuclei_path = ""
+        for p in (
+            os.path.join(tools_dir(), "nuclei.exe"),
+            os.path.join(tools_dir(), "nuclei", "nuclei.exe"),
+        ):
+            if os.path.isfile(p):
+                self.nuclei_path = p
+                break
+        if not self.nuclei_path:
+            self.nuclei_path = "nuclei"
+
+    def run(self):
+        t_start = time.time()
+        vulns = []
+
+        try:
+            if os.path.isfile(self.nuclei_path) and not os.path.exists(self.nuclei_path):
+                self.error.emit(f"Nuclei не найден: {self.nuclei_path}")
+                self.finished.emit([], 0.0)
+                return
+
+            urls = []
+            for port in self.ports:
+                urls.append(f"{self.target}:{port}")
+            if not urls:
+                urls = [self.target]
+
+            fd, temp_path = tempfile.mkstemp(suffix=".json")
+            os.close(fd)
+            fd_url, url_list_path = tempfile.mkstemp(suffix=".txt")
+            os.close(fd_url)
+            with open(url_list_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(urls))
+
+            try:
+                from nmap_integration import _resolve_nuclei_templates_dir
+                templates_dir = _resolve_nuclei_templates_dir()
+            except Exception:
+                templates_dir = ""
+
+            cmd = [
+                self.nuclei_path,
+                "-l", url_list_path,
+                "-json-export", temp_path,
+                "-ni", "-disable-update-check",
+                "-mhe", str(self.settings.get("max_host_errors", 100000)),
+                "-c", str(self.settings.get("concurrency", 50)),
+                "-timeout", str(self.settings.get("timeout", 3)),
+                "-retries", str(self.settings.get("retries", 1)),
+                "-stats", "-si", "2",
+            ]
+            if templates_dir:
+                cmd.extend(["-t", templates_dir])
+
+            startupinfo = subprocess.STARTUPINFO() if os.name == 'nt' else None
+            if startupinfo:
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+            cwd = os.path.dirname(os.path.abspath(self.nuclei_path)) if os.path.isfile(self.nuclei_path) else None
+
+            self.log_msg.emit("═" * 60)
+            self.log_msg.emit(f"  🚀 NUCLEI (СЕРВЕР)  [{datetime.now().strftime('%H:%M:%S')}]")
+            self.log_msg.emit("═" * 60)
+            self.log_msg.emit(f"  ▸ Цель:        {self.target}")
+            self.log_msg.emit(f"  ▸ URL-ы:       {', '.join(urls)}")
+            self.log_msg.emit(f"  ▸ Параллельно: {self.settings.get('concurrency', 50)} шаблонов")
+            self.log_msg.emit(f"  ▸ Timeout/Retry: {self.settings.get('timeout', 3)}s / {self.settings.get('retries', 1)}")
+            self.log_msg.emit("")
+
+            try:
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True, bufsize=1, universal_newlines=True,
+                    startupinfo=startupinfo,
+                    cwd=cwd,
+                )
+            except PermissionError as e:
+                if os.name == "nt" and os.path.isfile(self.nuclei_path):
+                    try:
+                        subprocess.run(
+                            [
+                                "powershell",
+                                "-NoProfile",
+                                "-ExecutionPolicy", "Bypass",
+                                "-Command",
+                                f"Unblock-File -LiteralPath '{self.nuclei_path}'",
+                            ],
+                            capture_output=True,
+                            text=True,
+                            timeout=10,
+                            creationflags=subprocess.CREATE_NO_WINDOW,
+                        )
+                        process = subprocess.Popen(
+                            cmd,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, bufsize=1, universal_newlines=True,
+                            startupinfo=startupinfo,
+                            cwd=cwd,
+                        )
+                    except Exception:
+                        raise e
+                else:
+                    raise e
+
+            for line in process.stdout:
+                clean_line = (line or "").strip()
+                if not clean_line:
+                    continue
+                stat_match = re.search(r'(?:reqs?|Requests):\s*(\d+)/(\d+)', clean_line, re.IGNORECASE)
+                if stat_match:
+                    tot = int(stat_match.group(2))
+                    pct = int((int(stat_match.group(1)) / tot) * 100) if tot > 0 else 0
+                    self.progress.emit(f"{stat_match.group(1)} из {tot} запросов", pct)
+                    continue
+                self.log_msg.emit(f"  {clean_line}")
+
+            process.wait()
+            elapsed = time.time() - t_start
+
+            if os.path.exists(temp_path) and os.path.getsize(temp_path) > 0:
+                with open(temp_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+                        try:
+                            item = json.loads(line)
+                        except Exception:
+                            continue
+                        if isinstance(item, list):
+                            items = item
+                        else:
+                            items = [item]
+                        for it in items:
+                            if not isinstance(it, dict):
+                                continue
+                            info = it.get("info") or {}
+                            if isinstance(info, list) and info:
+                                info = info[0] if isinstance(info[0], dict) else {}
+                            if not isinstance(info, dict):
+                                info = {}
+                            classification = info.get("classification") or {}
+                            if not isinstance(classification, dict):
+                                classification = {}
+                            cve_raw = classification.get("cve-id", "")
+                            cve_id = ""
+                            if isinstance(cve_raw, list):
+                                cve_id = str((cve_raw[0] if cve_raw else "") or "").strip()
+                            else:
+                                cve_id = str(cve_raw or "").strip()
+                            cwe_raw = classification.get("cwe-id", "")
+                            cwe_id = ""
+                            if isinstance(cwe_raw, list):
+                                cwe_id = str((cwe_raw[0] if cwe_raw else "") or "").strip()
+                            else:
+                                cwe_id = str(cwe_raw or "").strip()
+                            port = it.get("port", None)
+                            try:
+                                port_int = int(port) if port is not None and str(port).isdigit() else 0
+                            except Exception:
+                                port_int = 0
+                            vulns.append({
+                                "cve_id": str(cve_id or "").strip().upper(),
+                                "cwe_id": str(cwe_id or "").strip().upper(),
+                                "port": port_int,
+                                "protocol": "tcp",
+                                "service": (it.get("service") or {}).get("name", "unknown") if isinstance(it.get("service"), dict) else "unknown",
+                                "severity": str(info.get("severity", "medium")).upper(),
+                                "description": str(info.get("name", "") or it.get("template-id", "Nuclei finding")),
+                                "source": "Nuclei",
+                                "template": str(it.get("template-id", "") or ""),
+                                "scanner_location": "server",
+                                "scanner_label": "Сервер",
+                                "target": str(it.get("host", "") or self.target),
+                            })
+
+            self.finished.emit(vulns, elapsed)
+        except Exception as e:
+            logger.error(f"[LOCAL-NUCLEI] Ошибка: {e}", exc_info=True)
+            self.error.emit(str(e))
+            self.finished.emit([], 0.0)
+        finally:
+            try:
+                if 'temp_path' in locals() and os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except Exception:
+                pass
+            try:
+                if 'url_list_path' in locals() and os.path.exists(url_list_path):
+                    os.remove(url_list_path)
+            except Exception:
+                pass
 
 
 class CorrelationRestartWorker(QThread):
@@ -439,6 +735,9 @@ class ServerGUI(QMainWindow):
         self.actual_server_port = None
         self._last_scan_data = {}        # Данные от атакующего (для схем)
         self._last_results = []          # Результаты корреляции
+        self.server_scan_vectors = []    # Результаты Nmap/Nuclei на сервере (векторы)
+        self.server_scan_vulns = {"nmap": [], "nuclei": []}  # Сырые находки серверных сканеров
+        self._server_scan_running = {"nmap": False, "nuclei": False}
         self._correlation_results_by_profile = {}
         self._correlation_summaries_by_profile = {}
         self._correlation_profiles_meta = {}
@@ -476,6 +775,7 @@ class ServerGUI(QMainWindow):
         self._build_system_tab()
         self._build_software_tab() # НОВАЯ ВКЛАДКА
         self._build_trivy_tab()  # НОВАЯ ВКЛАДКА TRIVY
+        self._build_scanners_tab()
         self._build_trivy_history_tab()  # НОВАЯ ВКЛАДКА ИСТОРИИ TRIVY
         self._build_vuln_tab()
         self._build_correlation_tab()
@@ -617,6 +917,39 @@ class ServerGUI(QMainWindow):
         self.trivy_progress.setFixedHeight(20)
         self.trivy_progress.setVisible(False)
         cl.addWidget(self.trivy_progress)
+
+        self.btn_local_nmap = QPushButton("3в. Nmap (сервер, локально)  ➕")
+        self.btn_local_nmap.setStyleSheet(btn_style)
+        self.btn_local_nmap.setEnabled(False)
+        self.btn_local_nmap.clicked.connect(self._start_local_nmap_scan)
+        cl.addWidget(self.btn_local_nmap)
+
+        self.local_nmap_progress = QProgressBar()
+        self.local_nmap_progress.setFixedHeight(18)
+        self.local_nmap_progress.setVisible(False)
+        cl.addWidget(self.local_nmap_progress)
+
+        self.btn_local_nuclei = QPushButton("3г. Nuclei (сервер, локально)  ➕")
+        self.btn_local_nuclei.setStyleSheet(btn_style)
+        self.btn_local_nuclei.setEnabled(False)
+        self.btn_local_nuclei.clicked.connect(self._start_local_nuclei_scan)
+        cl.addWidget(self.btn_local_nuclei)
+
+        self.local_nuclei_progress = QProgressBar()
+        self.local_nuclei_progress.setFixedHeight(18)
+        self.local_nuclei_progress.setVisible(False)
+        cl.addWidget(self.local_nuclei_progress)
+
+        sep_scan = QFrame()
+        sep_scan.setFrameShape(QFrame.Shape.HLine)
+        sep_scan.setStyleSheet("color:#333;")
+        cl.addWidget(sep_scan)
+
+        self.btn_local_parallel_scan = QPushButton("⚡ Параллельный скан (Nmap + Nuclei)")
+        self.btn_local_parallel_scan.setStyleSheet(btn_style + "QPushButton { background: #2a3a4a; }")
+        self.btn_local_parallel_scan.setEnabled(False)
+        self.btn_local_parallel_scan.clicked.connect(self._start_local_parallel_scan)
+        cl.addWidget(self.btn_local_parallel_scan)
 
         self.btn_server = QPushButton("4. Запустить сервер")
         self.btn_server.setStyleSheet(btn_style + "QPushButton { background: #2a4a2a; }")
@@ -781,6 +1114,24 @@ class ServerGUI(QMainWindow):
         logger.info(f"[TRIVY] Применённые настройки: {options}")
         return options
 
+    def _apply_nuclei_profile(self):
+        preset_key = NUCLEI_PROFILE_MAP.get(self.nuclei_profile_combo.currentText(), "Balanced")
+        preset = NUCLEI_SCAN_PROFILES.get(preset_key, NUCLEI_SCAN_PROFILES["Balanced"])
+        self.nuclei_concurrency_spin.setValue(int(preset.get("concurrency", 50)))
+        self.nuclei_timeout_spin.setValue(int(preset.get("timeout", 3)))
+        self.nuclei_retries_spin.setValue(int(preset.get("retries", 1)))
+        self.nuclei_mhe_spin.setValue(int(preset.get("max_host_errors", 100000)))
+
+    def _get_nuclei_settings(self):
+        options = {
+            "concurrency": max(5, min(self.nuclei_concurrency_spin.value(), 150)),
+            "timeout": max(1, min(self.nuclei_timeout_spin.value(), 30)),
+            "retries": max(0, min(self.nuclei_retries_spin.value(), 5)),
+            "max_host_errors": max(1000, min(self.nuclei_mhe_spin.value(), 200000)),
+        }
+        logger.info(f"[NUCLEI] Применённые настройки (сервер): {options}")
+        return options
+
     def _build_system_tab(self):
         st = QWidget()
         stl = QVBoxLayout(st)
@@ -876,6 +1227,99 @@ class ServerGUI(QMainWindow):
         stl.addWidget(self.trivy_summary_label)
         
         self.tabs.addTab(st, "🛡️ Trivy")
+
+    def _build_scanners_tab(self):
+        tab = QWidget()
+        layout = QHBoxLayout(tab)
+
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        left = QWidget()
+        ll = QVBoxLayout(left)
+        ll.setContentsMargins(0, 0, 0, 0)
+        ll.setSpacing(8)
+
+        nuclei_title = QLabel("🧪 Nuclei (сервер, локально)")
+        nuclei_title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        nuclei_title.setStyleSheet("color:#888;padding:6px 0;")
+        ll.addWidget(nuclei_title)
+
+        self.server_nuclei_status = QLabel("⚪ Nuclei не запускался")
+        self.server_nuclei_status.setStyleSheet("color:#666;font-size:11px;padding:4px;")
+        ll.addWidget(self.server_nuclei_status)
+
+        self.server_nuclei_progress = QProgressBar()
+        self.server_nuclei_progress.setFixedHeight(18)
+        self.server_nuclei_progress.setVisible(True)
+        self.server_nuclei_progress.setValue(0)
+        self.server_nuclei_progress.setFormat("—")
+        ll.addWidget(self.server_nuclei_progress)
+
+        self.server_nuclei_table = QTableWidget(0, 6)
+        self.server_nuclei_table.setHorizontalHeaderLabels(["CVE", "CWE", "Серьёзность", "Порт", "Template", "Описание"])
+        self.server_nuclei_table.horizontalHeader().setStretchLastSection(True)
+        self.server_nuclei_table.setColumnWidth(0, 135)
+        self.server_nuclei_table.setColumnWidth(1, 110)
+        self.server_nuclei_table.setColumnWidth(2, 90)
+        self.server_nuclei_table.setColumnWidth(3, 60)
+        self.server_nuclei_table.setColumnWidth(4, 220)
+        self.server_nuclei_table.verticalHeader().setVisible(False)
+        self.server_nuclei_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        ll.addWidget(self.server_nuclei_table, 1)
+
+        self.server_nuclei_log = QTextEdit()
+        self.server_nuclei_log.setReadOnly(True)
+        self.server_nuclei_log.setFixedHeight(180)
+        ll.addWidget(self.server_nuclei_log)
+
+        splitter.addWidget(left)
+
+        right = QWidget()
+        rl = QVBoxLayout(right)
+        rl.setContentsMargins(0, 0, 0, 0)
+        rl.setSpacing(8)
+
+        trivy_title = QLabel("🛡️ Trivy (сервер)")
+        trivy_title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        trivy_title.setStyleSheet("color:#888;padding:6px 0;")
+        rl.addWidget(trivy_title)
+
+        self.server_trivy_status = QLabel("⚪ Trivy не запущен")
+        self.server_trivy_status.setStyleSheet("color:#666;font-size:11px;padding:4px;")
+        rl.addWidget(self.server_trivy_status)
+
+        self.server_trivy_progress = QProgressBar()
+        self.server_trivy_progress.setFixedHeight(18)
+        self.server_trivy_progress.setVisible(True)
+        self.server_trivy_progress.setValue(0)
+        self.server_trivy_progress.setFormat("—")
+        rl.addWidget(self.server_trivy_progress)
+
+        self.server_trivy_table = QTableWidget(0, 7)
+        self.server_trivy_table.setHorizontalHeaderLabels([
+            "CVE-ID", "ПО", "Версия", "Исправлено", "Серьёзность", "Заголовок", "CWE/CAPEC"
+        ])
+        self.server_trivy_table.horizontalHeader().setStretchLastSection(True)
+        self.server_trivy_table.setColumnWidth(0, 140)
+        self.server_trivy_table.setColumnWidth(1, 150)
+        self.server_trivy_table.setColumnWidth(2, 90)
+        self.server_trivy_table.setColumnWidth(3, 90)
+        self.server_trivy_table.setColumnWidth(4, 90)
+        self.server_trivy_table.setColumnWidth(5, 250)
+        self.server_trivy_table.verticalHeader().setVisible(False)
+        self.server_trivy_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        rl.addWidget(self.server_trivy_table, 1)
+
+        self.server_trivy_log = QTextEdit()
+        self.server_trivy_log.setReadOnly(True)
+        self.server_trivy_log.setFixedHeight(180)
+        rl.addWidget(self.server_trivy_log)
+
+        splitter.addWidget(right)
+        splitter.setSizes([800, 800])
+        layout.addWidget(splitter)
+
+        self.tabs.addTab(tab, "🖥️ Сканеры")
 
     def _build_trivy_history_tab(self):
         """Вкладка истории сканирований Trivy"""
@@ -1368,6 +1812,31 @@ class ServerGUI(QMainWindow):
         trivy_layout.addRow("Типы проверок:", self.trivy_checks_combo)
         scan_layout.addWidget(trivy_group)
 
+        nuclei_group = QGroupBox("Параметры Nuclei (сервер)")
+        nuclei_layout = QFormLayout(nuclei_group)
+        self.nuclei_profile_combo = QComboBox()
+        self.nuclei_profile_combo.addItems([
+            "Быстрый (Fast)",
+            "Сбалансированный (Balanced)",
+            "Точный (Accurate)",
+        ])
+        self.nuclei_profile_combo.setCurrentText("Сбалансированный (Balanced)")
+        nuclei_layout.addRow("Профиль сканирования:", self.nuclei_profile_combo)
+        self.nuclei_concurrency_spin = QSpinBox()
+        self.nuclei_concurrency_spin.setRange(5, 150)
+        self.nuclei_timeout_spin = QSpinBox()
+        self.nuclei_timeout_spin.setRange(1, 30)
+        self.nuclei_retries_spin = QSpinBox()
+        self.nuclei_retries_spin.setRange(0, 5)
+        self.nuclei_mhe_spin = QSpinBox()
+        self.nuclei_mhe_spin.setRange(1000, 200000)
+        self.nuclei_mhe_spin.setSingleStep(5000)
+        nuclei_layout.addRow("Потоки/параллелизм (-c):", self.nuclei_concurrency_spin)
+        nuclei_layout.addRow("Таймаут запроса (сек):", self.nuclei_timeout_spin)
+        nuclei_layout.addRow("Количество повторов:", self.nuclei_retries_spin)
+        nuclei_layout.addRow("Предел ошибок хоста (-mhe):", self.nuclei_mhe_spin)
+        scan_layout.addWidget(nuclei_group)
+
         scan_help = QLabel(
             "Пояснение: «Типы проверок» = vuln (поиск CVE), secret (поиск секретов в файлах). "
             "Профиль применяет рекомендуемые значения, после чего можно скорректировать поля вручную."
@@ -1379,6 +1848,8 @@ class ServerGUI(QMainWindow):
 
         self.trivy_profile_combo.currentTextChanged.connect(lambda _p: self._apply_trivy_profile())
         self._apply_trivy_profile()
+        self.nuclei_profile_combo.currentTextChanged.connect(lambda _p: self._apply_nuclei_profile())
+        self._apply_nuclei_profile()
 
         # Корневой контейнер вкладки "Настройки" с подвкладками
         settings_root = QWidget()
@@ -1709,6 +2180,9 @@ class ServerGUI(QMainWindow):
         self.btn_load_db.setEnabled(True)
         self.btn_load_toolkit.setEnabled(True)
         self.btn_trivy_scan.setEnabled(True)  # Включаем кнопку Trivy
+        self.btn_local_nmap.setEnabled(True)
+        self.btn_local_nuclei.setEnabled(True)
+        self.btn_local_parallel_scan.setEnabled(True)
     def _on_analysis_error(self, e):
         self.btn_analyze.setText("1. Анализ системы")
         self.btn_analyze.setEnabled(True)
@@ -1976,11 +2450,22 @@ class ServerGUI(QMainWindow):
         """Обновление прогресса Trivy"""
         self.trivy_progress.setValue(percent)
         self.trivy_progress.setFormat(f"{message} ({percent}%)")
+        if hasattr(self, "server_trivy_progress"):
+            self.server_trivy_progress.setValue(percent)
+            self.server_trivy_progress.setFormat(f"{message} ({percent}%)")
+        if hasattr(self, "server_trivy_status"):
+            self.server_trivy_status.setText(f"🔄 {message}")
+        if hasattr(self, "server_trivy_log"):
+            self.server_trivy_log.append(f"{datetime.now().strftime('%H:%M:%S')}  {message} ({percent}%)")
+            self.server_trivy_log.moveCursor(QTextCursor.MoveOperation.End)
     
     def _on_trivy_scan_done(self, summary):
         """Обработка результатов Trivy"""
         self.trivy_progress.setValue(100)
         self.trivy_progress.setVisible(False)
+        if hasattr(self, "server_trivy_progress"):
+            self.server_trivy_progress.setValue(100)
+            self.server_trivy_progress.setFormat("Готово")
         
         if summary.get("error"):
             err = str(summary.get("error") or "")
@@ -2006,12 +2491,18 @@ class ServerGUI(QMainWindow):
                     self.btn_server.setEnabled(True)
                 self.btn_trivy_scan.setText("3б. Сканирование Trivy (пропущено)")
                 self.btn_trivy_scan.setEnabled(True)
+                if hasattr(self, "server_trivy_status"):
+                    self.server_trivy_status.setText("⚠️ Trivy пропущен (нет доступа к DB)")
+                if hasattr(self, "server_trivy_log"):
+                    self.server_trivy_log.append("Trivy пропущен: нет доступа к базе уязвимостей.")
                 return
             self.trivy_status_label.setText(f"❌ Ошибка: {err}")
             self.trivy_status_label.setStyleSheet("color:#b55;font-size:11px;padding:4px;")
             QMessageBox.warning(self, "Ошибка Trivy", f"Не удалось завершить сканирование:\n{err}")
             self.btn_trivy_scan.setText("3б. Сканирование Trivy (ошибка)")
             self.btn_trivy_scan.setEnabled(True)
+            if hasattr(self, "server_trivy_status"):
+                self.server_trivy_status.setText("❌ Ошибка Trivy")
             return
         
         # Сохраняем сводку
@@ -2089,6 +2580,36 @@ class ServerGUI(QMainWindow):
                         cwe_capec += " | "
                     cwe_capec += "CAPEC: " + ", ".join(capec_ids[:3])
                 self.trivy_table.setItem(row, 6, QTableWidgetItem(cwe_capec if cwe_capec else "—"))
+
+            if hasattr(self, "server_trivy_table"):
+                self.server_trivy_table.setRowCount(0)
+                for vuln in sorted_vulns:
+                    row = self.server_trivy_table.rowCount()
+                    self.server_trivy_table.insertRow(row)
+                    self.server_trivy_table.setItem(row, 0, QTableWidgetItem(vuln.get("vuln_id", "")))
+                    self.server_trivy_table.setItem(row, 1, QTableWidgetItem(vuln.get("pkg_name", "")))
+                    self.server_trivy_table.setItem(row, 2, QTableWidgetItem(vuln.get("installed_version", "")))
+                    fixed = vuln.get("fixed_version", "")
+                    fixed_item = QTableWidgetItem(fixed if fixed else "Нет исправления")
+                    if not fixed:
+                        fixed_item.setForeground(QColor("#888"))
+                    self.server_trivy_table.setItem(row, 3, fixed_item)
+                    sev = vuln.get("severity", "UNKNOWN")
+                    sev_item = QTableWidgetItem(sev)
+                    sev_color = {"CRITICAL": "#c44", "HIGH": "#a85", "MEDIUM": "#997", "LOW": "#696", "UNKNOWN": "#888", "INFO": "#668"}.get(sev, "#888")
+                    sev_item.setForeground(QColor(sev_color))
+                    self.server_trivy_table.setItem(row, 4, sev_item)
+                    self.server_trivy_table.setItem(row, 5, QTableWidgetItem(vuln.get("title", "")[:200]))
+                    cwe_capec = ""
+                    cwe_ids = vuln.get("cwe_ids", [])
+                    capec_ids = vuln.get("capec_ids", [])
+                    if cwe_ids:
+                        cwe_capec += "CWE: " + ", ".join(cwe_ids[:3])
+                    if capec_ids:
+                        if cwe_capec:
+                            cwe_capec += " | "
+                        cwe_capec += "CAPEC: " + ", ".join(capec_ids[:3])
+                    self.server_trivy_table.setItem(row, 6, QTableWidgetItem(cwe_capec if cwe_capec else "—"))
         
         # Обновляем сводку
         self.trivy_summary_label.setText(
@@ -2102,6 +2623,9 @@ class ServerGUI(QMainWindow):
         
         self.btn_trivy_scan.setText("3б. Сканирование Trivy (выполнено)")
         self.btn_trivy_scan.setEnabled(True)
+        if hasattr(self, "server_trivy_status"):
+            total = summary.get("total_vulns", 0)
+            self.server_trivy_status.setText(f"✅ Trivy: найдено {total} уязвимостей")
         
         # Переключаемся на вкладку Trivy
         # Находим индекс вкладки Trivy
@@ -2117,7 +2641,208 @@ class ServerGUI(QMainWindow):
         self.trivy_status_label.setStyleSheet("color:#b55;font-size:11px;padding:4px;")
         self.btn_trivy_scan.setText("3б. Сканирование Trivy (ошибка)")
         self.btn_trivy_scan.setEnabled(True)
+        if hasattr(self, "server_trivy_status"):
+            self.server_trivy_status.setText("❌ Ошибка Trivy")
         QMessageBox.critical(self, "Ошибка Trivy", str(e))
+
+    def _ports_for_local_scanners(self) -> list[int]:
+        if not self.system_info:
+            return []
+        ports = []
+        for p in getattr(self.system_info, "open_ports", []) or []:
+            try:
+                ports.append(int(getattr(p, "port", 0)))
+            except Exception:
+                continue
+        return sorted(set([p for p in ports if p > 0]))
+
+    def _append_scanner_log(self, text: str):
+        self._on_log_message(text, "INFO")
+
+    def _start_local_nmap_scan(self):
+        ports = self._ports_for_local_scanners()
+        if not ports:
+            QMessageBox.warning(self, "Предупреждение", "Нет портов для сканирования. Сначала выполните «Анализ системы».")
+            return
+        if self._server_scan_running.get("nmap"):
+            return
+        self._server_scan_running["nmap"] = True
+        self.btn_local_nmap.setEnabled(False)
+        self.btn_local_parallel_scan.setEnabled(False)
+        self.local_nmap_progress.setVisible(True)
+        self.local_nmap_progress.setRange(0, 0)
+        self.local_nmap_progress.setFormat("Nmap: сканирование...")
+        self._append_scanner_log(f"[LOCAL] Запуск Nmap на сервере (localhost), портов: {len(ports)}")
+        self.local_nmap_worker = LocalNmapScanWorker("127.0.0.1", ports)
+        self.local_nmap_worker.finished.connect(self._on_local_nmap_done)
+        self.local_nmap_worker.error.connect(self._on_local_nmap_error)
+        self.local_nmap_worker.start()
+
+    def _on_local_nmap_done(self, vulns: list, elapsed: float):
+        self.server_scan_vulns["nmap"] = vulns or []
+        vectors = self._vectors_from_scanner_vulns(vulns or [], found_by_prefix="Сервер: Nmap")
+        self._merge_server_vectors(vectors)
+        self.local_nmap_progress.setRange(0, 100)
+        self.local_nmap_progress.setValue(100)
+        self.local_nmap_progress.setFormat(f"Nmap: готово ({len(vectors)} CVE, {elapsed:.1f}s)")
+        self._append_scanner_log(f"[LOCAL] Nmap завершён: {len(vectors)} CVE-векторов, {elapsed:.1f}s")
+        self._server_scan_running["nmap"] = False
+        self.btn_local_nmap.setEnabled(True)
+        self.btn_local_parallel_scan.setEnabled(True and not self._server_scan_running.get("nuclei"))
+        QTimer.singleShot(2000, lambda: self.local_nmap_progress.setVisible(False))
+
+    def _on_local_nmap_error(self, e: str):
+        self._append_scanner_log(f"[LOCAL] Ошибка Nmap: {e}")
+        self.local_nmap_progress.setVisible(False)
+        self._server_scan_running["nmap"] = False
+        self.btn_local_nmap.setEnabled(True)
+        self.btn_local_parallel_scan.setEnabled(True and not self._server_scan_running.get("nuclei"))
+        QMessageBox.warning(self, "Ошибка Nmap", str(e))
+
+    def _start_local_nuclei_scan(self):
+        ports = self._ports_for_local_scanners()
+        if not ports:
+            QMessageBox.warning(self, "Предупреждение", "Нет портов для сканирования. Сначала выполните «Анализ системы».")
+            return
+        if self._server_scan_running.get("nuclei"):
+            return
+        self._server_scan_running["nuclei"] = True
+        self.btn_local_nuclei.setEnabled(False)
+        self.btn_local_parallel_scan.setEnabled(False)
+        self.local_nuclei_progress.setVisible(True)
+        self.local_nuclei_progress.setRange(0, 100)
+        self.local_nuclei_progress.setValue(0)
+        self.local_nuclei_progress.setFormat("Nuclei: запуск...")
+        self._append_scanner_log(f"[LOCAL] Запуск Nuclei на сервере (localhost), портов: {len(ports)}")
+        nuclei_settings = self._get_nuclei_settings() if hasattr(self, "nuclei_concurrency_spin") else {}
+        self.local_nuclei_worker = ServerNucleiWorker("127.0.0.1", ports, nuclei_settings)
+        self.local_nuclei_worker.progress.connect(self._on_local_nuclei_progress)
+        self.local_nuclei_worker.log_msg.connect(self._on_local_nuclei_log)
+        self.local_nuclei_worker.finished.connect(self._on_local_nuclei_done)
+        self.local_nuclei_worker.error.connect(self._on_local_nuclei_error)
+        self.local_nuclei_worker.start()
+
+    def _on_local_nuclei_progress(self, msg: str, percent: int):
+        self.local_nuclei_progress.setValue(max(0, min(int(percent), 100)))
+        self.local_nuclei_progress.setFormat(f"Nuclei: {msg} ({percent}%)")
+        if hasattr(self, "server_nuclei_progress"):
+            self.server_nuclei_progress.setValue(max(0, min(int(percent), 100)))
+            self.server_nuclei_progress.setFormat(f"{msg} ({percent}%)")
+        if hasattr(self, "server_nuclei_status"):
+            self.server_nuclei_status.setText(f"🔄 Nuclei: {msg}")
+
+    def _on_local_nuclei_log(self, msg: str):
+        if hasattr(self, "server_nuclei_log"):
+            self.server_nuclei_log.append(msg)
+            self.server_nuclei_log.moveCursor(QTextCursor.MoveOperation.End)
+
+    def _on_local_nuclei_done(self, vulns: list, elapsed: float):
+        self.server_scan_vulns["nuclei"] = vulns or []
+        vectors = self._vectors_from_scanner_vulns(vulns or [], found_by_prefix="Сервер: Nuclei")
+        self._merge_server_vectors(vectors)
+        self.local_nuclei_progress.setValue(100)
+        self.local_nuclei_progress.setFormat(f"Nuclei: готово ({len(vectors)} CVE, {elapsed:.1f}s)")
+        self._append_scanner_log(f"[LOCAL] Nuclei завершён: {len(vectors)} CVE-векторов, {elapsed:.1f}s")
+        if hasattr(self, "server_nuclei_status"):
+            self.server_nuclei_status.setText(f"✅ Nuclei: {len(vectors)} CVE, {elapsed:.1f}s")
+        if hasattr(self, "server_nuclei_table"):
+            self.server_nuclei_table.setRowCount(0)
+            for v in (vulns or []):
+                if not isinstance(v, dict):
+                    continue
+                row = self.server_nuclei_table.rowCount()
+                self.server_nuclei_table.insertRow(row)
+                self.server_nuclei_table.setItem(row, 0, QTableWidgetItem(str(v.get("cve_id", "") or "")))
+                self.server_nuclei_table.setItem(row, 1, QTableWidgetItem(str(v.get("cwe_id", "") or "")))
+                sev_item = QTableWidgetItem(str(v.get("severity", "") or ""))
+                sev = str(v.get("severity", "") or "").upper()
+                sev_color = {"CRITICAL": "#c44", "HIGH": "#a85", "MEDIUM": "#997", "LOW": "#696", "INFO": "#668"}.get(sev, "#888")
+                sev_item.setForeground(QColor(sev_color))
+                self.server_nuclei_table.setItem(row, 2, sev_item)
+                self.server_nuclei_table.setItem(row, 3, QTableWidgetItem(str(v.get("port", "") or "")))
+                self.server_nuclei_table.setItem(row, 4, QTableWidgetItem(str(v.get("template", "") or "")[:200]))
+                self.server_nuclei_table.setItem(row, 5, QTableWidgetItem(str(v.get("description", "") or "")[:300]))
+        self._server_scan_running["nuclei"] = False
+        self.btn_local_nuclei.setEnabled(True)
+        self.btn_local_parallel_scan.setEnabled(True and not self._server_scan_running.get("nmap"))
+        QTimer.singleShot(2000, lambda: self.local_nuclei_progress.setVisible(False))
+
+    def _on_local_nuclei_error(self, e: str):
+        self._append_scanner_log(f"[LOCAL] Ошибка Nuclei: {e}")
+        self.local_nuclei_progress.setVisible(False)
+        if hasattr(self, "server_nuclei_status"):
+            self.server_nuclei_status.setText("❌ Ошибка Nuclei")
+        if hasattr(self, "server_nuclei_progress"):
+            self.server_nuclei_progress.setValue(0)
+            self.server_nuclei_progress.setFormat("Ошибка")
+        if hasattr(self, "server_nuclei_log"):
+            self.server_nuclei_log.append(f"❌ {e}")
+            self.server_nuclei_log.moveCursor(QTextCursor.MoveOperation.End)
+        self._server_scan_running["nuclei"] = False
+        self.btn_local_nuclei.setEnabled(True)
+        self.btn_local_parallel_scan.setEnabled(True and not self._server_scan_running.get("nmap"))
+        QMessageBox.warning(self, "Ошибка Nuclei", str(e))
+
+    def _start_local_parallel_scan(self):
+        ports = self._ports_for_local_scanners()
+        if not ports:
+            QMessageBox.warning(self, "Предупреждение", "Нет портов для сканирования. Сначала выполните «Анализ системы».")
+            return
+        if self._server_scan_running.get("nmap") or self._server_scan_running.get("nuclei"):
+            return
+        self.btn_local_parallel_scan.setEnabled(False)
+        self.btn_local_nmap.setEnabled(False)
+        self.btn_local_nuclei.setEnabled(False)
+        self._append_scanner_log(f"[LOCAL] Параллельный запуск Nmap+Nuclei (localhost), портов: {len(ports)}")
+        self._start_local_nmap_scan()
+        self._start_local_nuclei_scan()
+
+    def _vectors_from_scanner_vulns(self, vulns: list[dict], found_by_prefix: str) -> list[AttackVector]:
+        out = []
+        for v in vulns or []:
+            if not isinstance(v, dict):
+                continue
+            cve_id = str(v.get("cve_id", "") or "").strip().upper()
+            if not cve_id.startswith("CVE-"):
+                continue
+            src = str(v.get("source", "") or "Scanner").strip()
+            sev = str(v.get("severity", "") or "MEDIUM").upper()
+            desc = str(v.get("description", "") or "")
+            service = str(v.get("service", "") or "")
+            port = v.get("port", None)
+            try:
+                port_int = int(port) if port not in (None, "", "0", 0) else None
+            except Exception:
+                port_int = None
+            out.append(AttackVector(
+                id=f"AV-SERVER-{src.upper()}-{cve_id}",
+                name=f"{cve_id} ({src}, Сервер)",
+                description=f"{desc} (обнаружено на сервере; порт {port_int if port_int is not None else 'N/A'})",
+                target_port=port_int,
+                target_service=service,
+                attack_type="known_vulnerability",
+                severity=sev if sev in [s.value for s in Severity] else Severity.MEDIUM.value,
+                tools_used=src,
+                found_by=found_by_prefix,
+                representative_cve_ids=[cve_id],
+            ))
+        return out
+
+    def _merge_server_vectors(self, vectors: list[AttackVector]) -> None:
+        existing_ids = set()
+        for v in self.server_scan_vectors or []:
+            try:
+                existing_ids.add(getattr(v, "id", ""))
+            except Exception:
+                continue
+        merged = list(self.server_scan_vectors or [])
+        for v in vectors or []:
+            vid = getattr(v, "id", "")
+            if not vid or vid in existing_ids:
+                continue
+            existing_ids.add(vid)
+            merged.append(v)
+        self.server_scan_vectors = merged
 
     def _load_trivy_report(self):
         """Загрузка результатов Trivy из сохраненного JSON-файла."""
@@ -2492,6 +3217,12 @@ class ServerGUI(QMainWindow):
                         if state.on_client_connected:
                             state.on_client_connected(ip)
                     sr = from_json_scan_result(scan_data)
+                    try:
+                        extra = getattr(gui, "server_scan_vectors", None) or []
+                        if extra:
+                            sr.attack_vectors.extend(extra)
+                    except Exception:
+                        pass
                     profiles = []
                     try:
                         profiles = list_correlation_profiles(PROJECT_DIR)

@@ -150,7 +150,7 @@ class AttackCorrelator:
                     reason="Не найдено соответствующих CVE уязвимостей в базе данных",
                     recommendation="Требуется ручной анализ вектора атаки",
                     target_port=av.target_port,
-                    found_by="Сервер (вектор атакующего)",
+                    found_by=self._found_by_from_attack_vector(av),
                     feasibility_trace={
                         "version": 1,
                         "note": "Для вектора не найдено CVE в локальной базе",
@@ -305,12 +305,20 @@ class AttackCorrelator:
                 reason=reason,
                 recommendation=recommendation,
                 target_port=av.target_port,
-                found_by="Сервер (вектор атакующего)",
+                found_by=self._found_by_from_attack_vector(av),
                 feasibility_trace=trace if isinstance(trace, dict) else {},
             )
             matches.append(match)
 
         return matches
+
+    def _found_by_from_attack_vector(self, av: AttackVector) -> str:
+        src = ""
+        try:
+            src = str(getattr(av, "found_by", "") or "").strip()
+        except Exception:
+            src = ""
+        return src or "Сервер (вектор атакующего)"
 
     def _check_trivy_vulnerability(self, cve_id: str) -> tuple:
         """

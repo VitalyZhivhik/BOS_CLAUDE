@@ -179,6 +179,7 @@ class AttackVector:
     attack_type: str = ""
     severity: str = Severity.MEDIUM.value
     tools_used: str = ""
+    found_by: str = ""
     # Явные CVE для корреляции (если заданы генератором или клиентом API)
     representative_cve_ids: list = field(default_factory=list)
     # Эвристика с атакующей стороны: предполагаемое ПО по баннеру/порту (для target_software на сервере)
