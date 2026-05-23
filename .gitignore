@@ -1,6 +1,28 @@
-```
-# Compiled and build artifacts
-*.pyc
+/tools
+/reports
+/history
+SecurityAttacker.spec
+SecurityServer.spec
+dist/data/logs
+dist/SecurityAttacker/logs
+dist/SecurityServer/logs
+dist/SecurityAttacker/tools
+dist/SecurityServer/tools
+dist/SecurityAttacker/_internal
+dist/SecurityServer/_internal
+build
+.vscode
+.qwen
+data
+skills
+.continue
+.idea
+.amazonq
+dist_attacker/logs/
+dist
+dist_attacker
+MITRE_PARSER/.venv/
+instal/
 __pycache__/
 
 # Dependencies
@@ -38,8 +60,13 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+
 # Backup files
 *~
 *.bak
 *.backup
-```
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+
