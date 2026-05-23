@@ -119,10 +119,19 @@ def _resolve_nuclei_templates_dir() -> str:
     for root in candidates:
         if not root or not os.path.isdir(root):
             continue
+        # Проверяем наличие подпапок с шаблонами (cves, http, network и т.д.)
         cves_dir = os.path.join(root, "cves")
+        http_dir = os.path.join(root, "http")
+        network_dir = os.path.join(root, "network")
         if os.path.isdir(cves_dir):
             return cves_dir
-        return root
+        # Если есть другие папки с шаблонами, возвращаем корень
+        if os.path.isdir(http_dir) or os.path.isdir(network_dir):
+            return root
+        # Если это просто папка с yaml/yml файлами шаблонов
+        for f in os.listdir(root):
+            if f.endswith(('.yaml', '.yml')):
+                return root
     return ""
 
 
