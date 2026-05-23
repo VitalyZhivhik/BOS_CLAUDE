@@ -526,21 +526,23 @@ class NucleiWorker(QThread):
         try:
             templates_dir = _resolve_nuclei_templates_dir()
             if not templates_dir:
-                self.log_msg.emit("  ⚠️ Шаблоны Nuclei не найдены в tools/. Будут использованы шаблоны из профиля пользователя/онлайн.")
+                self.log_msg.emit("  ⚠️ Шаблоны Nuclei не найдены в tools/. Сканирование отменено.")
+                self.log_msg.emit("   Убедитесь, что шаблоны установлены в папке tools/nuclei-templates")
+                self.finished.emit([], 0)
+                return
 
             cmd = [
                 self.nuclei_path,
                 "-l", url_list_path,
                 "-json-export", temp_path,
-                "-ni", "-disable-update-check",
+                "-ni", "-duc",
+                "-t", templates_dir,
                 "-mhe", str(self.settings.get("max_host_errors", 100000)),
                 "-c", str(self.settings.get("concurrency", 50)),
                 "-timeout", str(self.settings.get("timeout", 2)),
                 "-retries", str(self.settings.get("retries", 0)),
                 "-stats", "-si", "2"
             ]
-            if templates_dir:
-                cmd.extend(["-t", templates_dir])
 
             startupinfo = subprocess.STARTUPINFO() if os.name == 'nt' else None
             if startupinfo:
