@@ -1,9 +1,6 @@
-.venv/
-venv/
-__pycache__/
-.env
-logs/
+# Compiled Python files
 *.pyc
+<<<<<<< HEAD
 /tools
 /reports
 /history
@@ -29,3 +26,37 @@ dist
 dist_attacker
 MITRE_PARSER/.venv/
 instal/
+=======
+__pycache__/
+
+# Virtual environments
+venv/
+.venv/
+.env
+.env.local
+*.env.*
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# Logs
+*.log
+
+# Coverage reports
+.coverage
+coverage/
+htmlcov/
+
+# Distribution artifacts
+dist/
+build/
+*.egg-info/
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+>>>>>>> a15e6576098ad54ab1ce83f92e36e499d1376c98

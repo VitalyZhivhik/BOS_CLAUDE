@@ -345,18 +345,24 @@ class NucleiScanner:
         # Формируем команду Nuclei
         target_url = f"http://{self.target}" if any(p in [80, 443, 8080, 8443] for p in ports) else self.target
         templates_dir = _resolve_nuclei_templates_dir()
+        
+        # Если шаблоны не найдены, пробуем использовать пути по умолчанию или пропускаем сканирование
+        if not templates_dir:
+            logger.warning("[NUCLEI] Директория с шаблонами не найдена. Сканирование отменено.")
+            return vulnerabilities
+        
         cmd = [
             self.nuclei_path,
             "-u", target_url,
             "-json",
-            "-silent",
+            "-duc",  # Disable update checks
+            "-ni",   # Disable nuclei-ignore file
             "-c", str(self.settings.get("concurrency", 40)),
             "-timeout", str(self.settings.get("timeout", 4)),
             "-retries", str(self.settings.get("retries", 1)),
             "-mhe", str(self.settings.get("max_host_errors", 100000)),
+            "-t", templates_dir,
         ]
-        if templates_dir:
-            cmd.extend(["-t", templates_dir])
 
         try:
             logger.info(f"Запуск Nuclei для сканирования уязвимостей: {' '.join(cmd)}")
@@ -372,8 +378,10 @@ class NucleiScanner:
             if result.returncode == 0 and result.stdout:
                 vulnerabilities = self._parse_nuclei_json(result.stdout)
                 logger.info(f"Nuclei нашел {len(vulnerabilities)} уязвимостей")
+            elif result.returncode != 0:
+                logger.warning(f"Nuclei завершился с кодом {result.returncode}. stderr: {result.stderr}")
             else:
-                logger.warning(f"Nuclei завершился с ошибкой: {result.stderr}")
+                logger.info("Nuclei завершил работу без результатов (уязвимости не найдены)")
 
         except subprocess.TimeoutExpired:
             logger.warning("Nuclei сканирование превысило лимит времени")
