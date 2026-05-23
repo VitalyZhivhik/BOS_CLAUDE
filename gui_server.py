@@ -401,19 +401,25 @@ class ServerNucleiWorker(QThread):
             except Exception:
                 templates_dir = ""
 
+            # Если шаблоны не найдены, выводим предупреждение и отменяем сканирование
+            if not templates_dir:
+                self.log_msg.emit("[⚠️] Директория с шаблонами Nuclei не найдена. Сканирование отменено.")
+                self.log_msg.emit("   Убедитесь, что шаблоны установлены в папке tools/nuclei-templates")
+                self.finished.emit([], 0)
+                return
+
             cmd = [
                 self.nuclei_path,
                 "-l", url_list_path,
                 "-json-export", temp_path,
-                "-ni", "-disable-update-check",
+                "-ni", "-duc",
+                "-t", templates_dir,
                 "-mhe", str(self.settings.get("max_host_errors", 100000)),
                 "-c", str(self.settings.get("concurrency", 50)),
                 "-timeout", str(self.settings.get("timeout", 3)),
                 "-retries", str(self.settings.get("retries", 1)),
                 "-stats", "-si", "2",
             ]
-            if templates_dir:
-                cmd.extend(["-t", templates_dir])
 
             startupinfo = subprocess.STARTUPINFO() if os.name == 'nt' else None
             if startupinfo:
