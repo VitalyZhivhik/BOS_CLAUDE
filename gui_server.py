@@ -403,10 +403,41 @@ class ServerNucleiWorker(QThread):
 
             # Если шаблоны не найдены, выводим предупреждение и отменяем сканирование
             if not templates_dir:
-                self.log_msg.emit("[⚠️] Директория с шаблонами Nuclei не найдена. Сканирование отменено.")
-                self.log_msg.emit("   Убедитесь, что шаблоны установлены в папке tools/nuclei-templates")
-                self.finished.emit([], 0)
-                return
+                install_dir = os.path.join(tools_dir(), "nuclei-templates")
+                try:
+                    os.makedirs(install_dir, exist_ok=True)
+                except Exception:
+                    install_dir = ""
+                if install_dir:
+                    self.log_msg.emit(f"[NUCLEI] Шаблоны не найдены. Пробуем установить/обновить в: {install_dir}")
+                    try:
+                        update_cmd = [self.nuclei_path, "-ut", "-ud", install_dir]
+                        cwd = os.path.dirname(os.path.abspath(self.nuclei_path)) if os.path.isfile(self.nuclei_path) else None
+                        subprocess.run(
+                            update_cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=240,
+                            cwd=cwd,
+                            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                        )
+                    except Exception:
+                        pass
+
+                try:
+                    from nmap_integration import _resolve_nuclei_templates_dir
+                    templates_dir = _resolve_nuclei_templates_dir()
+                except Exception:
+                    templates_dir = ""
+
+                if not templates_dir:
+                    self.log_msg.emit("[⚠️] Директория с шаблонами Nuclei не найдена или пуста. Сканирование отменено.")
+                    if install_dir:
+                        self.log_msg.emit(f"   Ожидаемая папка: {install_dir}")
+                        self.log_msg.emit(f"   Команда для установки: {self.nuclei_path} -ut -ud \"{install_dir}\"")
+                    self.log_msg.emit("   Или задайте путь через переменную окружения BOS_NUCLEI_TEMPLATES_DIR")
+                    self.finished.emit([], 0)
+                    return
 
             cmd = [
                 self.nuclei_path,
@@ -2590,6 +2621,35 @@ class ServerGUI(QMainWindow):
             err = str(summary.get("error") or "")
             err_low = err.lower()
             is_db_net = ("failed to download" in err_low) or ("db error" in err_low) or ("connection attempt failed" in err_low) or ("connectex" in err_low)
+            is_db_missing = "trivy_db_missing" in err_low
+            if is_db_missing:
+                self.trivy_status_label.setText("⚠️ Trivy пропущен (нет локальной базы). Продолжаем без Trivy.")
+                self.trivy_status_label.setStyleSheet("color:#d29922;font-size:11px;padding:4px;")
+                QMessageBox.information(
+                    self,
+                    "Trivy (офлайн)",
+                    "Локальная база Trivy отсутствует, поэтому сканирование пропущено.\n\n"
+                    "Решение (офлайн):\n"
+                    "1) На ПК с интернетом выполните: trivy fs --download-db-only --cache-dir <папка>\n"
+                    "2) Перенесите эту папку на данный ПК в путь cache-dir.\n\n"
+                    "Текущий cache-dir: %LOCALAPPDATA%\\BOS_CLAUDE\\trivy_cache"
+                )
+                self.trivy_summary = {"error": err, "skipped": True}
+                self.trivy_result = None
+                try:
+                    from server.api_server import state
+                    state.trivy_result = None
+                except ImportError:
+                    pass
+                if self.system_info and self.vuln_db:
+                    self.btn_server.setEnabled(True)
+                self.btn_trivy_scan.setText("3б. Сканирование Trivy (пропущено)")
+                self.btn_trivy_scan.setEnabled(True)
+                if hasattr(self, "server_trivy_status"):
+                    self.server_trivy_status.setText("⚠️ Trivy пропущен (нет локальной базы)")
+                if hasattr(self, "server_trivy_log"):
+                    self.server_trivy_log.append("Trivy пропущен: локальная база отсутствует.")
+                return
             if is_db_net:
                 self.trivy_status_label.setText("⚠️ Trivy недоступен (нет доступа к DB). Продолжаем без Trivy.")
                 self.trivy_status_label.setStyleSheet("color:#d29922;font-size:11px;padding:4px;")

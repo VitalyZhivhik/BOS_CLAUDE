@@ -10,12 +10,13 @@ import re
 from typing import List, Dict, Optional
 import sys
 import os
+import shutil
 
 # Добавляем путь к модулям
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "."))
 
 from common.logger import get_server_logger
-from common.bundle_paths import bundle_resources_root
+from common.bundle_paths import bundle_resources_root, tools_dir
 
 logger = get_server_logger()
 
@@ -83,34 +84,104 @@ def _location_label(norm_location: str) -> str:
     return norm_location
 
 def _resolve_nuclei_templates_dir() -> str:
+    env_keys = (
+        "BOS_NUCLEI_TEMPLATES_DIR",
+        "NUCLEI_TEMPLATES_DIR",
+    )
+    env_candidates: list[str] = []
+    for k in env_keys:
+        v = str(os.environ.get(k, "") or "").strip()
+        if v:
+            env_candidates.append(v)
+
     base_dir = bundle_resources_root()
-    tools_root = os.path.join(base_dir, "tools")
-    candidates = [
-        os.path.join(tools_root, "nuclei-templates"),
-        os.path.join(tools_root, "nuclei_templates"),
-        os.path.join(tools_root, "templates"),
-        os.path.join(tools_root, "nuclei", "nuclei-templates"),
-        os.path.join(tools_root, "nuclei", "templates"),
+    tr = tools_dir()
+    user = os.environ.get("USERPROFILE", "")
+    local = os.environ.get("LOCALAPPDATA", "")
+    roaming = os.environ.get("APPDATA", "")
+
+    candidates = _expand_candidate_paths([
+        *env_candidates,
+        os.path.join(tr, "nuclei-templates"),
+        os.path.join(tr, "nuclei-templates", "nuclei-templates"),
+        os.path.join(tr, "nuclei_templates"),
+        os.path.join(tr, "templates"),
+        os.path.join(tr, "nuclei", "nuclei-templates"),
+        os.path.join(tr, "nuclei", "templates"),
         os.path.join(base_dir, "nuclei-templates"),
         os.path.join(base_dir, "templates"),
-    ]
+        os.path.join(user, "nuclei-templates"),
+        os.path.join(user, ".nuclei", "templates"),
+        os.path.join(local, "nuclei-templates"),
+        os.path.join(local, "nuclei-templates", "nuclei-templates"),
+        os.path.join(local, "nuclei", "templates"),
+        os.path.join(roaming, "nuclei-templates"),
+        os.path.join(roaming, "nuclei", "templates"),
+        os.path.join(local, "nuclei-templates", "nuclei-templates"),
+    ])
+
     for root in candidates:
         if not root or not os.path.isdir(root):
             continue
-        # Проверяем наличие подпапок с шаблонами (cves, http, network и т.д.)
         cves_dir = os.path.join(root, "cves")
         http_dir = os.path.join(root, "http")
         network_dir = os.path.join(root, "network")
         if os.path.isdir(cves_dir):
             return cves_dir
-        # Если есть другие папки с шаблонами, возвращаем корень
         if os.path.isdir(http_dir) or os.path.isdir(network_dir):
             return root
-        # Если это просто папка с yaml/yml файлами шаблонов
-        for f in os.listdir(root):
-            if f.endswith(('.yaml', '.yml')):
-                return root
+        try:
+            for f in os.listdir(root):
+                if f.endswith((".yaml", ".yml")):
+                    return root
+        except Exception:
+            continue
     return ""
+
+
+def _try_update_nuclei_templates(nuclei_path: str, install_dir: str, timeout_sec: int = 240) -> bool:
+    p = str(nuclei_path or "").strip()
+    if not p:
+        return False
+    install_dir = os.path.abspath(os.path.expandvars(os.path.expanduser(str(install_dir or "").strip())))
+    if not install_dir:
+        return False
+    try:
+        os.makedirs(install_dir, exist_ok=True)
+    except Exception:
+        return False
+
+    cmd = [p, "-v", "-ut", "-ud", install_dir]
+    try:
+        logger.info(f"[NUCLEI] Шаблоны не найдены. Пробуем установить/обновить nuclei-templates в: {install_dir}")
+        r = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=max(30, int(timeout_sec)),
+            cwd=os.path.dirname(os.path.abspath(p)) if os.path.isfile(p) else None,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        )
+        out = (r.stdout or "").strip()
+        err = (r.stderr or "").strip()
+        if out:
+            logger.debug(f"[NUCLEI] update stdout: {out[:4000]}")
+        if err:
+            logger.debug(f"[NUCLEI] update stderr: {err[:4000]}")
+
+        resolved_after = _resolve_nuclei_templates_dir()
+        if resolved_after:
+            logger.info(f"[NUCLEI] ✅ nuclei-templates доступны: {resolved_after}")
+            return True
+
+        if r.returncode != 0:
+            logger.warning(f"[NUCLEI] ❌ Не удалось обновить nuclei-templates (код {r.returncode})")
+        else:
+            logger.warning("[NUCLEI] ❌ Обновление завершилось, но шаблоны так и не появились (возможно нет доступа к сети)")
+        return False
+    except Exception as e:
+        logger.warning(f"[NUCLEI] ❌ Ошибка обновления nuclei-templates: {e}")
+        return False
 
 
 def _resolve_nmap_datadir(nmap_exe_path: str) -> str:
@@ -146,7 +217,7 @@ class NmapScanner:
     def _find_nmap(self) -> str:
         """Поиск исполняемого файла Nmap."""
         base_dir = bundle_resources_root()
-        tools_root = os.path.join(base_dir, "tools")
+        tools_root = tools_dir()
 
         possible_paths = [
             os.path.join(tools_root, "nmap.exe"),
@@ -160,9 +231,27 @@ class NmapScanner:
         
         for path in possible_paths:
             logger.debug(f"[NMAP] Проверка: {path}")
-            if os.path.exists(path):
+            if os.path.isfile(path):
                 logger.info(f"[NMAP] ✅ Найден по пути: {path}")
                 return path
+            if path in ("nmap", "nmap.exe"):
+                resolved = shutil.which(path) or ""
+                if resolved and os.path.isfile(resolved):
+                    logger.info(f"[NMAP] ✅ В PATH: {resolved}")
+                    return resolved
+                try:
+                    r = subprocess.run(
+                        [path, "--version"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                    )
+                    if r.returncode == 0:
+                        logger.info(f"[NMAP] ✅ В PATH: {path}")
+                        return path
+                except Exception:
+                    pass
         
         logger.warning(f"[NMAP] ❌ Исполняемый файл Nmap не найден. Проверенные пути: {possible_paths}")
         return "nmap"  # Fallback на PATH
@@ -315,7 +404,7 @@ class NucleiScanner:
     def _find_nuclei(self) -> str:
         """Поиск исполняемого файла Nuclei."""
         base_dir = bundle_resources_root()
-        tools_root = os.path.join(base_dir, "tools")
+        tools_root = tools_dir()
 
         possible_paths = [
             os.path.join(tools_root, "nuclei.exe"),
@@ -329,9 +418,27 @@ class NucleiScanner:
         
         for path in possible_paths:
             logger.debug(f"[NUCLEI] Проверка: {path}")
-            if os.path.exists(path):
+            if os.path.isfile(path):
                 logger.info(f"[NUCLEI] ✅ Найден по пути: {path}")
                 return path
+            if path in ("nuclei", "nuclei.exe"):
+                resolved = shutil.which(path) or ""
+                if resolved and os.path.isfile(resolved):
+                    logger.info(f"[NUCLEI] ✅ В PATH: {resolved}")
+                    return resolved
+                try:
+                    r = subprocess.run(
+                        [path, "-version"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                    )
+                    if r.returncode == 0:
+                        logger.info(f"[NUCLEI] ✅ В PATH: {path}")
+                        return path
+                except Exception:
+                    pass
         
         logger.warning(f"[NUCLEI] ❌ Исполняемый файл Nuclei не найден. Проверенные пути: {possible_paths}")
         return "nuclei"  # Fallback на PATH
@@ -357,8 +464,15 @@ class NucleiScanner:
         
         # Если шаблоны не найдены, пробуем использовать пути по умолчанию или пропускаем сканирование
         if not templates_dir:
-            logger.warning("[NUCLEI] Директория с шаблонами не найдена. Сканирование отменено.")
-            return vulnerabilities
+            install_dir = os.path.join(tools_dir(), "nuclei-templates")
+            if _try_update_nuclei_templates(self.nuclei_path, install_dir):
+                templates_dir = _resolve_nuclei_templates_dir()
+            if not templates_dir:
+                logger.warning(
+                    "[NUCLEI] Директория с шаблонами не найдена или пуста. Сканирование отменено. "
+                    "Укажите путь через BOS_NUCLEI_TEMPLATES_DIR или установите шаблоны в tools/nuclei-templates."
+                )
+                return vulnerabilities
         
         cmd = [
             self.nuclei_path,

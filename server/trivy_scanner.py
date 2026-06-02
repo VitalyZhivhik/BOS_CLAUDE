@@ -11,6 +11,7 @@ import json
 import re
 import subprocess
 import tempfile
+import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Dict, Optional, Any
@@ -18,7 +19,7 @@ from typing import List, Dict, Optional, Any
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from common.logger import get_server_logger
-from common.bundle_paths import application_base_dir, bundle_resources_root
+from common.bundle_paths import application_base_dir, bundle_resources_root, tools_dir
 
 logger = get_server_logger()
 
@@ -95,7 +96,7 @@ class TrivyScanner:
     def _find_trivy(self) -> str:
         """Поиск исполняемого файла Trivy."""
         base_dir = bundle_resources_root()
-        tools_root = os.path.join(base_dir, "tools")
+        tools_root = tools_dir()
 
         possible_paths = [
             os.path.join(tools_root, "trivy_0.69.3_windows-64bit", "trivy.exe"),
@@ -126,6 +127,10 @@ class TrivyScanner:
 
         for path in ("trivy.exe", "trivy"):
             logger.debug(f"[TRIVY] Проверка PATH: {path}")
+            resolved = shutil.which(path) or ""
+            if resolved and os.path.isfile(resolved):
+                logger.info(f"[TRIVY] ✅ В PATH: {resolved}")
+                return resolved
             try:
                 r = subprocess.run(
                     [path, "--version"],
@@ -144,6 +149,102 @@ class TrivyScanner:
             f"[TRIVY] ❌ Исполняемый файл Trivy не найден. Проверенные пути: {possible_paths}"
         )
         return ""
+
+    def _default_cache_dir(self) -> str:
+        env_keys = (
+            "BOS_TRIVY_CACHE_DIR",
+            "TRIVY_CACHE_DIR",
+        )
+        for k in env_keys:
+            v = str(os.environ.get(k, "") or "").strip()
+            if not v:
+                continue
+            p = os.path.abspath(os.path.expandvars(os.path.expanduser(v)))
+            return p
+
+        local = os.environ.get("LOCALAPPDATA", "")
+        default_local = os.path.join(local, "BOS_CLAUDE", "trivy_cache") if local else os.path.join(tempfile.gettempdir(), "BOS_CLAUDE", "trivy_cache")
+
+        bundled_candidates: list[str] = []
+        try:
+            bundled_candidates.append(os.path.join(tools_dir(), "trivy_cache"))
+        except Exception:
+            pass
+        try:
+            bundled_candidates.append(os.path.join(application_base_dir(), "tools", "trivy_cache"))
+        except Exception:
+            pass
+
+        for p in bundled_candidates:
+            if p and self._trivy_db_present(p):
+                return os.path.abspath(p)
+
+        if local:
+            return default_local
+        return default_local
+
+    def _is_writable_dir(self, path: str) -> bool:
+        p = os.path.abspath(os.path.expandvars(os.path.expanduser(str(path or "").strip())))
+        if not p:
+            return False
+        if os.path.isdir(p):
+            return os.access(p, os.W_OK)
+        parent = os.path.dirname(p)
+        return bool(parent) and os.path.isdir(parent) and os.access(parent, os.W_OK)
+
+    def _trivy_db_present(self, cache_dir: str) -> bool:
+        cd = os.path.abspath(os.path.expandvars(os.path.expanduser(str(cache_dir or "").strip())))
+        if not cd or not os.path.isdir(cd):
+            return False
+        db_dir = os.path.join(cd, "db")
+        if not os.path.isdir(db_dir):
+            return False
+        markers = [
+            os.path.join(db_dir, "metadata.json"),
+            os.path.join(db_dir, "trivy.db"),
+        ]
+        for p in markers:
+            if os.path.isfile(p):
+                return True
+        try:
+            for f in os.listdir(db_dir):
+                if f.lower().endswith(".db"):
+                    return True
+        except Exception:
+            return False
+        return False
+
+    def _download_db(self, cache_dir: str, trivy_home: str, env: dict, startupinfo) -> tuple[bool, list[str]]:
+        cmd = [
+            self.trivy_path,
+            "fs",
+            "--download-db-only",
+            "--cache-dir",
+            cache_dir,
+        ]
+        output_lines: list[str] = []
+        try:
+            p = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True,
+                startupinfo=startupinfo,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                cwd=trivy_home or None,
+                env=env,
+            )
+            for raw in p.stdout:
+                line = (raw or "").strip()
+                if line:
+                    output_lines.append(line)
+            p.wait()
+        except Exception as e:
+            output_lines.append(f"download error: {e}")
+        ok = self._trivy_db_present(cache_dir)
+        return ok, output_lines
 
     def is_available(self) -> bool:
         """Проверяет, доступен ли Trivy."""
@@ -231,8 +332,67 @@ class TrivyScanner:
 
             cache_dir = scan_options.get("cache_dir", "")
             if not isinstance(cache_dir, str) or not cache_dir.strip():
-                cache_dir = os.path.join(tempfile.gettempdir(), "trivy_cache")
+                cache_dir = self._default_cache_dir()
             cache_dir = os.path.abspath(cache_dir)
+            try:
+                os.makedirs(cache_dir, exist_ok=True)
+            except Exception:
+                cache_dir = os.path.abspath(os.path.join(tempfile.gettempdir(), "BOS_CLAUDE", "trivy_cache"))
+                os.makedirs(cache_dir, exist_ok=True)
+
+            skip_db_update = scan_options.get("skip_db_update", None)
+            if skip_db_update is None:
+                v = str(os.environ.get("BOS_TRIVY_SKIP_DB_UPDATE", "") or "").strip().lower()
+                skip_db_update = v in ("1", "true", "yes", "on")
+
+            trivy_home = (
+                os.path.dirname(os.path.abspath(self.trivy_path))
+                if self.trivy_path and os.path.isfile(self.trivy_path)
+                else ""
+            )
+            env = os.environ.copy()
+            if trivy_home:
+                env["PATH"] = trivy_home + os.pathsep + env.get("PATH", "")
+
+            startupinfo = None
+            if os.name == "nt":
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+            if self._trivy_db_present(cache_dir) and not self._is_writable_dir(cache_dir):
+                seeded_from = cache_dir
+                cache_dir = os.path.abspath(self._default_cache_dir())
+                try:
+                    os.makedirs(cache_dir, exist_ok=True)
+                    shutil.copytree(
+                        os.path.join(seeded_from, "db"),
+                        os.path.join(cache_dir, "db"),
+                        dirs_exist_ok=True,
+                    )
+                except Exception:
+                    cache_dir = seeded_from
+
+            if not self._trivy_db_present(cache_dir):
+                if skip_db_update:
+                    result.error = (
+                        "TRIVY_DB_MISSING: база Trivy отсутствует в кэше. "
+                        f"Путь кэша: {cache_dir}. "
+                        "Скачайте базу на ПК с интернетом (trivy fs --download-db-only --cache-dir <dir>) "
+                        "и перенесите папку кэша на этот компьютер."
+                    )
+                    self.last_result = result
+                    return result
+                self.progress_callback(12, "Trivy скачивает базу уязвимостей...")
+                ok, dl_lines = self._download_db(cache_dir, trivy_home, env, startupinfo)
+                if not ok:
+                    tail = " | ".join(dl_lines[-3:]) if dl_lines else "нет вывода"
+                    result.error = (
+                        "TRIVY_DB_MISSING: не удалось скачать базу Trivy. "
+                        f"Путь кэша: {cache_dir}. "
+                        f"Детали: {tail}"
+                    )
+                    self.last_result = result
+                    return result
 
             cmd = [
                 self.trivy_path,
@@ -246,7 +406,11 @@ class TrivyScanner:
                 "--parallel", str(scan_threads),
                 "--cache-dir", cache_dir,
                 "--pkg-types", "os,library",
+                "--offline-scan",
             ]
+
+            if skip_db_update:
+                cmd.append("--skip-db-update")
 
             logger.info(f"  Цель сканирования: {target_path}")
             logger.info(f"  Cache dir: {cache_dir}")
@@ -254,20 +418,6 @@ class TrivyScanner:
             self.progress_callback(15, "Trivy анализирует установленное ПО...")
 
             # Запускаем процесс
-            startupinfo = None
-            if os.name == 'nt':
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-
-            trivy_home = (
-                os.path.dirname(os.path.abspath(self.trivy_path))
-                if self.trivy_path and os.path.isfile(self.trivy_path)
-                else ""
-            )
-            env = os.environ.copy()
-            if trivy_home:
-                env["PATH"] = trivy_home + os.pathsep + env.get("PATH", "")
-
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,

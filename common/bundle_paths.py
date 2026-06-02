@@ -42,4 +42,27 @@ def application_base_dir() -> str:
 
 
 def tools_dir() -> str:
-    return os.path.join(bundle_resources_root(), "tools")
+    env_keys = (
+        "BOS_TOOLS_DIR",
+        "BOS_SCANNERS_DIR",
+        "TOOLS_DIR",
+    )
+    for k in env_keys:
+        v = str(os.environ.get(k, "") or "").strip()
+        if not v:
+            continue
+        p = os.path.abspath(os.path.expandvars(os.path.expanduser(v)))
+        if os.path.isdir(p):
+            return p
+
+    base = bundle_resources_root()
+    bundled = os.path.join(base, "tools")
+    if os.path.isdir(bundled):
+        return bundled
+
+    app = application_base_dir()
+    near_app = os.path.join(app, "tools")
+    if os.path.isdir(near_app):
+        return near_app
+
+    return bundled
