@@ -400,14 +400,85 @@ class TrivyScanner:
                 target_path,
                 "--format", "json",
                 "--output", output_path,
-                "--scanners", "vuln",
+                "--scanners",
                 "--exit-code", "0",
                 "--timeout", f"{timeout_minutes}m",
                 "--parallel", str(scan_threads),
                 "--cache-dir", cache_dir,
                 "--pkg-types", "os,library",
-                "--offline-scan",
             ]
+
+            scanners_opt = scan_options.get("scanners", None)
+            scanners: list[str] = []
+            if isinstance(scanners_opt, str):
+                scanners = [s.strip().lower() for s in scanners_opt.split(",") if s.strip()]
+            elif isinstance(scanners_opt, (list, tuple, set)):
+                scanners = [str(s).strip().lower() for s in scanners_opt if str(s).strip()]
+            if not scanners:
+                scanners = ["vuln"]
+            allowed_scanners = {"vuln", "misconfig", "secret", "license"}
+            scanners = [s for s in scanners if s in allowed_scanners]
+            if not scanners:
+                scanners = ["vuln"]
+            cmd[cmd.index("--scanners") + 1:cmd.index("--scanners") + 1] = [",".join(dict.fromkeys(scanners))]
+
+            severities_opt = scan_options.get("severities", None)
+            severities: list[str] = []
+            if isinstance(severities_opt, str):
+                severities = [s.strip().upper() for s in severities_opt.split(",") if s.strip()]
+            elif isinstance(severities_opt, (list, tuple, set)):
+                severities = [str(s).strip().upper() for s in severities_opt if str(s).strip()]
+            if severities:
+                allowed_sev = {"UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"}
+                severities = [s for s in severities if s in allowed_sev]
+            if severities:
+                cmd.extend(["--severity", ",".join(dict.fromkeys(severities))])
+
+            offline_scan = scan_options.get("offline_scan", None)
+            if offline_scan is None:
+                v = str(os.environ.get("BOS_TRIVY_OFFLINE_SCAN", "") or "").strip().lower()
+                offline_scan = v in ("1", "true", "yes", "on")
+            if offline_scan:
+                cmd.append("--offline-scan")
+
+            if "secret" in scanners:
+                skip_dirs: list[str] = []
+                tp = os.path.abspath(target_path)
+                if os.name == "nt" and len(tp) == 3 and tp[1:] == ":\\":  # C:\
+                    skip_dirs.extend([
+                        os.path.join(tp, "$Recycle.Bin"),
+                        os.path.join(tp, "System Volume Information"),
+                        os.path.join(tp, "Windows"),
+                        os.path.join(tp, "Program Files"),
+                        os.path.join(tp, "Program Files (x86)"),
+                        os.path.join(tp, "ProgramData"),
+                    ])
+                extra_skip_dirs = scan_options.get("skip_dirs", None)
+                if isinstance(extra_skip_dirs, str) and extra_skip_dirs.strip():
+                    skip_dirs.extend([s.strip() for s in extra_skip_dirs.split(",") if s.strip()])
+                elif isinstance(extra_skip_dirs, (list, tuple, set)):
+                    skip_dirs.extend([str(s).strip() for s in extra_skip_dirs if str(s).strip()])
+                for d in dict.fromkeys(skip_dirs):
+                    cmd.extend(["--skip-dirs", d])
+
+                skip_files: list[str] = [
+                    "*.exe",
+                    "*.dll",
+                    "*.sys",
+                    "*.msi",
+                    "*.cab",
+                    "*.zip",
+                    "*.7z",
+                    "*.rar",
+                    "*.iso",
+                ]
+                extra_skip_files = scan_options.get("skip_files", None)
+                if isinstance(extra_skip_files, str) and extra_skip_files.strip():
+                    skip_files.extend([s.strip() for s in extra_skip_files.split(",") if s.strip()])
+                elif isinstance(extra_skip_files, (list, tuple, set)):
+                    skip_files.extend([str(s).strip() for s in extra_skip_files if str(s).strip()])
+                for f in dict.fromkeys(skip_files):
+                    cmd.extend(["--skip-files", f])
 
             if skip_db_update:
                 cmd.append("--skip-db-update")
@@ -655,9 +726,10 @@ class TrivyScanner:
                 vulnerabilities_list = res.get("Vulnerabilities", [])
 
                 if not vulnerabilities_list:
-                    continue
+                    vulnerabilities_list = []
 
-                logger.debug(f"[TRIVY-PARSE] Цель: {target}, уязвимостей: {len(vulnerabilities_list)}")
+                if vulnerabilities_list:
+                    logger.debug(f"[TRIVY-PARSE] Цель: {target}, уязвимостей: {len(vulnerabilities_list)}")
 
                 for vuln in vulnerabilities_list:
                     trivy_vuln = TrivyVulnerability(
@@ -676,6 +748,65 @@ class TrivyScanner:
                     )
 
                     vulnerabilities.append(trivy_vuln)
+
+                misconfigs = res.get("Misconfigurations", [])
+                if isinstance(misconfigs, list) and misconfigs:
+                    for mc in misconfigs:
+                        if not isinstance(mc, dict):
+                            continue
+                        sev = str(mc.get("Severity", "") or "UNKNOWN").upper().strip() or "UNKNOWN"
+                        vid = str(mc.get("ID", "") or mc.get("AVDID", "") or mc.get("Type", "") or "MISCONFIG").strip()
+                        title = str(mc.get("Title", "") or vid).strip()
+                        msg = str(mc.get("Message", "") or mc.get("Description", "") or "").strip()
+                        pkg = str(target or mc.get("Target", "") or "misconfig").strip()
+                        vulnerabilities.append(
+                            TrivyVulnerability(
+                                vuln_id=f"MISCONFIG:{vid}",
+                                pkg_name=pkg,
+                                installed_version="",
+                                fixed_version="",
+                                severity=sev,
+                                title=title,
+                                description=msg,
+                                references=[str(mc.get("PrimaryURL", "") or "").strip()] if mc.get("PrimaryURL") else [],
+                                cwe_ids=[],
+                                capec_ids=[],
+                                vendor_severity="",
+                                status=str(mc.get("Status", "") or "").strip(),
+                            )
+                        )
+
+                secrets = res.get("Secrets", [])
+                if isinstance(secrets, list) and secrets:
+                    for s in secrets:
+                        if not isinstance(s, dict):
+                            continue
+                        sev = str(s.get("Severity", "") or "UNKNOWN").upper().strip() or "UNKNOWN"
+                        rid = str(s.get("RuleID", "") or s.get("ID", "") or "SECRET").strip()
+                        title = str(s.get("Title", "") or rid).strip()
+                        match = str(s.get("Match", "") or s.get("Message", "") or "").strip()
+                        pkg = str(target or s.get("Target", "") or "secret").strip()
+                        start = s.get("StartLine", None)
+                        end = s.get("EndLine", None)
+                        loc = ""
+                        if isinstance(start, int) and isinstance(end, int) and start > 0 and end >= start:
+                            loc = f" (lines {start}-{end})"
+                        vulnerabilities.append(
+                            TrivyVulnerability(
+                                vuln_id=f"SECRET:{rid}",
+                                pkg_name=pkg,
+                                installed_version="",
+                                fixed_version="",
+                                severity=sev,
+                                title=title,
+                                description=(match + loc).strip(),
+                                references=[],
+                                cwe_ids=[],
+                                capec_ids=[],
+                                vendor_severity="",
+                                status="",
+                            )
+                        )
 
             result.vulnerabilities = vulnerabilities
             result.total_vulns = len(vulnerabilities)

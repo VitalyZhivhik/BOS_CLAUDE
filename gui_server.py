@@ -70,8 +70,8 @@ TRIVY_SCAN_PROFILES = {
     },
     "Balanced": {
         "timeout_minutes": 15,
-        "severities": ["MEDIUM", "HIGH", "CRITICAL"],
-        "scanners": ["vuln"],
+        "severities": ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+        "scanners": ["vuln", "secret"],
         "threads": 5,
         "security_checks": False,
     },
