@@ -325,9 +325,22 @@ class TrivyScanner:
             self.progress_callback(10, "Запуск анализа ПО через Trivy...")
             logger.info(f"  Вывод результатов в: {output_path}")
 
-            target_path = scan_options.get("target_path", "")
-            if not isinstance(target_path, str) or not target_path.strip():
-                target_path = r"C:\\"
+            target_opt = scan_options.get("target_path", "")
+            target_provided = isinstance(target_opt, str) and bool(target_opt.strip())
+            if target_provided:
+                target_path = target_opt
+            else:
+                try:
+                    target_path = application_base_dir()
+                except Exception:
+                    target_path = ""
+                if not target_path:
+                    try:
+                        target_path = bundle_resources_root()
+                    except Exception:
+                        target_path = ""
+                if not target_path:
+                    target_path = os.getcwd()
             target_path = os.path.abspath(target_path)
 
             cache_dir = scan_options.get("cache_dir", "")
@@ -341,9 +354,6 @@ class TrivyScanner:
                 os.makedirs(cache_dir, exist_ok=True)
 
             skip_db_update = scan_options.get("skip_db_update", None)
-            if skip_db_update is None:
-                v = str(os.environ.get("BOS_TRIVY_SKIP_DB_UPDATE", "") or "").strip().lower()
-                skip_db_update = v in ("1", "true", "yes", "on")
 
             trivy_home = (
                 os.path.dirname(os.path.abspath(self.trivy_path))
@@ -371,6 +381,15 @@ class TrivyScanner:
                     )
                 except Exception:
                     cache_dir = seeded_from
+
+            if skip_db_update is None:
+                v = str(os.environ.get("BOS_TRIVY_SKIP_DB_UPDATE", "") or "").strip().lower()
+                if v in ("1", "true", "yes", "on"):
+                    skip_db_update = True
+            if skip_db_update is None and self._trivy_db_present(cache_dir):
+                skip_db_update = True
+            if skip_db_update is None:
+                skip_db_update = False
 
             if not self._trivy_db_present(cache_dir):
                 if skip_db_update:
@@ -453,6 +472,35 @@ class TrivyScanner:
                         os.path.join(tp, "Program Files (x86)"),
                         os.path.join(tp, "ProgramData"),
                     ])
+                else:
+                    root = ""
+                    try:
+                        root = os.path.abspath(application_base_dir())
+                    except Exception:
+                        root = ""
+                    if root:
+                        root_prefix = root.lower().rstrip("\\/") + "\\"
+                        tp_l = tp.lower().rstrip("\\/") + "\\"
+                        if tp_l.startswith(root_prefix) or root_prefix.startswith(tp_l):
+                            skip_dirs.extend(
+                                [
+                                    os.path.join(root, ".venv"),
+                                    os.path.join(root, ".git"),
+                                    os.path.join(root, "__pycache__"),
+                                    os.path.join(root, ".pytest_cache"),
+                                    os.path.join(root, "dist"),
+                                    os.path.join(root, "dist_attacker"),
+                                    os.path.join(root, "dist_server"),
+                                    os.path.join(root, "dist_gui"),
+                                    os.path.join(root, "build"),
+                                    os.path.join(root, "node_modules"),
+                                    os.path.join(root, "tools"),
+                                    os.path.join(root, "logs"),
+                                    os.path.join(root, "data"),
+                                    os.path.join(root, "databases"),
+                                    os.path.join(root, "MITRE_PARSER", "output"),
+                                ]
+                            )
                 extra_skip_dirs = scan_options.get("skip_dirs", None)
                 if isinstance(extra_skip_dirs, str) and extra_skip_dirs.strip():
                     skip_dirs.extend([s.strip() for s in extra_skip_dirs.split(",") if s.strip()])
@@ -471,7 +519,36 @@ class TrivyScanner:
                     "*.7z",
                     "*.rar",
                     "*.iso",
+                    "*.pyc",
+                    "*.pyo",
+                    "*.pyd",
+                    "DumpStack.log*",
                 ]
+                if os.name == "nt" and len(tp) == 3 and tp[1:] == ":\\":  # C:\
+                    skip_files.extend(
+                        [
+                            os.path.join(tp, "DumpStack.log*"),
+                            os.path.join(tp, "DumpStack.log.tmp"),
+                            os.path.join(tp, "DumpStack.log"),
+                            os.path.join(tp, "pagefile.sys"),
+                            os.path.join(tp, "swapfile.sys"),
+                            os.path.join(tp, "hiberfil.sys"),
+                            os.path.join(tp, "MEMORY.DMP"),
+                        ]
+                    )
+                    skip_files.extend(
+                        [
+                            "C:/DumpStack.log*",
+                            "**/DumpStack.log*",
+                            "**\\DumpStack.log*",
+                            "*/DumpStack.log*",
+                            "*\\DumpStack.log*",
+                            "pagefile.sys",
+                            "swapfile.sys",
+                            "hiberfil.sys",
+                            "MEMORY.DMP",
+                        ]
+                    )
                 extra_skip_files = scan_options.get("skip_files", None)
                 if isinstance(extra_skip_files, str) and extra_skip_files.strip():
                     skip_files.extend([s.strip() for s in extra_skip_files.split(",") if s.strip()])
@@ -541,17 +618,28 @@ class TrivyScanner:
             # Если результат не сформирован (часто из-за заблокированных файлов на Windows),
             # повторяем скан с динамическим исключением проблемного файла.
             if (return_code != 0) and (not (os.path.exists(output_path) and os.path.getsize(output_path) > 0)):
-                excluded_files: list[str] = []
+                if output_lines:
+                    logger.warning(
+                        f"[TRIVY] Ошибка выполнения Trivy (код={return_code}). Последние строки: {' | '.join(output_lines[-10:])}"
+                    )
+                excluded_patterns: list[str] = []
                 max_attempts = 5
                 for attempt in range(1, max_attempts + 1):
                     locked_file = self._extract_locked_file_path(output_lines)
-                    if not locked_file or locked_file in excluded_files:
+                    if not locked_file:
                         break
-                    excluded_files.append(locked_file)
+                    new_patterns = self._locked_file_skip_patterns(target_path, locked_file)
+                    added = False
+                    for p in new_patterns:
+                        if p not in excluded_patterns:
+                            excluded_patterns.append(p)
+                            added = True
+                    if not added:
+                        break
                     logger.warning(f"[TRIVY] Обнаружен заблокированный файл: {locked_file}. Повторяем скан с исключением. (попытка {attempt}/{max_attempts})")
 
                     retry_cmd = list(cmd)
-                    for excluded in excluded_files:
+                    for excluded in excluded_patterns:
                         retry_cmd.extend(["--skip-files", excluded])
 
                     process = subprocess.Popen(
@@ -686,13 +774,52 @@ class TrivyScanner:
 
         return "Trivy не сформировал JSON-отчёт (пустой вывод процесса)"
 
+    def _locked_file_skip_patterns(self, target_path: str, locked_path: str) -> List[str]:
+        locked_path = (locked_path or "").strip().strip('"').strip()
+        if not locked_path:
+            return []
+        patterns: list[str] = []
+        patterns.append(os.path.basename(locked_path))
+        try:
+            locked_abs = os.path.abspath(locked_path)
+            patterns.append(locked_abs)
+            patterns.append(locked_abs.replace("\\", "/"))
+        except Exception:
+            pass
+        try:
+            target_abs = os.path.abspath(target_path)
+            locked_abs = os.path.abspath(locked_path)
+            if os.name == "nt":
+                prefix = target_abs.lower().rstrip("\\/") + "\\"
+                if locked_abs.lower().startswith(prefix):
+                    rel = os.path.relpath(locked_abs, target_abs)
+                    rel = rel.replace("\\", "/")
+                    patterns.append(rel)
+        except Exception:
+            pass
+        seen = set()
+        out: list[str] = []
+        for p in patterns:
+            p = (p or "").strip()
+            if not p or p in seen:
+                continue
+            seen.add(p)
+            out.append(p)
+        return out
+
     def _extract_locked_file_path(self, output_lines: List[str]) -> str:
         """Возвращает путь к файлу, который Trivy не смог открыть (если есть)."""
         patterns = [
             r"unable to open\s+([A-Za-z]:\\.+)$",
+            r"unable to open\s+([A-Za-z]:/.+)$",
             r"file_path=\"([A-Za-z]:\\[^\"]+)\"",
+            r"file_path=\"([A-Za-z]:/[^\"]+)\"",
             r"open\s+([A-Za-z]:\\.+?)(?::\s+|$)",
+            r"open\s+([A-Za-z]:/.+?)(?::\s+|$)",
             r"cannot access the file\s+\"([A-Za-z]:\\.+?)\"",
+            r"cannot access the file\s+\"([A-Za-z]:/.+?)\"",
+            r"unknown error with\s+([A-Za-z]:\\.+?)(?::\s+|$)",
+            r"unknown error with\s+([A-Za-z]:/.+?)(?::\s+|$)",
         ]
         for line in reversed(output_lines):
             low = line.lower()
@@ -701,6 +828,9 @@ class TrivyScanner:
                 and "unable to open" not in low
                 and "access is denied" not in low
                 and "permission denied" not in low
+                and "used by another process" not in low
+                and "unknown error with" not in low
+                and "walk dir error" not in low
             ):
                 continue
             for pattern in patterns:
