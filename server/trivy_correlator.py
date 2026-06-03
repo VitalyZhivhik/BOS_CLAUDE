@@ -138,6 +138,9 @@ class TrivyCorrelator:
         
         # Коррелируем каждую уязвимость Trivy с атаками
         for trivy_vuln in trivy_result.vulnerabilities:
+            vuln_id = trivy_vuln.vuln_id or ""
+            if not (vuln_id.startswith("CVE-") or vuln_id.startswith("BDU-")):
+                continue
             self._correlate_trivy_vulnerability(
                 trivy_vuln, 
                 attacker_vectors, 

@@ -110,26 +110,26 @@ class TrivyScanner:
         for path in possible_paths:
             logger.debug(f"[TRIVY] Проверка: {path}")
             if os.path.isfile(path):
-                logger.info(f"[TRIVY] ✅ Найден по пути: {path}")
+                logger.info(f"[TRIVY] Найден по пути: {path}")
                 return path
 
         if os.path.isdir(tools_root):
             for path in sorted(glob.glob(os.path.join(tools_root, "**", "trivy.exe"), recursive=True)):
                 if os.path.isfile(path):
-                    logger.info(f"[TRIVY] ✅ Найден (glob): {path}")
+                    logger.info(f"[TRIVY] Найден (glob): {path}")
                     return path
 
         for path in self._windows_trivy_candidates():
             logger.debug(f"[TRIVY] Проверка (Windows): {path}")
             if os.path.isfile(path):
-                logger.info(f"[TRIVY] ✅ Найден (Windows): {path}")
+                logger.info(f"[TRIVY] Найден (Windows): {path}")
                 return path
 
         for path in ("trivy.exe", "trivy"):
             logger.debug(f"[TRIVY] Проверка PATH: {path}")
             resolved = shutil.which(path) or ""
             if resolved and os.path.isfile(resolved):
-                logger.info(f"[TRIVY] ✅ В PATH: {resolved}")
+                logger.info(f"[TRIVY] Найден в PATH: {resolved}")
                 return resolved
             try:
                 r = subprocess.run(
@@ -140,7 +140,7 @@ class TrivyScanner:
                     creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
                 )
                 if r.returncode == 0:
-                    logger.info(f"[TRIVY] ✅ В PATH: {path}")
+                    logger.info(f"[TRIVY] Найден в PATH: {path}")
                     return path
             except Exception:
                 continue
@@ -769,8 +769,11 @@ class TrivyScanner:
             else:
                 result.error = self._extract_failure_reason(last_output_lines, last_return_code)
 
+            augment_when_below = int(scan_options.get("augment_when_below", 20) or 20)
+            if augment_when_below < 0:
+                augment_when_below = 0
             if (
-                result.total_vulns == 0
+                result.total_vulns < augment_when_below
                 and not result.error
                 and bool(scan_options.get("augment_from_local_db", True))
             ):
