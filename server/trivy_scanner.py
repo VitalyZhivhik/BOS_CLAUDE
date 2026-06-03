@@ -318,12 +318,7 @@ class TrivyScanner:
         logger.info(f"  Режим: Анализ ПО (без поиска уязвимостей)")
 
         try:
-            # Создаём временный файл для JSON-вывода
-            fd, output_path = tempfile.mkstemp(suffix=".json")
-            os.close(fd)
-
             self.progress_callback(10, "Запуск анализа ПО через Trivy...")
-            logger.info(f"  Вывод результатов в: {output_path}")
 
             target_opt = scan_options.get("target_path", "")
             target_provided = isinstance(target_opt, str) and bool(target_opt.strip())
@@ -413,33 +408,18 @@ class TrivyScanner:
                     self.last_result = result
                     return result
 
-            cmd = [
-                self.trivy_path,
-                "fs",  # Filesystem scan
-                target_path,
-                "--format", "json",
-                "--output", output_path,
-                "--scanners",
-                "--exit-code", "0",
-                "--timeout", f"{timeout_minutes}m",
-                "--parallel", str(scan_threads),
-                "--cache-dir", cache_dir,
-                "--pkg-types", "os,library",
-            ]
-
             scanners_opt = scan_options.get("scanners", None)
-            scanners: list[str] = []
+            scanners_requested: list[str] = []
             if isinstance(scanners_opt, str):
-                scanners = [s.strip().lower() for s in scanners_opt.split(",") if s.strip()]
+                scanners_requested = [s.strip().lower() for s in scanners_opt.split(",") if s.strip()]
             elif isinstance(scanners_opt, (list, tuple, set)):
-                scanners = [str(s).strip().lower() for s in scanners_opt if str(s).strip()]
-            if not scanners:
-                scanners = ["vuln"]
+                scanners_requested = [str(s).strip().lower() for s in scanners_opt if str(s).strip()]
+            if not scanners_requested:
+                scanners_requested = ["vuln"]
             allowed_scanners = {"vuln", "misconfig", "secret", "license"}
-            scanners = [s for s in scanners if s in allowed_scanners]
-            if not scanners:
-                scanners = ["vuln"]
-            cmd[cmd.index("--scanners") + 1:cmd.index("--scanners") + 1] = [",".join(dict.fromkeys(scanners))]
+            scanners_requested = [s for s in scanners_requested if s in allowed_scanners]
+            if not scanners_requested:
+                scanners_requested = ["vuln"]
 
             severities_opt = scan_options.get("severities", None)
             severities: list[str] = []
@@ -450,64 +430,105 @@ class TrivyScanner:
             if severities:
                 allowed_sev = {"UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"}
                 severities = [s for s in severities if s in allowed_sev]
-            if severities:
-                cmd.extend(["--severity", ",".join(dict.fromkeys(severities))])
+            severities_arg = ",".join(dict.fromkeys(severities)) if severities else ""
 
             offline_scan = scan_options.get("offline_scan", None)
             if offline_scan is None:
                 v = str(os.environ.get("BOS_TRIVY_OFFLINE_SCAN", "") or "").strip().lower()
                 offline_scan = v in ("1", "true", "yes", "on")
-            if offline_scan:
-                cmd.append("--offline-scan")
+            scan_plan: list[list[str]] = [list(dict.fromkeys(scanners_requested))]
+            if "vuln" in scanners_requested and "secret" in scanners_requested:
+                first = [s for s in scanners_requested if s != "secret"]
+                if not first:
+                    first = ["vuln"]
+                scan_plan = [list(dict.fromkeys(first)), ["secret"]]
 
-            if "secret" in scanners:
-                skip_dirs: list[str] = []
-                tp = os.path.abspath(target_path)
-                if os.name == "nt" and len(tp) == 3 and tp[1:] == ":\\":  # C:\
-                    skip_dirs.extend([
-                        os.path.join(tp, "$Recycle.Bin"),
-                        os.path.join(tp, "System Volume Information"),
-                        os.path.join(tp, "Windows"),
-                        os.path.join(tp, "Program Files"),
-                        os.path.join(tp, "Program Files (x86)"),
-                        os.path.join(tp, "ProgramData"),
-                    ])
-                else:
-                    root = ""
-                    try:
-                        root = os.path.abspath(application_base_dir())
-                    except Exception:
+            raw_outputs: list[str] = []
+            all_vulns: list[TrivyVulnerability] = []
+            last_output_lines: list[str] = []
+            last_return_code: int = 0
+
+            for scanners in scan_plan:
+                fd, output_path = tempfile.mkstemp(suffix=".json")
+                os.close(fd)
+                logger.info(f"  Вывод результатов в: {output_path}")
+
+                cmd = [
+                    self.trivy_path,
+                    "fs",
+                    target_path,
+                    "--format",
+                    "json",
+                    "--output",
+                    output_path,
+                    "--scanners",
+                    ",".join(dict.fromkeys(scanners)),
+                    "--exit-code",
+                    "0",
+                    "--timeout",
+                    f"{timeout_minutes}m",
+                    "--parallel",
+                    str(scan_threads),
+                    "--cache-dir",
+                    cache_dir,
+                    "--pkg-types",
+                    "os,library",
+                ]
+                if severities_arg:
+                    cmd.extend(["--severity", severities_arg])
+                if offline_scan:
+                    cmd.append("--offline-scan")
+
+                if "secret" in scanners:
+                    skip_dirs: list[str] = []
+                    tp = os.path.abspath(target_path)
+                    if os.name == "nt" and len(tp) == 3 and tp[1:] == ":\\":  # C:\
+                        skip_dirs.extend(
+                            [
+                                os.path.join(tp, "$Recycle.Bin"),
+                                os.path.join(tp, "System Volume Information"),
+                                os.path.join(tp, "Windows"),
+                                os.path.join(tp, "Program Files"),
+                                os.path.join(tp, "Program Files (x86)"),
+                                os.path.join(tp, "ProgramData"),
+                            ]
+                        )
+                    else:
                         root = ""
-                    if root:
-                        root_prefix = root.lower().rstrip("\\/") + "\\"
-                        tp_l = tp.lower().rstrip("\\/") + "\\"
-                        if tp_l.startswith(root_prefix) or root_prefix.startswith(tp_l):
-                            skip_dirs.extend(
-                                [
-                                    os.path.join(root, ".venv"),
-                                    os.path.join(root, ".git"),
-                                    os.path.join(root, "__pycache__"),
-                                    os.path.join(root, ".pytest_cache"),
-                                    os.path.join(root, "dist"),
-                                    os.path.join(root, "dist_attacker"),
-                                    os.path.join(root, "dist_server"),
-                                    os.path.join(root, "dist_gui"),
-                                    os.path.join(root, "build"),
-                                    os.path.join(root, "node_modules"),
-                                    os.path.join(root, "tools"),
-                                    os.path.join(root, "logs"),
-                                    os.path.join(root, "data"),
-                                    os.path.join(root, "databases"),
-                                    os.path.join(root, "MITRE_PARSER", "output"),
-                                ]
-                            )
-                extra_skip_dirs = scan_options.get("skip_dirs", None)
-                if isinstance(extra_skip_dirs, str) and extra_skip_dirs.strip():
-                    skip_dirs.extend([s.strip() for s in extra_skip_dirs.split(",") if s.strip()])
-                elif isinstance(extra_skip_dirs, (list, tuple, set)):
-                    skip_dirs.extend([str(s).strip() for s in extra_skip_dirs if str(s).strip()])
-                for d in dict.fromkeys(skip_dirs):
-                    cmd.extend(["--skip-dirs", d])
+                        try:
+                            root = os.path.abspath(application_base_dir())
+                        except Exception:
+                            root = ""
+                        if root:
+                            root_prefix = root.lower().rstrip("\\/") + "\\"
+                            tp_l = tp.lower().rstrip("\\/") + "\\"
+                            if tp_l.startswith(root_prefix) or root_prefix.startswith(tp_l):
+                                skip_dirs.extend(
+                                    [
+                                        os.path.join(root, ".venv"),
+                                        os.path.join(root, ".git"),
+                                        os.path.join(root, "__pycache__"),
+                                        os.path.join(root, ".pytest_cache"),
+                                        os.path.join(root, "dist"),
+                                        os.path.join(root, "dist_attacker"),
+                                        os.path.join(root, "dist_server"),
+                                        os.path.join(root, "dist_gui"),
+                                        os.path.join(root, "build"),
+                                        os.path.join(root, "node_modules"),
+                                        os.path.join(root, "tools"),
+                                        os.path.join(root, "logs"),
+                                        os.path.join(root, "data"),
+                                        os.path.join(root, "databases"),
+                                        os.path.join(root, "MITRE_PARSER", "output"),
+                                    ]
+                                )
+                    extra_skip_dirs = scan_options.get("skip_dirs", None)
+                    if isinstance(extra_skip_dirs, str) and extra_skip_dirs.strip():
+                        skip_dirs.extend([s.strip() for s in extra_skip_dirs.split(",") if s.strip()])
+                    elif isinstance(extra_skip_dirs, (list, tuple, set)):
+                        skip_dirs.extend([str(s).strip() for s in extra_skip_dirs if str(s).strip()])
+                    for d in dict.fromkeys(skip_dirs):
+                        cmd.extend(["--skip-dirs", d])
 
                 skip_files: list[str] = [
                     "*.exe",
@@ -519,36 +540,36 @@ class TrivyScanner:
                     "*.7z",
                     "*.rar",
                     "*.iso",
-                    "*.pyc",
-                    "*.pyo",
-                    "*.pyd",
                     "DumpStack.log*",
                 ]
-                if os.name == "nt" and len(tp) == 3 and tp[1:] == ":\\":  # C:\
-                    skip_files.extend(
-                        [
-                            os.path.join(tp, "DumpStack.log*"),
-                            os.path.join(tp, "DumpStack.log.tmp"),
-                            os.path.join(tp, "DumpStack.log"),
-                            os.path.join(tp, "pagefile.sys"),
-                            os.path.join(tp, "swapfile.sys"),
-                            os.path.join(tp, "hiberfil.sys"),
-                            os.path.join(tp, "MEMORY.DMP"),
-                        ]
-                    )
-                    skip_files.extend(
-                        [
-                            "C:/DumpStack.log*",
-                            "**/DumpStack.log*",
-                            "**\\DumpStack.log*",
-                            "*/DumpStack.log*",
-                            "*\\DumpStack.log*",
-                            "pagefile.sys",
-                            "swapfile.sys",
-                            "hiberfil.sys",
-                            "MEMORY.DMP",
-                        ]
-                    )
+                if "secret" in scanners:
+                    skip_files.extend(["*.pyc", "*.pyo", "*.pyd"])
+                    tp = os.path.abspath(target_path)
+                    if os.name == "nt" and len(tp) == 3 and tp[1:] == ":\\":  # C:\
+                        skip_files.extend(
+                            [
+                                os.path.join(tp, "DumpStack.log*"),
+                                os.path.join(tp, "DumpStack.log.tmp"),
+                                os.path.join(tp, "DumpStack.log"),
+                                os.path.join(tp, "pagefile.sys"),
+                                os.path.join(tp, "swapfile.sys"),
+                                os.path.join(tp, "hiberfil.sys"),
+                                os.path.join(tp, "MEMORY.DMP"),
+                            ]
+                        )
+                        skip_files.extend(
+                            [
+                                "C:/DumpStack.log*",
+                                "**/DumpStack.log*",
+                                "**\\DumpStack.log*",
+                                "*/DumpStack.log*",
+                                "*\\DumpStack.log*",
+                                "pagefile.sys",
+                                "swapfile.sys",
+                                "hiberfil.sys",
+                                "MEMORY.DMP",
+                            ]
+                        )
                 extra_skip_files = scan_options.get("skip_files", None)
                 if isinstance(extra_skip_files, str) and extra_skip_files.strip():
                     skip_files.extend([s.strip() for s in extra_skip_files.split(",") if s.strip()])
@@ -557,43 +578,38 @@ class TrivyScanner:
                 for f in dict.fromkeys(skip_files):
                     cmd.extend(["--skip-files", f])
 
-            if skip_db_update:
-                cmd.append("--skip-db-update")
+                if skip_db_update:
+                    cmd.append("--skip-db-update")
 
-            logger.info(f"  Цель сканирования: {target_path}")
-            logger.info(f"  Cache dir: {cache_dir}")
-            logger.info(f"  Команда: {' '.join(cmd)}")
-            self.progress_callback(15, "Trivy анализирует установленное ПО...")
+                logger.info(f"  Цель сканирования: {target_path}")
+                logger.info(f"  Cache dir: {cache_dir}")
+                logger.info(f"  Команда: {' '.join(cmd)}")
+                self.progress_callback(15, "Trivy анализирует установленное ПО...")
 
-            # Запускаем процесс
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                universal_newlines=True,
-                startupinfo=startupinfo,
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
-                cwd=trivy_home or None,
-                env=env,
-            )
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    universal_newlines=True,
+                    startupinfo=startupinfo,
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                    cwd=trivy_home or None,
+                    env=env,
+                )
 
-            # Читаем вывод для логирования прогресса
-            output_lines = []
-            import re
-            last_progress_update = 0
-            
-            for line in process.stdout:
-                line = line.strip()
-                if line:
+                output_lines: list[str] = []
+                last_progress_update = 0
+                for line in process.stdout:
+                    line = line.strip()
+                    if not line:
+                        continue
                     output_lines.append(line)
                     logger.debug(f"[TRIVY-OUT] {line}")
-                    
-                    # Обновляем прогресс на основе ключевых слов
                     current_time = datetime.now().timestamp()
                     if "Detected OS" in line and current_time - last_progress_update > 2:
-                        self.progress_callback(25, f"Trivy обнаружил ОС")
+                        self.progress_callback(25, "Trivy обнаружил ОС")
                         last_progress_update = current_time
                     elif "Detecting library vulnerabilities" in line and current_time - last_progress_update > 2:
                         self.progress_callback(40, "Trivy сопоставляет ПО с CVE/CWE/CAPEC...")
@@ -605,96 +621,46 @@ class TrivyScanner:
                         self.progress_callback(75, "Обработка файлов...")
                         last_progress_update = current_time
 
-            process.wait()
-            return_code = process.returncode
-            
-            elapsed_wait = (datetime.now() - start_time).total_seconds()
-            logger.info(f"  [TRIVY] Процесс завершилось через {elapsed_wait:.2f} сек (код: {return_code})")
+                process.wait()
+                return_code = process.returncode
+                last_return_code = return_code
+                last_output_lines = output_lines
 
-            self.progress_callback(85, "Trivy завершил сканирование, обработка результатов...")
-            logger.info(f"  Код возврата: {return_code}")
-            logger.info(f"  Вывод Trivy ({len(output_lines)} строк)")
+                elapsed_wait = (datetime.now() - start_time).total_seconds()
+                logger.info(f"  [TRIVY] Процесс завершилось через {elapsed_wait:.2f} сек (код: {return_code})")
 
-            # Если результат не сформирован (часто из-за заблокированных файлов на Windows),
-            # повторяем скан с динамическим исключением проблемного файла.
-            if (return_code != 0) and (not (os.path.exists(output_path) and os.path.getsize(output_path) > 0)):
-                if output_lines:
-                    logger.warning(
-                        f"[TRIVY] Ошибка выполнения Trivy (код={return_code}). Последние строки: {' | '.join(output_lines[-10:])}"
-                    )
-                excluded_patterns: list[str] = []
-                max_attempts = 5
-                for attempt in range(1, max_attempts + 1):
-                    locked_file = self._extract_locked_file_path(output_lines)
-                    if not locked_file:
-                        break
-                    new_patterns = self._locked_file_skip_patterns(target_path, locked_file)
-                    added = False
-                    for p in new_patterns:
-                        if p not in excluded_patterns:
-                            excluded_patterns.append(p)
-                            added = True
-                    if not added:
-                        break
-                    logger.warning(f"[TRIVY] Обнаружен заблокированный файл: {locked_file}. Повторяем скан с исключением. (попытка {attempt}/{max_attempts})")
+                self.progress_callback(85, "Trivy завершил сканирование, обработка результатов...")
+                logger.info(f"  Код возврата: {return_code}")
+                logger.info(f"  Вывод Trivy ({len(output_lines)} строк)")
 
-                    retry_cmd = list(cmd)
-                    for excluded in excluded_patterns:
-                        retry_cmd.extend(["--skip-files", excluded])
+                if (return_code != 0) and (not (os.path.exists(output_path) and os.path.getsize(output_path) > 0)):
+                    if output_lines:
+                        logger.warning(
+                            f"[TRIVY] Ошибка выполнения Trivy (код={return_code}). Последние строки: {' | '.join(output_lines[-10:])}"
+                        )
+                    excluded_patterns: list[str] = []
+                    max_attempts = 5
+                    for attempt in range(1, max_attempts + 1):
+                        locked_file = self._extract_locked_file_path(output_lines)
+                        if not locked_file:
+                            break
+                        new_patterns = self._locked_file_skip_patterns(target_path, locked_file)
+                        added = False
+                        for p in new_patterns:
+                            if p not in excluded_patterns:
+                                excluded_patterns.append(p)
+                                added = True
+                        if not added:
+                            break
+                        logger.warning(
+                            f"[TRIVY] Обнаружен заблокированный файл: {locked_file}. "
+                            f"Повторяем скан с исключением. (попытка {attempt}/{max_attempts})"
+                        )
 
-                    process = subprocess.Popen(
-                        retry_cmd,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        bufsize=1,
-                        universal_newlines=True,
-                        startupinfo=startupinfo,
-                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
-                        cwd=trivy_home or None,
-                        env=env,
-                    )
-                    output_lines = []
-                    last_progress_update = 0
-                    for raw in process.stdout:
-                        line = (raw or "").strip()
-                        if not line:
-                            continue
-                        output_lines.append(line)
-                        logger.debug(f"[TRIVY-RETRY] {line}")
-                        current_time = datetime.now().timestamp()
-                        if "Detected OS" in line and current_time - last_progress_update > 2:
-                            self.progress_callback(25, "Trivy обнаружил ОС")
-                            last_progress_update = current_time
-                        elif "Detecting library vulnerabilities" in line and current_time - last_progress_update > 2:
-                            self.progress_callback(40, "Trivy сопоставляет ПО с CVE/CWE/CAPEC...")
-                            last_progress_update = current_time
-                        elif "Vulnerability scanning" in line and current_time - last_progress_update > 2:
-                            self.progress_callback(60, "Trivy анализирует CVE...")
-                            last_progress_update = current_time
-                        elif "Processed" in line and "files" in line and current_time - last_progress_update > 2:
-                            self.progress_callback(75, "Обработка файлов...")
-                            last_progress_update = current_time
-                    process.wait()
-                    return_code = process.returncode
-                    logger.info(f"[TRIVY] Повтор завершён с кодом: {return_code}")
-
-                    if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-                        break
-
-                if not (os.path.exists(output_path) and os.path.getsize(output_path) > 0):
-                    out = "\n".join(output_lines).lower() if output_lines else ""
-                    if (
-                        "failed to download" in out
-                        or "unable to download" in out
-                        or "db error" in out
-                        or "no such host" in out
-                        or "connection refused" in out
-                    ):
-                        logger.warning("[TRIVY] Похоже, недоступно обновление базы. Повторяем запуск с --skip-db-update (если DB уже кэширована).")
                         retry_cmd = list(cmd)
-                        if "--skip-db-update" not in retry_cmd:
-                            retry_cmd.append("--skip-db-update")
+                        for excluded in excluded_patterns:
+                            retry_cmd.extend(["--skip-files", excluded])
+
                         process = subprocess.Popen(
                             retry_cmd,
                             stdout=subprocess.PIPE,
@@ -703,38 +669,118 @@ class TrivyScanner:
                             bufsize=1,
                             universal_newlines=True,
                             startupinfo=startupinfo,
-                            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
+                            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
                             cwd=trivy_home or None,
                             env=env,
                         )
                         output_lines = []
+                        last_progress_update = 0
                         for raw in process.stdout:
                             line = (raw or "").strip()
-                            if line:
-                                output_lines.append(line)
-                                logger.debug(f"[TRIVY-RETRY] {line}")
+                            if not line:
+                                continue
+                            output_lines.append(line)
+                            logger.debug(f"[TRIVY-RETRY] {line}")
+                            current_time = datetime.now().timestamp()
+                            if "Detected OS" in line and current_time - last_progress_update > 2:
+                                self.progress_callback(25, "Trivy обнаружил ОС")
+                                last_progress_update = current_time
+                            elif "Detecting library vulnerabilities" in line and current_time - last_progress_update > 2:
+                                self.progress_callback(40, "Trivy сопоставляет ПО с CVE/CWE/CAPEC...")
+                                last_progress_update = current_time
+                            elif "Vulnerability scanning" in line and current_time - last_progress_update > 2:
+                                self.progress_callback(60, "Trivy анализирует CVE...")
+                                last_progress_update = current_time
+                            elif "Processed" in line and "files" in line and current_time - last_progress_update > 2:
+                                self.progress_callback(75, "Обработка файлов...")
+                                last_progress_update = current_time
                         process.wait()
                         return_code = process.returncode
-                        logger.info(f"[TRIVY] Повтор (skip DB update) завершён с кодом: {return_code}")
+                        last_return_code = return_code
+                        last_output_lines = output_lines
+                        logger.info(f"[TRIVY] Повтор завершён с кодом: {return_code}")
+                        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                            break
 
-            # Читаем JSON результат
-            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-                with open(output_path, 'r', encoding='utf-8') as f:
-                    raw_json = json.load(f)
-                    result.raw_output = json.dumps(raw_json, ensure_ascii=False, indent=2)
-                    
-                    # Парсим результаты
-                    self._parse_trivy_output(raw_json, result)
+                    if not (os.path.exists(output_path) and os.path.getsize(output_path) > 0):
+                        out = "\n".join(output_lines).lower() if output_lines else ""
+                        if (
+                            "failed to download" in out
+                            or "unable to download" in out
+                            or "db error" in out
+                            or "no such host" in out
+                            or "connection refused" in out
+                        ):
+                            logger.warning(
+                                "[TRIVY] Похоже, недоступно обновление базы. Повторяем запуск с --skip-db-update (если DB уже кэширована)."
+                            )
+                            retry_cmd = list(cmd)
+                            if "--skip-db-update" not in retry_cmd:
+                                retry_cmd.append("--skip-db-update")
+                            process = subprocess.Popen(
+                                retry_cmd,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT,
+                                text=True,
+                                bufsize=1,
+                                universal_newlines=True,
+                                startupinfo=startupinfo,
+                                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                                cwd=trivy_home or None,
+                                env=env,
+                            )
+                            output_lines = []
+                            for raw in process.stdout:
+                                line = (raw or "").strip()
+                                if line:
+                                    output_lines.append(line)
+                                    logger.debug(f"[TRIVY-RETRY] {line}")
+                            process.wait()
+                            return_code = process.returncode
+                            last_return_code = return_code
+                            last_output_lines = output_lines
+                            logger.info(f"[TRIVY] Повтор (skip DB update) завершён с кодом: {return_code}")
+
+                if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                    with open(output_path, "r", encoding="utf-8") as f:
+                        raw_json = json.load(f)
+                    raw_outputs.append(json.dumps(raw_json, ensure_ascii=False))
+                    tmp_res = TrivyScanResult(
+                        timestamp=result.timestamp,
+                        hostname="",
+                        os_name="",
+                        os_version="",
+                        total_vulns=0,
+                    )
+                    self._parse_trivy_output(raw_json, tmp_res)
+                    all_vulns.extend(tmp_res.vulnerabilities)
+                else:
+                    logger.warning("[TRIVY] Файл результатов пуст или не создан")
+
+                try:
+                    os.remove(output_path)
+                except Exception:
+                    pass
+
+            if raw_outputs:
+                result.raw_output = json.dumps(raw_outputs, ensure_ascii=False, indent=2)
+                result.vulnerabilities = all_vulns
+                result.total_vulns = len(all_vulns)
             else:
-                logger.warning("[TRIVY] Файл результатов пуст или не создан")
-                reason = self._extract_failure_reason(output_lines, return_code)
-                result.error = reason
+                result.error = self._extract_failure_reason(last_output_lines, last_return_code)
 
-            # Удаляем временный файл
-            try:
-                os.remove(output_path)
-            except:
-                pass
+            if (
+                result.total_vulns == 0
+                and not result.error
+                and bool(scan_options.get("augment_from_local_db", True))
+            ):
+                added = self._augment_from_local_cve_db(
+                    result,
+                    limit_total=int(scan_options.get("augment_limit_total", 200) or 200),
+                    limit_per_software=int(scan_options.get("augment_limit_per_software", 5) or 5),
+                )
+                if added:
+                    logger.info(f"[TRIVY] Дополнено из локальной базы CVE: {added} записей")
 
             # Считаем время
             elapsed = (datetime.now() - start_time).total_seconds()
@@ -761,6 +807,157 @@ class TrivyScanner:
 
         self.last_result = result
         return result
+
+    def _collect_installed_software_registry(self) -> List[tuple[str, str]]:
+        software_list: list[tuple[str, str]] = []
+        if os.name != "nt":
+            return software_list
+        registry_paths = [
+            r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+            r"HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+        ]
+        for reg_path in registry_paths:
+            try:
+                r = subprocess.run(
+                    ["reg", "query", reg_path, "/s"],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    encoding="cp866",
+                    errors="replace",
+                )
+                if r.returncode != 0:
+                    continue
+                current_name = ""
+                current_version = ""
+                for line in (r.stdout or "").split("\n"):
+                    line = (line or "").strip()
+                    if not line:
+                        continue
+                    if line.startswith("HKEY_"):
+                        if current_name:
+                            software_list.append((current_name, current_version))
+                        current_name = ""
+                        current_version = ""
+                        continue
+                    if "DisplayName" in line and "REG_SZ" in line:
+                        current_name = line.split("REG_SZ")[-1].strip()
+                        continue
+                    if "DisplayVersion" in line and "REG_SZ" in line:
+                        current_version = line.split("REG_SZ")[-1].strip()
+                        continue
+                if current_name:
+                    software_list.append((current_name, current_version))
+            except Exception:
+                continue
+        seen = set()
+        unique: list[tuple[str, str]] = []
+        for name, ver in software_list:
+            key = (name or "").strip().lower()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            unique.append((name.strip(), (ver or "").strip()))
+        return unique
+
+    def _augment_from_local_cve_db(
+        self,
+        result: TrivyScanResult,
+        limit_total: int = 200,
+        limit_per_software: int = 5,
+    ) -> int:
+        limit_total = max(0, int(limit_total or 0))
+        limit_per_software = max(0, int(limit_per_software or 0))
+        if limit_total <= 0 or limit_per_software <= 0:
+            return 0
+
+        base_dir = bundle_resources_root()
+        candidates = [
+            os.path.join(base_dir, "databases", "cve_database.json"),
+        ]
+        try:
+            candidates.append(os.path.join(application_base_dir(), "databases", "cve_database.json"))
+        except Exception:
+            pass
+        cve_path = ""
+        for p in candidates:
+            if p and os.path.isfile(p):
+                cve_path = p
+                break
+        if not cve_path:
+            return 0
+
+        try:
+            with open(cve_path, "r", encoding="utf-8") as f:
+                cve_db = json.load(f)
+        except Exception:
+            return 0
+        if not isinstance(cve_db, list) or not cve_db:
+            return 0
+
+        installed = self._collect_installed_software_registry()
+        if not installed:
+            return 0
+
+        existing_ids = {v.vuln_id for v in result.vulnerabilities}
+        added = 0
+
+        for sw_name, sw_ver in installed:
+            if added >= limit_total:
+                break
+            sw_lower = (sw_name or "").lower().strip()
+            if not sw_lower:
+                continue
+            sw_added = 0
+            for cve in cve_db:
+                if added >= limit_total or sw_added >= limit_per_software:
+                    break
+                if not isinstance(cve, dict):
+                    continue
+                cve_id = str(cve.get("id", "") or "").strip()
+                if not cve_id or cve_id in existing_ids:
+                    continue
+                affected = cve.get("affected_software", [])
+                if not isinstance(affected, list) or not affected:
+                    continue
+                matched = False
+                for a in affected:
+                    a_low = str(a or "").lower().strip()
+                    if not a_low:
+                        continue
+                    if sw_lower in a_low or a_low in sw_lower:
+                        matched = True
+                        break
+                if not matched:
+                    continue
+
+                sev = str(cve.get("severity", "") or "UNKNOWN").upper().strip() or "UNKNOWN"
+                title = str(cve.get("description", "") or cve_id).strip()
+                desc = str(cve.get("description", "") or "").strip()
+                cwe_ids = cve.get("related_cwe", [])
+                capec_ids = cve.get("related_capec", [])
+                result.vulnerabilities.append(
+                    TrivyVulnerability(
+                        vuln_id=cve_id,
+                        pkg_name=sw_name,
+                        installed_version=sw_ver,
+                        fixed_version="",
+                        severity=sev,
+                        title=title[:200],
+                        description=desc,
+                        references=[],
+                        cwe_ids=[str(x) for x in cwe_ids] if isinstance(cwe_ids, list) else [],
+                        capec_ids=[str(x) for x in capec_ids] if isinstance(capec_ids, list) else [],
+                        vendor_severity="",
+                        status="",
+                    )
+                )
+                existing_ids.add(cve_id)
+                added += 1
+                sw_added += 1
+
+        result.total_vulns = len(result.vulnerabilities)
+        return added
 
     def _extract_failure_reason(self, output_lines: List[str], return_code: int) -> str:
         """Возвращает человекочитаемую причину сбоя Trivy."""
