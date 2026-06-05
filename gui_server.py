@@ -21,7 +21,7 @@ try:
         QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
         QFrame, QMessageBox, QStatusBar, QProgressBar, QFileDialog,
         QComboBox, QListWidget, QListWidgetItem, QSplitter,
-        QScrollArea, QDialog, QDialogButtonBox, QFormLayout, QLineEdit, QAbstractItemView, QInputDialog
+        QScrollArea, QDialog, QDialogButtonBox, QFormLayout, QLineEdit, QAbstractItemView, QInputDialog, QCheckBox
     )
     from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
     from PyQt6.QtGui import QFont, QColor, QTextCursor
@@ -772,14 +772,53 @@ class ServerGUI(QMainWindow):
         severities = [s.strip().upper() for s in self.trivy_severity_combo.currentText().split(",") if s.strip()]
         scanners = [s.strip() for s in self.trivy_checks_combo.currentText().split(",") if s.strip()]
         options = {
-            "timeout_minutes": max(1, min(self.trivy_timeout_spin.value(), 120)),
+            "timeout_minutes": max(0, min(self.trivy_timeout_spin.value(), 720)),
             "severities": severities or ["MEDIUM", "HIGH", "CRITICAL"],
             "scanners": scanners or ["vuln"],
-            "threads": max(1, min(self.trivy_threads_spin.value(), 32)),
-            "security_checks": "secret" in scanners,
+            "threads": max(1, min(self.trivy_threads_spin.value(), 128)),
         }
+        target_path = getattr(self, "trivy_target_path_edit", None).text().strip() if hasattr(self, "trivy_target_path_edit") else ""
+        if target_path:
+            options["target_path"] = target_path
+        skip_globs_raw = getattr(self, "trivy_skip_dir_globs_edit", None).text().strip() if hasattr(self, "trivy_skip_dir_globs_edit") else ""
+        if skip_globs_raw:
+            parts = [p.strip() for p in skip_globs_raw.split(";") if p.strip()]
+            if parts:
+                options["skip_dir_globs"] = parts
+        use_saved_excl = bool(getattr(self, "trivy_use_saved_exclusions_cb", None).isChecked()) if hasattr(self, "trivy_use_saved_exclusions_cb") else True
+        use_saved_large = bool(getattr(self, "trivy_use_saved_large_cb", None).isChecked()) if hasattr(self, "trivy_use_saved_large_cb") else True
+        persist_excl = bool(getattr(self, "trivy_persist_exclusions_cb", None).isChecked()) if hasattr(self, "trivy_persist_exclusions_cb") else True
+        options["use_saved_exclusions"] = use_saved_excl
+        options["use_saved_large_exclusions"] = use_saved_excl and use_saved_large
+        options["persist_exclusions"] = persist_excl
+        options["persist_large_exclusions"] = persist_excl and use_saved_large
         logger.info(f"[TRIVY] Применённые настройки: {options}")
         return options
+
+    def _clear_trivy_exclusions(self):
+        path = os.path.join(PROJECT_DIR, "data", "trivy_exclusions.json")
+        if not os.path.exists(path):
+            QMessageBox.information(self, "Trivy", "Список исключений не найден.")
+            return
+        r = QMessageBox.question(
+            self,
+            "Trivy",
+            "Очистить сохранённый список исключений?\nСледующее сканирование будет пытаться проверять эти файлы снова.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if r != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            os.remove(path)
+            QMessageBox.information(self, "Trivy", "Список исключений очищен.")
+        except Exception as e:
+            QMessageBox.warning(self, "Trivy", f"Не удалось удалить файл исключений:\n{e}")
+
+    def _pick_trivy_target_path(self):
+        path = QFileDialog.getExistingDirectory(self, "Выбрать папку для Trivy", PROJECT_DIR)
+        if path:
+            self.trivy_target_path_edit.setText(path)
 
     def _build_system_tab(self):
         st = QWidget()
@@ -1349,10 +1388,11 @@ class ServerGUI(QMainWindow):
         trivy_layout.addRow(self.btn_trivy_recommend)
 
         self.trivy_timeout_spin = QSpinBox()
-        self.trivy_timeout_spin.setRange(1, 120)
+        self.trivy_timeout_spin.setRange(0, 720)
+        self.trivy_timeout_spin.setToolTip("0 = без таймаута (Trivy может работать очень долго на больших папках/дисках)")
         trivy_layout.addRow("Таймаут сканирования (мин):", self.trivy_timeout_spin)
         self.trivy_threads_spin = QSpinBox()
-        self.trivy_threads_spin.setRange(1, 32)
+        self.trivy_threads_spin.setRange(1, 128)
         trivy_layout.addRow("Потоки сканирования:", self.trivy_threads_spin)
 
         self.trivy_severity_combo = QComboBox()
@@ -1366,10 +1406,42 @@ class ServerGUI(QMainWindow):
         self.trivy_checks_combo = QComboBox()
         self.trivy_checks_combo.addItems(["vuln", "vuln,secret"])
         trivy_layout.addRow("Типы проверок:", self.trivy_checks_combo)
+
+        self.trivy_target_path_edit = QLineEdit()
+        self.trivy_target_path_edit.setPlaceholderText("По умолчанию: C:\\Program Files (можно указать C:\\ или C:\\Users)")
+        browse_trivy_target = QPushButton("Выбрать…")
+        browse_trivy_target.clicked.connect(self._pick_trivy_target_path)
+        target_row = QHBoxLayout()
+        target_row.addWidget(self.trivy_target_path_edit, 1)
+        target_row.addWidget(browse_trivy_target)
+        trivy_layout.addRow("Путь для сканирования:", target_row)
+
+        self.trivy_skip_dir_globs_edit = QLineEdit()
+        self.trivy_skip_dir_globs_edit.setPlaceholderText(r"Напр.: Qt\**\Src;Qt\**\src")
+        self.trivy_skip_dir_globs_edit.setText(r"Qt\**\Src")
+        trivy_layout.addRow("Исключить папки (шаблоны):", self.trivy_skip_dir_globs_edit)
+
+        self.trivy_use_saved_exclusions_cb = QCheckBox("Использовать сохранённые исключения (skip-files)")
+        self.trivy_use_saved_exclusions_cb.setChecked(True)
+        trivy_layout.addRow(self.trivy_use_saved_exclusions_cb)
+
+        self.trivy_use_saved_large_cb = QCheckBox("Пропускать большие файлы secret (по сохранённому списку)")
+        self.trivy_use_saved_large_cb.setChecked(True)
+        trivy_layout.addRow(self.trivy_use_saved_large_cb)
+
+        self.trivy_persist_exclusions_cb = QCheckBox("Запоминать проблемные/большие файлы для следующих сканирований")
+        self.trivy_persist_exclusions_cb.setChecked(True)
+        trivy_layout.addRow(self.trivy_persist_exclusions_cb)
+
+        clear_exclusions_btn = QPushButton("Очистить список исключений")
+        clear_exclusions_btn.clicked.connect(self._clear_trivy_exclusions)
+        trivy_layout.addRow(clear_exclusions_btn)
         scan_layout.addWidget(trivy_group)
 
         scan_help = QLabel(
             "Пояснение: «Типы проверок» = vuln (поиск CVE), secret (поиск секретов в файлах). "
+            "«Таймаут» = время на одну попытку сканирования. "
+            "«Исключить папки (шаблоны)» — относительные пути от выбранной папки, поддерживают ** (рекурсивный шаблон).\n"
             "Профиль применяет рекомендуемые значения, после чего можно скорректировать поля вручную."
         )
         scan_help.setStyleSheet(_HINT_NEUTRAL)
@@ -1987,12 +2059,19 @@ class ServerGUI(QMainWindow):
             err_low = err.lower()
             is_db_net = ("failed to download" in err_low) or ("db error" in err_low) or ("connection attempt failed" in err_low) or ("connectex" in err_low)
             if is_db_net:
+                cache_dir_data = os.path.abspath(os.path.join(PROJECT_DIR, "data", "trivy_cache"))
+                cache_dir_tools = os.path.abspath(os.path.join(PROJECT_DIR, "tools", "trivy_cache"))
                 self.trivy_status_label.setText("⚠️ Trivy недоступен (нет доступа к DB). Продолжаем без Trivy.")
                 self.trivy_status_label.setStyleSheet("color:#d29922;font-size:11px;padding:4px;")
                 QMessageBox.information(
                     self,
                     "Trivy (офлайн)",
                     "Trivy не смог скачать/обновить базу уязвимостей (скорее всего нет доступа к ghcr.io / ecr / gcr).\n\n"
+                    f"Что можно сделать:\n"
+                    f"1) Если вы переносили программу на новый ПК — перенесите папку кэша Trivy со старого ПК (папка trivy_cache с db\\trivy.db) в один из путей:\n"
+                    f"   {cache_dir_data}\n"
+                    f"   {cache_dir_tools}\n"
+                    f"2) Либо дайте Trivy доступ в интернет (разрешите домены ghcr.io / public.ecr.aws / mirror.gcr.io) и запустите сканирование ещё раз.\n\n"
                     "Сканирование Trivy будет пропущено, корреляция продолжит работать без подтверждения Trivy."
                 )
                 self.trivy_summary = {"error": err, "skipped": True}

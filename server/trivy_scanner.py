@@ -62,6 +62,71 @@ class TrivyScanner:
         self.progress_callback = progress_callback or (lambda percent, text: None)
         self.last_result: Optional[TrivyScanResult] = None
 
+    def _exclusions_file_path(self) -> str:
+        data_dir = os.path.join(application_base_dir(), "data")
+        os.makedirs(data_dir, exist_ok=True)
+        return os.path.join(data_dir, "trivy_exclusions.json")
+
+    def _load_exclusions(self) -> Dict[str, Any]:
+        path = self._exclusions_file_path()
+        data: Dict[str, Any] = {"version": 1, "skip_files_error": [], "skip_files_large": [], "updated_at": ""}
+        if not os.path.exists(path):
+            return data
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            if isinstance(raw, dict):
+                data.update(raw)
+        except Exception:
+            return data
+        for k in ("skip_files_error", "skip_files_large"):
+            v = data.get(k)
+            if not isinstance(v, list):
+                data[k] = []
+            else:
+                data[k] = [str(x) for x in v if x]
+        if not isinstance(data.get("updated_at"), str):
+            data["updated_at"] = ""
+        if not isinstance(data.get("version"), int):
+            data["version"] = 1
+        return data
+
+    def _save_exclusions(self, data: Dict[str, Any]) -> None:
+        path = self._exclusions_file_path()
+        data = dict(data or {})
+        data["version"] = int(data.get("version", 1) or 1)
+        data["updated_at"] = datetime.now().isoformat()
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+    def _normalize_path_for_exclusion(self, path: str, target_root: str = "") -> str:
+        p = (path or "").strip().strip('"').strip("'")
+        if not p:
+            return ""
+        p = p.replace("/", "\\")
+        if re.match(r"^[A-Za-z]:\\", p) or p.startswith("\\\\"):
+            return os.path.normpath(p)
+        if target_root:
+            return os.path.normpath(os.path.join(target_root, p))
+        return p
+
+    def _merge_exclusions(self, existing: List[str], new_items: List[str], limit: int = 2000) -> List[str]:
+        merged = list(existing or [])
+        merged.extend(new_items or [])
+        merged = [x for x in (self._normalize_path_for_exclusion(p) for p in merged) if x]
+        merged = list(dict.fromkeys(merged))
+        if len(merged) > limit:
+            merged = merged[-limit:]
+        return merged
+
+    def _extract_secret_large_file_path(self, line: str, target_root: str = "") -> str:
+        if "The size of the scanned file is too large" not in (line or ""):
+            return ""
+        m = re.search(r'file_path="([^"]+)"', line)
+        if not m:
+            return ""
+        return self._normalize_path_for_exclusion(m.group(1), target_root=target_root)
+
     def _find_trivy(self) -> str:
         """Поиск исполняемого файла Trivy."""
         base_dir = bundle_resources_root()
@@ -158,8 +223,12 @@ class TrivyScanner:
         self.progress_callback(5, "Инициализация Trivy...")
         
         scan_options = scan_options or {}
-        timeout_minutes = max(1, min(int(scan_options.get("timeout_minutes", 15)), 120))
-        scan_threads = max(1, min(int(scan_options.get("threads", 5)), 32))
+        use_saved_exclusions = bool(scan_options.get("use_saved_exclusions", True))
+        use_saved_large_exclusions = bool(scan_options.get("use_saved_large_exclusions", False))
+        persist_exclusions = bool(scan_options.get("persist_exclusions", True))
+        persist_large_exclusions = bool(scan_options.get("persist_large_exclusions", True))
+        timeout_minutes = max(0, min(int(scan_options.get("timeout_minutes", 15)), 720))
+        scan_threads = max(1, min(int(scan_options.get("threads", 5)), 128))
         severities = scan_options.get("severities", ["MEDIUM", "HIGH", "CRITICAL"])
         if isinstance(severities, str):
             severities = [x.strip().upper() for x in severities.split(",") if x.strip()]
@@ -196,18 +265,10 @@ class TrivyScanner:
 
             # Используем fs для сканирования установленного ПО
             # --security-checks vuln отключён - только анализ ПО
-            # Исключаем шумные/проблемные системные пути, которые часто ломают скан на Windows.
-            skip_dirs = [
-                r"C:\$Recycle.Bin",
-                r"C:\System Volume Information",
-                r"C:\Windows\Temp",
-            ]
-            skip_files = [
-                r"C:\DumpStack.log.tmp",
-                r"C:\pagefile.sys",
-                r"C:\swapfile.sys",
-                r"C:\hiberfil.sys",
-            ]
+            # Исключаем шумные/проблемные системные пути.
+            # Для не-системных дисков (например D:\) не добавляем пути с C:\, чтобы не плодить предупреждения Trivy.
+            skip_dirs: List[str] = []
+            skip_files: List[str] = []
             for custom_dir in scan_options.get("skip_dirs", []) if isinstance(scan_options.get("skip_dirs"), list) else []:
                 if custom_dir and custom_dir not in skip_dirs:
                     skip_dirs.append(str(custom_dir))
@@ -226,11 +287,70 @@ class TrivyScanner:
                 ]
                 target_path = next((p for p in candidates if p and os.path.isdir(p)), r"C:\\")
             target_path = os.path.abspath(target_path)
+            target_drive, _ = os.path.splitdrive(target_path)
+            target_drive = target_drive or "C:"
+            skip_dirs.extend([
+                os.path.join(target_drive + "\\", "$Recycle.Bin"),
+                os.path.join(target_drive + "\\", "System Volume Information"),
+            ])
+            if target_drive.upper() == "C:":
+                skip_dirs.append(os.path.join(target_drive + "\\", "Windows", "Temp"))
+                skip_files.extend([
+                    os.path.join(target_drive + "\\", "DumpStack.log.tmp"),
+                    os.path.join(target_drive + "\\", "pagefile.sys"),
+                    os.path.join(target_drive + "\\", "swapfile.sys"),
+                    os.path.join(target_drive + "\\", "hiberfil.sys"),
+                ])
+
+            skip_dir_globs = scan_options.get("skip_dir_globs", None)
+            if isinstance(skip_dir_globs, str):
+                skip_dir_globs = [p.strip() for p in skip_dir_globs.split(";") if p.strip()]
+            if not isinstance(skip_dir_globs, list):
+                skip_dir_globs = [r"Qt\**\Src"]
+
+            resolved = []
+            for g in skip_dir_globs:
+                if not g:
+                    continue
+                g = str(g).strip().strip('"').strip("'")
+                if not g:
+                    continue
+                if re.match(r"^[A-Za-z]:\\", g) or g.startswith("\\\\"):
+                    pattern_path = g
+                else:
+                    pattern_path = os.path.join(target_path, g)
+                try:
+                    for m in glob.glob(pattern_path, recursive=True):
+                        if m and os.path.isdir(m):
+                            resolved.append(os.path.abspath(m))
+                except Exception:
+                    continue
+            if resolved:
+                resolved = sorted(set(resolved))
+                if len(resolved) > 200:
+                    resolved = resolved[:200]
+                for d in resolved:
+                    if d not in skip_dirs:
+                        skip_dirs.append(d)
 
             cache_dir = scan_options.get("cache_dir", "")
             if not isinstance(cache_dir, str) or not cache_dir.strip():
-                cache_dir = os.path.join(application_base_dir(), "data", "trivy_cache")
+                data_cache_dir = os.path.join(application_base_dir(), "data", "trivy_cache")
+                tools_cache_dir = os.path.join(bundle_resources_root(), "tools", "trivy_cache")
+                data_has_db = os.path.isfile(os.path.join(data_cache_dir, "db", "trivy.db"))
+                tools_has_db = os.path.isfile(os.path.join(tools_cache_dir, "db", "trivy.db"))
+                if data_has_db:
+                    cache_dir = data_cache_dir
+                elif tools_has_db:
+                    cache_dir = tools_cache_dir
+                elif os.path.isdir(data_cache_dir):
+                    cache_dir = data_cache_dir
+                elif os.path.isdir(tools_cache_dir):
+                    cache_dir = tools_cache_dir
+                else:
+                    cache_dir = data_cache_dir
             cache_dir = os.path.abspath(cache_dir)
+            os.makedirs(cache_dir, exist_ok=True)
 
             skip_db_update = scan_options.get("skip_db_update", None)
             if not isinstance(skip_db_update, bool):
@@ -253,17 +373,28 @@ class TrivyScanner:
                 "--scanners", ",".join(scanners) if scanners else "vuln",
                 "--severity", ",".join(severities) if severities else "MEDIUM,HIGH,CRITICAL",
                 "--exit-code", "0",
-                "--timeout", f"{timeout_minutes}m",
                 "--parallel", str(scan_threads),
                 "--cache-dir", cache_dir,
             ]
+            if timeout_minutes > 0:
+                cmd.extend(["--timeout", f"{timeout_minutes}m"])
             for repo in db_repos:
                 if repo:
                     cmd.extend(["--db-repository", str(repo)])
             if skip_db_update:
                 cmd.append("--skip-db-update")
-            if security_checks:
-                cmd.extend(["--security-checks", "vuln,config,secret"])
+
+            exclusions = self._load_exclusions() if use_saved_exclusions else {"skip_files_error": [], "skip_files_large": []}
+            if use_saved_exclusions:
+                saved_error_files = exclusions.get("skip_files_error", [])
+                if isinstance(saved_error_files, list):
+                    skip_files.extend(saved_error_files)
+                if use_saved_large_exclusions:
+                    saved_large_files = exclusions.get("skip_files_large", [])
+                    if isinstance(saved_large_files, list):
+                        skip_files.extend(saved_large_files)
+            skip_files = list(dict.fromkeys([p for p in (self._normalize_path_for_exclusion(x, target_root=target_path) for x in skip_files) if p]))
+
             for skip_dir in skip_dirs:
                 cmd.extend(["--skip-dirs", skip_dir])
             for skip_file in skip_files:
@@ -275,7 +406,6 @@ class TrivyScanner:
             logger.info(f"  Команда: {' '.join(cmd)}")
             self.progress_callback(15, "Trivy анализирует установленное ПО...")
 
-            # Запускаем процесс
             startupinfo = None
             if os.name == 'nt':
                 startupinfo = subprocess.STARTUPINFO()
@@ -303,10 +433,12 @@ class TrivyScanner:
                 env=env,
             )
 
-            # Читаем вывод для логирования прогресса
             output_lines = []
-            import re
             last_progress_update = 0
+            last_elapsed_update = 0
+            current_percent = 15
+            error_files_found = set()
+            large_files_found = set()
             
             for line in process.stdout:
                 line = line.strip()
@@ -314,19 +446,30 @@ class TrivyScanner:
                     output_lines.append(line)
                     logger.debug(f"[TRIVY-OUT] {line}")
                     
-                    # Обновляем прогресс на основе ключевых слов
                     current_time = datetime.now().timestamp()
+                    large_path = self._extract_secret_large_file_path(line, target_root=target_path)
+                    if large_path:
+                        large_files_found.add(large_path)
+                    if current_time - last_elapsed_update > 30:
+                        elapsed_s = int((datetime.now() - start_time).total_seconds())
+                        mins, secs = divmod(elapsed_s, 60)
+                        self.progress_callback(current_percent, f"Trivy работает: {mins}м {secs}с")
+                        last_elapsed_update = current_time
                     if "Detected OS" in line and current_time - last_progress_update > 2:
-                        self.progress_callback(25, f"Trivy обнаружил ОС")
+                        current_percent = 25
+                        self.progress_callback(current_percent, "Trivy обнаружил ОС")
                         last_progress_update = current_time
                     elif "Detecting library vulnerabilities" in line and current_time - last_progress_update > 2:
-                        self.progress_callback(40, "Trivy сопоставляет ПО с CVE/CWE/CAPEC...")
+                        current_percent = 40
+                        self.progress_callback(current_percent, "Trivy сопоставляет ПО с CVE/CWE/CAPEC...")
                         last_progress_update = current_time
                     elif "Vulnerability scanning" in line and current_time - last_progress_update > 2:
-                        self.progress_callback(60, "Trivy анализирует CVE...")
+                        current_percent = 60
+                        self.progress_callback(current_percent, "Trivy анализирует CVE...")
                         last_progress_update = current_time
                     elif "Processed" in line and "files" in line and current_time - last_progress_update > 2:
-                        self.progress_callback(75, "Обработка файлов...")
+                        current_percent = 75
+                        self.progress_callback(current_percent, "Обработка файлов...")
                         last_progress_update = current_time
 
             process.wait()
@@ -341,10 +484,24 @@ class TrivyScanner:
 
             # Если упали на заблокированном файле - пробуем 1 повтор с динамическим skip-files.
             if return_code != 0:
-                locked_file = self._extract_locked_file_path(output_lines)
-                if locked_file:
-                    logger.warning(f"[TRIVY] Обнаружен заблокированный файл: {locked_file}. Повторяем скан с исключением.")
-                    retry_cmd = cmd + ["--skip-files", locked_file]
+                extra_skip_files: List[str] = []
+
+                def _cmd_with_extra_skips(base_cmd: List[str]) -> List[str]:
+                    merged = list(base_cmd)
+                    for p in extra_skip_files:
+                        merged.extend(["--skip-files", p])
+                    return merged
+
+                for _ in range(3):
+                    problem_file = self._extract_problem_file_path(output_lines, target_path)
+                    if not problem_file or problem_file in extra_skip_files:
+                        break
+                    extra_skip_files.append(problem_file)
+                    error_files_found.add(problem_file)
+                    logger.warning(
+                        f"[TRIVY] Файл не удалось прочитать: {problem_file}. Повторяем скан с исключением."
+                    )
+                    retry_cmd = _cmd_with_extra_skips(cmd)
                     process = subprocess.Popen(
                         retry_cmd,
                         stdout=subprocess.PIPE,
@@ -366,11 +523,33 @@ class TrivyScanner:
                     process.wait()
                     return_code = process.returncode
                     logger.info(f"[TRIVY] Повтор завершён с кодом: {return_code}")
-                else:
-                    out = "\n".join(output_lines[-50:]) if output_lines else ""
-                    if skip_db_update and ("failed to download" in out.lower() or "db error" in out.lower()):
-                        logger.warning("[TRIVY] Похоже, отсутствует локальная DB. Повторяем с обновлением DB.")
-                        retry_cmd = [x for x in cmd if x != "--skip-db-update"]
+                    if return_code == 0:
+                        break
+
+                if return_code != 0:
+                    out = "\n".join(output_lines[-80:]) if output_lines else ""
+                    out_low = out.lower()
+                    if "context deadline exceeded" in out_low:
+                        timeout_hint = f"Trivy превысил таймаут сканирования. Увеличьте таймаут или сузьте путь сканирования (сейчас: {target_path})."
+                        logger.warning(f"[TRIVY] {timeout_hint}")
+                        result.error = timeout_hint
+                    db_problem = any(
+                        s in out_low
+                        for s in (
+                            "db error",
+                            "failed to download vulnerability db",
+                            "failed to download artifact",
+                            "oci artifact error",
+                            "need to update db",
+                            "vulndb",
+                            "no such host",
+                            "dial tcp",
+                        )
+                    )
+
+                    if skip_db_update and db_problem:
+                        logger.warning("[TRIVY] Похоже, локальная DB отсутствует или повреждена. Пробуем обновить DB.")
+                        retry_cmd = _cmd_with_extra_skips([x for x in cmd if x != "--skip-db-update"])
                         process = subprocess.Popen(
                             retry_cmd,
                             stdout=subprocess.PIPE,
@@ -392,9 +571,9 @@ class TrivyScanner:
                         process.wait()
                         return_code = process.returncode
                         logger.info(f"[TRIVY] Повтор (DB update) завершён с кодом: {return_code}")
-                    elif (not skip_db_update) and ("failed to download" in out.lower() or "db error" in out.lower()):
-                        logger.warning("[TRIVY] Ошибка загрузки DB. Повторяем без обновления DB (если cache уже есть).")
-                        retry_cmd = cmd + ["--skip-db-update"]
+                    elif (not skip_db_update) and db_problem:
+                        logger.warning("[TRIVY] Ошибка загрузки DB. Пробуем без обновления DB (если cache уже есть).")
+                        retry_cmd = _cmd_with_extra_skips(cmd + ["--skip-db-update"])
                         process = subprocess.Popen(
                             retry_cmd,
                             stdout=subprocess.PIPE,
@@ -416,6 +595,17 @@ class TrivyScanner:
                         process.wait()
                         return_code = process.returncode
                         logger.info(f"[TRIVY] Повтор (skip DB update) завершён с кодом: {return_code}")
+
+            if persist_exclusions:
+                try:
+                    current = self._load_exclusions()
+                    err_list = list(error_files_found)
+                    large_list = list(large_files_found) if persist_large_exclusions else []
+                    current["skip_files_error"] = self._merge_exclusions(current.get("skip_files_error", []), err_list)
+                    current["skip_files_large"] = self._merge_exclusions(current.get("skip_files_large", []), large_list)
+                    self._save_exclusions(current)
+                except Exception:
+                    pass
 
             # Читаем JSON результат
             if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
@@ -474,21 +664,41 @@ class TrivyScanner:
 
         return "Trivy не сформировал JSON-отчёт (пустой вывод процесса)"
 
-    def _extract_locked_file_path(self, output_lines: List[str]) -> str:
-        """Возвращает путь к файлу, который Trivy не смог открыть (если есть)."""
+    def _extract_problem_file_path(self, output_lines: List[str], target_root: str = "") -> str:
+        """Возвращает путь к файлу, который Trivy не смог обработать (если есть)."""
         patterns = [
-            r"unable to open\s+([A-Za-z]:\\[^\s:]+)",
-            r"file_path=\"([A-Za-z]:\\[^\"]+)\"",
-            r"open\s+([A-Za-z]:\\[^\s:]+):\s+The process cannot access the file",
+            r"unknown error with\s+([A-Za-z]:\\[^:]+):",
+            r"open\s+([A-Za-z]:\\[^:]+):\s+Operation did not complete successfully because the file contains a virus",
+            r"open\s+([A-Za-z]:\\[^:]+):\s+Access is denied",
+            r"open\s+([A-Za-z]:\\[^:]+):\s+The process cannot access the file",
+            r"unable to open\s+([A-Za-z]:\\[^:]+):",
+            r"unable to open\s+([A-Za-z]:\\[^:]+)$",
+            r"file_path=\"([^\"]+)\"",
         ]
         for line in reversed(output_lines):
             low = line.lower()
-            if "cannot access the file" not in low and "unable to open" not in low:
+            if (
+                "cannot access the file" not in low
+                and "unable to open" not in low
+                and "access is denied" not in low
+                and "contains a virus" not in low
+                and "potentially unwanted" not in low
+                and "unknown error with" not in low
+                and "context deadline exceeded" not in low
+            ):
                 continue
             for pattern in patterns:
                 m = re.search(pattern, line, re.IGNORECASE)
                 if m:
-                    return m.group(1)
+                    p = (m.group(1) or "").strip().strip('"')
+                    if not p:
+                        continue
+                    p = p.replace("/", "\\")
+                    if re.match(r"^[A-Za-z]:\\", p):
+                        return p
+                    if target_root:
+                        return os.path.abspath(os.path.join(target_root, p))
+                    return p
         return ""
 
     def _parse_trivy_output(self, raw_json: Dict[str, Any], result: TrivyScanResult):
