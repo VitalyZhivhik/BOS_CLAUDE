@@ -1,0 +1,211 @@
+{
+  "_meta": {
+    "description": "Локальный curated-срез данных MITRE (CVE/CWE/CAPEC/ATT&CK). Покрывает сущности, встречающиеся в данных стенда; расширяется из официальных фидов NVD/CWE/CAPEC/ATT&CK.",
+    "sources": ["nvd.nist.gov", "cwe.mitre.org", "capec.mitre.org", "attack.mitre.org"],
+    "snapshot": "2026-05-01"
+  },
+
+  "cve": {
+    "CVE-2017-0144": {
+      "name": "Windows SMBv1 Remote Code Execution (EternalBlue)",
+      "description": "Переполнение в обработчике SMBv1 (srv.sys) позволяет удалённо выполнить произвольный код с правами SYSTEM. Лежит в основе WannaCry и NotPetya.",
+      "cvss": 8.1,
+      "cwe": ["CWE-20"],
+      "capec": ["CAPEC-100"],
+      "attack": ["T1210"],
+      "affected_product": "Microsoft Windows SMBv1",
+      "match": {"os": "windows", "vulnerable_if_build_lt": 15063, "patch": "MS17-010 (март 2017)"},
+      "exploit": {"metasploit": "exploit/windows/smb/ms17_010_eternalblue"}
+    },
+    "CVE-2017-0146": {
+      "name": "Windows SMBv1 Remote Code Execution (EternalChampion)",
+      "description": "Состояние гонки в SMBv1 (транзакции) позволяет удалённо выполнить код. Эксплуатируется через MS17-010.",
+      "cvss": 8.1,
+      "cwe": ["CWE-362"],
+      "capec": ["CAPEC-26"],
+      "attack": ["T1210"],
+      "affected_product": "Microsoft Windows SMBv1",
+      "match": {"os": "windows", "vulnerable_if_build_lt": 15063, "patch": "MS17-010 (март 2017)"},
+      "exploit": {"metasploit": "exploit/windows/smb/ms17_010_psexec"}
+    },
+    "CVE-2017-0147": {
+      "name": "Windows SMBv1 Information Disclosure (EternalRomance/Synergy)",
+      "description": "Утечка данных из памяти ядра через SMBv1. Часть набора MS17-010.",
+      "cvss": 5.9,
+      "cwe": ["CWE-200"],
+      "capec": ["CAPEC-118"],
+      "attack": ["T1210"],
+      "affected_product": "Microsoft Windows SMBv1",
+      "match": {"os": "windows", "vulnerable_if_build_lt": 15063, "patch": "MS17-010 (март 2017)"},
+      "exploit": {"metasploit": "exploit/windows/smb/ms17_010_psexec"}
+    },
+    "CVE-2011-3368": {
+      "name": "Apache HTTP Server mod_proxy Reverse Proxy Exposure",
+      "description": "Некорректная обработка запросов в mod_proxy (RewriteRule/ProxyPassMatch) позволяет проксировать запросы во внутреннюю сеть (SSRF-подобное поведение).",
+      "cvss": 5.0,
+      "cwe": ["CWE-441"],
+      "capec": ["CAPEC-664"],
+      "attack": ["T1090"],
+      "affected_product": "Apache HTTP Server 1.3/2.x",
+      "match": {"requires_product": ["apache", "httpd"]},
+      "exploit": {"nmap": "http-vuln-cve2011-3368"}
+    },
+    "CVE-2007-6750": {
+      "name": "Apache HTTP Server Slowloris Denial of Service",
+      "description": "Удержание частичных HTTP-заголовков исчерпывает пул соединений сервера (Slowloris), приводя к отказу в обслуживании.",
+      "cvss": 7.5,
+      "cwe": ["CWE-400"],
+      "capec": ["CAPEC-469"],
+      "attack": ["T1499"],
+      "affected_product": "Apache HTTP Server (и иные HTTP-сервисы, удерживающие соединения)",
+      "match": {"requires_product": ["apache", "httpd", "http"]},
+      "exploit": {"tool": "slowhttptest -c 1000 -H -u https://<host>:<port>"}
+    },
+    "CVE-2021-21972": {
+      "name": "VMware vCenter Server vSphere Client RCE",
+      "description": "Отсутствие аутентификации в плагине vSphere Client (vROps) позволяет загрузить файл и выполнить код без аутентификации.",
+      "cvss": 9.8,
+      "cwe": ["CWE-306"],
+      "capec": ["CAPEC-1"],
+      "attack": ["T1190"],
+      "affected_product": "VMware vCenter Server 6.5/6.7/7.0",
+      "match": {"requires_product": ["vcenter"], "port_hint": [443, 8443]},
+      "exploit": {"metasploit": "exploit/multi/http/vmware_vcenter_uploadova_rce"}
+    },
+    "CVE-2021-21985": {
+      "name": "VMware vCenter Server vSAN Health RCE",
+      "description": "Отсутствие проверки ввода в плагине vSAN Health (vSphere Client) приводит к удалённому выполнению кода без аутентификации.",
+      "cvss": 9.8,
+      "cwe": ["CWE-20"],
+      "capec": ["CAPEC-248"],
+      "attack": ["T1190"],
+      "affected_product": "VMware vCenter Server 6.5/6.7/7.0",
+      "match": {"requires_product": ["vcenter"], "port_hint": [443, 8443]},
+      "exploit": {"metasploit": "exploit/linux/http/vmware_vcenter_vsan_health_rce"}
+    },
+    "CVE-2019-0708": {
+      "name": "Windows RDP Remote Code Execution (BlueKeep)",
+      "description": "Use-after-free в службе удалённого рабочего стола (RDP) позволяет удалённо выполнить код без аутентификации. Затрагивает Windows 7 / Server 2008 R2 и старше.",
+      "cvss": 9.8,
+      "cwe": ["CWE-416"],
+      "capec": ["CAPEC-100"],
+      "attack": ["T1210"],
+      "affected_product": "Microsoft Windows 7 / Server 2008 R2 (RDP)",
+      "match": {"os": "windows", "vulnerable_if_build_lt": 10240, "patch": "затрагивает только Windows 7/2008 R2 и старше"},
+      "exploit": {"metasploit": "exploit/windows/rdp/cve_2019_0708_bluekeep_rce"}
+    },
+    "CVE-2020-0796": {
+      "name": "Windows SMBv3 Remote Code Execution (SMBGhost)",
+      "description": "Переполнение при обработке сжатия SMBv3 позволяет удалённо выполнить код. Затрагивает Windows 10 1903/1909.",
+      "cvss": 10.0,
+      "cwe": ["CWE-787"],
+      "capec": ["CAPEC-100"],
+      "attack": ["T1210"],
+      "affected_product": "Microsoft Windows 10 1903/1909 (SMBv3)",
+      "match": {"os": "windows", "vulnerable_build_range": [18362, 18363], "patch": "только сборки 1903/1909 (KB4551762, март 2020)"},
+      "exploit": {"metasploit": "exploit/windows/smb/cve_2020_0796_smbghost"}
+    },
+    "CVE-2020-1472": {
+      "name": "Netlogon Elevation of Privilege (Zerologon)",
+      "description": "Криптографическая ошибка в протоколе Netlogon позволяет получить права администратора домена. Применима к контроллерам домена.",
+      "cvss": 10.0,
+      "cwe": ["CWE-330"],
+      "capec": ["CAPEC-1"],
+      "attack": ["T1210"],
+      "affected_product": "Microsoft Windows Server (контроллер домена, Netlogon)",
+      "match": {"os": "windows", "vulnerable_if_build_lt": 19042, "patch": "устранено августом 2020; также требует роли контроллера домена"},
+      "exploit": {"metasploit": "auxiliary/admin/dcerpc/cve_2020_1472_zerologon"}
+    },
+    "CVE-2021-34527": {
+      "name": "Windows Print Spooler Remote Code Execution (PrintNightmare)",
+      "description": "Некорректная проверка привилегий в службе печати позволяет удалённо выполнить код. Требует доступной службы Print Spooler.",
+      "cvss": 8.8,
+      "cwe": ["CWE-269"],
+      "capec": ["CAPEC-233"],
+      "attack": ["T1068"],
+      "affected_product": "Microsoft Windows Print Spooler",
+      "match": {"os": "windows", "vulnerable_if_build_lt": 22000, "patch": "устранено июлем 2021; также требует включённой службы печати"},
+      "exploit": {"metasploit": "exploit/windows/dcerpc/cve_2021_1675_printnightmare"}
+    },
+    "CVE-2021-31166": {
+      "name": "Windows HTTP Protocol Stack Remote Code Execution",
+      "description": "Двойное освобождение в http.sys позволяет удалённо выполнить код/вызвать отказ. Затрагивает Windows 10 2004/20H2/21H1.",
+      "cvss": 9.8,
+      "cwe": ["CWE-415"],
+      "capec": ["CAPEC-100"],
+      "attack": ["T1499"],
+      "affected_product": "Microsoft Windows 10 2004/20H2/21H1 (http.sys)",
+      "match": {"os": "windows", "vulnerable_build_range": [19041, 19043], "patch": "только сборки 2004/20H2/21H1 (май 2021)"},
+      "exploit": {"tool": "PoC CVE-2021-31166 (HTTP Range header)"}
+    }
+  },
+
+  "cwe": {
+    "CWE-20": {"name": "Improper Input Validation", "description": "Некорректная проверка входных данных, ведущая к непредусмотренному поведению."},
+    "CWE-79": {"name": "Cross-site Scripting (XSS)", "description": "Внедрение скриптов в веб-страницу из-за отсутствия экранирования вывода."},
+    "CWE-89": {"name": "SQL Injection", "description": "Внедрение SQL из-за неэкранированного пользовательского ввода в запрос."},
+    "CWE-22": {"name": "Path Traversal", "description": "Доступ к файлам вне разрешённого каталога через '../'."},
+    "CWE-94": {"name": "Code Injection", "description": "Выполнение управляемого злоумышленником кода интерпретатором."},
+    "CWE-125": {"name": "Out-of-bounds Read", "description": "Чтение за пределами выделенного буфера."},
+    "CWE-200": {"name": "Exposure of Sensitive Information", "description": "Раскрытие чувствительной информации неавторизованной стороне."},
+    "CWE-306": {"name": "Missing Authentication for Critical Function", "description": "Критическая функция доступна без проверки подлинности."},
+    "CWE-345": {"name": "Insufficient Verification of Data Authenticity", "description": "Недостаточная проверка подлинности данных."},
+    "CWE-362": {"name": "Race Condition", "description": "Состояние гонки при конкурентном доступе к разделяемому ресурсу."},
+    "CWE-400": {"name": "Uncontrolled Resource Consumption", "description": "Неконтролируемое потребление ресурсов, ведущее к отказу в обслуживании."},
+    "CWE-441": {"name": "Unintended Proxy or Intermediary (Confused Deputy)", "description": "Сервис проксирует запросы во внутреннюю сеть от имени злоумышленника."},
+    "CWE-502": {"name": "Deserialization of Untrusted Data", "description": "Десериализация недоверенных данных, ведущая к выполнению кода."},
+    "CWE-770": {"name": "Allocation of Resources Without Limits", "description": "Выделение ресурсов без ограничений."},
+    "CWE-787": {"name": "Out-of-bounds Write", "description": "Запись за пределами выделенного буфера."},
+    "CWE-918": {"name": "Server-Side Request Forgery (SSRF)", "description": "Сервер выполняет запросы по управляемому злоумышленником адресу."},
+    "CWE-1333": {"name": "Inefficient Regular Expression Complexity (ReDoS)", "description": "Регулярное выражение с экспоненциальным временем работы вызывает отказ в обслуживании."},
+    "CWE-269": {"name": "Improper Privilege Management", "description": "Некорректное назначение/проверка привилегий, ведущее к их повышению."},
+    "CWE-330": {"name": "Use of Insufficiently Random Values", "description": "Использование предсказуемых значений в криптографических операциях."},
+    "CWE-415": {"name": "Double Free", "description": "Повторное освобождение памяти, ведущее к повреждению кучи и выполнению кода."},
+    "CWE-416": {"name": "Use After Free", "description": "Обращение к памяти после её освобождения, ведущее к выполнению кода."}
+  },
+
+  "capec": {
+    "CAPEC-1": {"name": "Accessing Functionality Not Properly Constrained by ACLs", "description": "Доступ к функциям, не защищённым списками контроля доступа."},
+    "CAPEC-26": {"name": "Leveraging Race Conditions", "description": "Эксплуатация состояния гонки для нарушения логики."},
+    "CAPEC-49": {"name": "Password Brute Forcing", "description": "Перебор паролей для получения доступа."},
+    "CAPEC-94": {"name": "Adversary in the Middle (AiTM)", "description": "Перехват и/или подмена трафика между сторонами."},
+    "CAPEC-100": {"name": "Overflow Buffers", "description": "Переполнение буфера для исполнения произвольного кода."},
+    "CAPEC-118": {"name": "Collect and Analyze Information", "description": "Сбор и анализ информации о цели."},
+    "CAPEC-248": {"name": "Command Injection", "description": "Внедрение команд ОС через уязвимый ввод."},
+    "CAPEC-300": {"name": "Port Scanning", "description": "Определение открытых портов и сервисов."},
+    "CAPEC-469": {"name": "HTTP DoS", "description": "Исчерпание ресурсов HTTP-сервера медленными/массовыми запросами."},
+    "CAPEC-560": {"name": "Use of Known Domain Credentials", "description": "Использование известных учётных данных домена."},
+    "CAPEC-664": {"name": "Server Side Request Forgery", "description": "Принуждение сервера к запросам во внутреннюю сеть."},
+    "CAPEC-233": {"name": "Privilege Escalation", "description": "Получение более высоких привилегий, чем предусмотрено."}
+  },
+
+  "attack": {
+    "T1046": {"name": "Network Service Discovery", "tactic": "Discovery", "description": "Перечисление сетевых сервисов и портов для поиска точек входа."},
+    "T1090": {"name": "Proxy", "tactic": "Command and Control", "description": "Использование промежуточного узла для проксирования трафика."},
+    "T1110": {"name": "Brute Force", "tactic": "Credential Access", "description": "Систематический подбор учётных данных."},
+    "T1135": {"name": "Network Share Discovery", "tactic": "Discovery", "description": "Перечисление сетевых ресурсов и общих папок (SMB)."},
+    "T1190": {"name": "Exploit Public-Facing Application", "tactic": "Initial Access", "description": "Эксплуатация уязвимости публично доступного приложения для первичного доступа."},
+    "T1003": {"name": "OS Credential Dumping", "tactic": "Credential Access", "description": "Извлечение учётных данных из ОС."},
+    "T1210": {"name": "Exploitation of Remote Services", "tactic": "Lateral Movement", "description": "Эксплуатация уязвимости сетевого сервиса для выполнения кода и перемещения по сети."},
+    "T1499": {"name": "Endpoint Denial of Service", "tactic": "Impact", "description": "Отказ в обслуживании конечного узла через исчерпание ресурсов."},
+    "T1556": {"name": "Modify Authentication Process", "tactic": "Credential Access", "description": "Обход или изменение механизма аутентификации."},
+    "T1557": {"name": "Adversary-in-the-Middle", "tactic": "Credential Access", "description": "Перехват/подмена сетевого трафика (например, SMB Relay, NBT-NS/LLMNR)."},
+    "T1021": {"name": "Remote Services", "tactic": "Lateral Movement", "description": "Использование легитимных удалённых сервисов (SMB/RDP) для доступа."},
+    "T1068": {"name": "Exploitation for Privilege Escalation", "tactic": "Privilege Escalation", "description": "Эксплуатация уязвимости для повышения привилегий в системе."}
+  },
+
+  "attack_type_to_technique": {
+    "remote_code_execution": "T1210",
+    "information_disclosure": "T1046",
+    "credential_theft": "T1003",
+    "man_in_the_middle": "T1557",
+    "brute_force": "T1110",
+    "authentication_bypass": "T1556",
+    "denial_of_service": "T1499",
+    "relay_attack": "T1557",
+    "misconfiguration": "T1190",
+    "known_vulnerability": "T1190",
+    "reconnaissance": "T1046",
+    "os_specific": "T1210"
+  }
+}

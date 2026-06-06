@@ -11,7 +11,7 @@
   - Интеграция AttackToolkit и ReportHistory
   - Вкладка «Обнаруженное ПО» (показ сырых данных от сканера)
 """
-import sys, os, json, socket, threading, webbrowser, ctypes
+import sys, os, json, socket, threading, webbrowser, ctypes, subprocess, time, urllib.request
 from datetime import datetime
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 try:
@@ -437,6 +437,9 @@ class ServerGUI(QMainWindow):
         self.server_running = False
         self.last_report_path = None
         self.actual_server_port = None
+        self._rvc_process = None
+        self._rvc_url = ""
+        self._rvc_base_dir = ""
         self._last_scan_data = {}        # Данные от атакующего (для схем)
         self._last_results = []          # Результаты корреляции
         self._correlation_results_by_profile = {}
@@ -459,6 +462,7 @@ class ServerGUI(QMainWindow):
         self.analysis_done_signal.connect(self._on_server_analysis_done)
         # Синхронизируем историю с диском при старте
         QTimer.singleShot(500, self._sync_history)
+        QTimer.singleShot(650, self._setup_rvc_integration)
     # ─────────────────────────────────────────
     #  Построение интерфейса
     # ─────────────────────────────────────────
@@ -1716,6 +1720,120 @@ class ServerGUI(QMainWindow):
         c = {"ERROR": "#b55", "WARNING": "#a85", "CRITICAL": "#c44"}.get(level, "#888")
         self.log_output.append(f'<span style="color:{c}">{msg}</span>')
         self.log_output.moveCursor(QTextCursor.MoveOperation.End)
+
+    def _rvc_tools_dir(self) -> str:
+        return os.path.join(PROJECT_DIR, "rvc_module", "tools")
+
+    def _ensure_rvc_dirs(self) -> None:
+        base = self._rvc_tools_dir()
+        os.makedirs(os.path.join(base, "data", "scan_history"), exist_ok=True)
+        os.makedirs(os.path.join(base, "history"), exist_ok=True)
+        self._rvc_base_dir = base
+
+    def _probe_rvc(self, url: str, timeout_sec: float = 0.6) -> bool:
+        try:
+            req = urllib.request.Request(url, headers={"Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                return 200 <= getattr(resp, "status", 0) < 300
+        except Exception:
+            return False
+
+    def _pick_rvc_port_and_url(self) -> tuple[int, str]:
+        for port in range(5000, 5011):
+            base_url = f"http://127.0.0.1:{port}/"
+            if self._probe_rvc(base_url + "api/report"):
+                return port, base_url
+            ok, _ = is_port_available(port)
+            if ok:
+                return port, base_url
+        return 5000, "http://127.0.0.1:5000/"
+
+    def _start_rvc_subprocess(self, port: int, base_url: str) -> bool:
+        app_py = os.path.join(PROJECT_DIR, "rvc_module", "app.py")
+        if not os.path.exists(app_py):
+            logger.warning(f"[RVC] app.py не найден: {app_py}")
+            return False
+        if self._probe_rvc(base_url + "api/report"):
+            return True
+        env = os.environ.copy()
+        env["RVC_BASE_DIR"] = self._rvc_base_dir or self._rvc_tools_dir()
+        env["RVC_PORT"] = str(port)
+        env["RVC_HOST"] = "127.0.0.1"
+        log_dir = os.path.join(PROJECT_DIR, "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        rvc_log_path = os.path.join(log_dir, "rvc.log")
+        try:
+            rvc_log = open(rvc_log_path, "w", encoding="utf-8")
+        except Exception:
+            rvc_log = None
+        try:
+            self._rvc_process = subprocess.Popen(
+                [sys.executable, "-u", app_py],
+                cwd=os.path.join(PROJECT_DIR, "rvc_module"),
+                env=env,
+                stdout=rvc_log or subprocess.DEVNULL,
+                stderr=rvc_log or subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            logger.info(f"[RVC] Запуск сервера: {sys.executable} -u {app_py}")
+            logger.info(f"[RVC] BASE={env['RVC_BASE_DIR']} PORT={env['RVC_PORT']} URL={base_url}")
+            if rvc_log:
+                logger.info(f"[RVC] Лог процесса: {rvc_log_path}")
+        except Exception as e:
+            logger.error(f"[RVC] Не удалось запустить сервер: {e}", exc_info=True)
+            try:
+                if rvc_log:
+                    rvc_log.close()
+            except Exception:
+                pass
+            self._rvc_process = None
+            return False
+        finally:
+            try:
+                if rvc_log:
+                    rvc_log.flush()
+                    rvc_log.close()
+            except Exception:
+                pass
+
+        for _ in range(12):
+            if self._probe_rvc(base_url + "api/report", timeout_sec=0.8):
+                return True
+            time.sleep(0.25)
+        logger.warning("[RVC] Сервер запущен, но /api/report не отвечает (таймаут)")
+        return False
+
+    def _setup_rvc_integration(self) -> None:
+        def worker():
+            try:
+                self._ensure_rvc_dirs()
+                port, base_url = self._pick_rvc_port_and_url()
+                started = self._start_rvc_subprocess(port, base_url)
+                self._rvc_url = base_url
+                os.environ["RVC_URL"] = base_url
+                if started:
+                    logger.info(f"[RVC] Интеграция активна: {base_url}")
+                else:
+                    logger.warning(f"[RVC] Интеграция не активна (сервер не отвечает): {base_url}")
+            except Exception as e:
+                logger.error(f"[RVC] Ошибка интеграции: {e}", exc_info=True)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _persist_attacker_scan_for_rvc(self, scan_data: dict) -> None:
+        try:
+            self._ensure_rvc_dirs()
+            target = (scan_data.get("target_ip") or "unknown").replace(":", "_").replace("/", "_")
+            now = datetime.now()
+            date_str = now.strftime("%Y-%m-%d")
+            time_str = now.strftime("%H-%M-%S")
+            out_dir = os.path.join(self._rvc_base_dir, "history", target, date_str)
+            os.makedirs(out_dir, exist_ok=True)
+            out_path = os.path.join(out_dir, f"{time_str}_analyze.json")
+            with open(out_path, "w", encoding="utf-8") as f:
+                json.dump(scan_data, f, ensure_ascii=False, indent=2)
+            logger.info(f"[RVC] Attacker scan сохранён: {out_path}")
+        except Exception as e:
+            logger.warning(f"[RVC] Не удалось сохранить attacker scan: {e}")
     # ─────────────────────────────────────────
     #  Проверка порта
     # ─────────────────────────────────────────
@@ -2566,6 +2684,10 @@ class ServerGUI(QMainWindow):
                     body = self.rfile.read(ln).decode("utf-8")
                     scan_data = json.loads(body)
                     logger.info(f"[API] Данные от {ip}: {len(scan_data.get('open_ports', []))} портов, {len(scan_data.get('attack_vectors', []))} векторов")
+                    try:
+                        gui._persist_attacker_scan_for_rvc(scan_data)
+                    except Exception:
+                        pass
                     if ip not in state.connected_clients:
                         state.connected_clients.append(ip)
                         if state.on_client_connected:
@@ -3529,6 +3651,15 @@ class ServerGUI(QMainWindow):
                 e.ignore()
                 return
             self._stop_server()
+        try:
+            if self._rvc_process and self._rvc_process.poll() is None:
+                logger.info("[RVC] Остановка сервера (subprocess)")
+                try:
+                    self._rvc_process.terminate()
+                except Exception:
+                    pass
+        except Exception:
+            pass
         e.accept()
 # ─────────────────────────────────────────
 #  Запуск

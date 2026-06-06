@@ -2382,6 +2382,15 @@ class AttackerGUI(QMainWindow):
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(asdict(sr), f, ensure_ascii=False, indent=2)
             logger.info(_log_result_line("История сохранена:", filepath))
+            try:
+                rvc_dir = os.path.join(APP_DIR, "rvc_module", "tools", "history", t, date_str)
+                os.makedirs(rvc_dir, exist_ok=True)
+                rvc_path = os.path.join(rvc_dir, filename)
+                with open(rvc_path, "w", encoding="utf-8") as f:
+                    json.dump(asdict(sr), f, ensure_ascii=False, indent=2)
+                logger.info(_log_result_line("RVC история сохранена:", rvc_path))
+            except Exception:
+                pass
             self._load_history_tree()
         except Exception as e:
             logger.error(f"❌ Ошибка сохранения истории: {e}")

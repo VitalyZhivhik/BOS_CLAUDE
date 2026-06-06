@@ -16,7 +16,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .header-flex { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 15px; }
 
         /* Кнопки */
-        .btn-toggle { background: var(--accent); color: #fff; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .btn-toggle { background: var(--accent); color: #fff; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
         .btn-toggle:hover { background: #3182ce; }
         .btn-danger { background: #da3633; }
         .btn-danger:hover { background: #b32a28; }
@@ -248,6 +248,31 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <body>
     <div class="container">
         <h1 style="margin-top: 20px;">🛡️ Интерактивная Карта Поверхности Атаки SOC</h1>
+        <div class="header-flex" style="border: none; padding-bottom: 0; margin-bottom: 10px;">
+            <div>
+                <div style="font-size: 13px; color: #8b949e;">RVC: анализ воспроизводимости уязвимостей (веб-дашборд)</div>
+            </div>
+            <a class="btn-toggle" href="__RVC_URL__" target="_blank" rel="noopener noreferrer" onclick="return openRvcDashboard(event)">🧪 Перейти в анализатор уязвимостей</a>
+        </div>
+        <script>
+            function openRvcDashboard(ev) {
+                if (ev && ev.preventDefault) ev.preventDefault();
+                const baseUrl = "__RVC_URL__";
+                const normBase = baseUrl.replace(/\/+$/, "") + "/";
+                const probeUrl = normBase + "api/report";
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 900);
+                const open = () => window.open(normBase, "_blank", "noopener,noreferrer");
+                fetch(probeUrl, { mode: "no-cors", signal: controller.signal })
+                    .then(() => open())
+                    .catch(() => {
+                        open();
+                        alert("RVC не отвечает на " + probeUrl + ". Скорее всего веб-сервер RVC не запущен. Запустите: python rvc_module/app.py (при необходимости установите зависимости из rvc_module/requirements.txt).");
+                    })
+                    .finally(() => clearTimeout(timer));
+                return false;
+            }
+        </script>
 
         <div id="profile-bar" class="profile-bar">
             <label for="profile-select">Профиль корреляции</label>

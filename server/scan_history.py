@@ -20,6 +20,20 @@ logger = get_server_logger()
 SCAN_HISTORY_DIR = "data/scan_history"
 SCAN_HISTORY_PATTERN = "scan_*.json"
 
+def _rvc_tools_base_dir(project_base_dir: str) -> str:
+    return os.path.join(project_base_dir, "rvc_module", "tools")
+
+def _mirror_to_rvc_tools(project_base_dir: str, relative_path: str, payload: dict) -> str:
+    tools_base = _rvc_tools_base_dir(project_base_dir)
+    dst = os.path.join(tools_base, relative_path)
+    try:
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        with open(dst, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        return dst
+    except Exception:
+        return ""
+
 
 @dataclass
 class ScanRecord:
@@ -176,13 +190,17 @@ class ScanHistory:
         filepath = os.path.join(self._history_dir, filename)
 
         try:
+            payload = record.to_dict()
             with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(record.to_dict(), f, ensure_ascii=False, indent=2)
+                json.dump(payload, f, ensure_ascii=False, indent=2)
 
             # Добавляем в память
             self._records.insert(0, record)
             self._record_files[record.scan_id] = filepath
             logger.info(f"[SCAN HISTORY] Создана новая запись: {record.scan_id} в файле {filename}")
+            mirrored = _mirror_to_rvc_tools(self.base_dir, os.path.join(SCAN_HISTORY_DIR, filename), payload)
+            if mirrored:
+                logger.info(f"[RVC] ScanHistory зеркалирован: {mirrored}")
         except Exception as e:
             logger.error(f"[SCAN HISTORY] Ошибка сохранения записи {record.scan_id}: {e}")
 
@@ -230,8 +248,9 @@ class ScanHistory:
         if scan_id in self._record_files:
             filepath = self._record_files[scan_id]
             try:
+                payload = updated_record.to_dict()
                 with open(filepath, "w", encoding="utf-8") as f:
-                    json.dump(updated_record.to_dict(), f, ensure_ascii=False, indent=2)
+                    json.dump(payload, f, ensure_ascii=False, indent=2)
 
                 # Обновляем в памяти
                 for i, r in enumerate(self._records):
@@ -240,6 +259,10 @@ class ScanHistory:
                         break
 
                 logger.info(f"[SCAN_HISTORY] Обновлена запись {scan_id} с Trivy данными: {len(updated_record.trivy_scan_result.get('vulnerabilities', []))} уязвимостей")
+                filename = os.path.basename(filepath)
+                mirrored = _mirror_to_rvc_tools(self.base_dir, os.path.join(SCAN_HISTORY_DIR, filename), payload)
+                if mirrored:
+                    logger.info(f"[RVC] ScanHistory зеркалирован: {mirrored}")
                 return True
             except Exception as e:
                 logger.error(f"[SCAN_HISTORY] Ошибка обновления файла {filepath}: {e}")

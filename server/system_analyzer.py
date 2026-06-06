@@ -319,6 +319,15 @@ class SystemAnalyzer:
                 with open(save_path, "w", encoding="utf-8") as f:
                     json.dump(self.system_info.trivy_scan_result, f, ensure_ascii=False, indent=4)
                 logger.info(f"Успех: История Trivy успешно сохранена в файл {save_path}")
+                try:
+                    rvc_base = os.path.join(application_base_dir(), "rvc_module", "tools", "data")
+                    os.makedirs(rvc_base, exist_ok=True)
+                    rvc_save_path = os.path.join(rvc_base, f"trivy_scan_{timestamp}.json")
+                    with open(rvc_save_path, "w", encoding="utf-8") as f:
+                        json.dump(self.system_info.trivy_scan_result, f, ensure_ascii=False, indent=4)
+                    logger.info(f"[RVC] Trivy зеркалирован: {rvc_save_path}")
+                except Exception as mirror_err:
+                    logger.warning(f"[RVC] Не удалось зеркалировать Trivy: {mirror_err}")
             except Exception as save_err:
                 logger.error(f"Ошибка при сохранении истории Trivy: {save_err}")
 
