@@ -5,7 +5,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <title>Интерактивный Отчет Корреляции SOC</title>
-    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+    <script type="text/javascript">
+        if (typeof vis === "undefined") {
+            document.write('<script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"><\/script>');
+        }
+    </script>
     <style>
         :root { --bg: #0d1117; --card: #161b22; --text: #c9d1d9; --border: #30363d; --accent: #58a6ff; }
         body { font-family: "Segoe UI", Tahoma, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
@@ -188,7 +193,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .attack-box { border-left: 4px solid #d29922 !important; background: rgba(210, 153, 34, 0.05) !important; font-family: monospace;}
 
         /* Перечни CVE/CWE/CAPEC/ПО */
-        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; }
         .summary-panel { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 15px; }
         .summary-panel h3 { color: #fff; font-size: 13px; margin: 0 0 10px 0; border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
         .summary-panel .count-badge { float: right; background: var(--accent); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
@@ -352,6 +357,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <label class="agg-chip"><input type="checkbox" class="agg-key" value="port" onchange="onAggregationChanged()"><span>Порт</span></label>
                         <label class="agg-chip"><input type="checkbox" class="agg-key" value="cwe" onchange="onAggregationChanged()"><span>CWE</span></label>
                         <label class="agg-chip"><input type="checkbox" class="agg-key" value="capec" onchange="onAggregationChanged()"><span>CAPEC</span></label>
+                        <label class="agg-chip"><input type="checkbox" class="agg-key" value="mitre" onchange="onAggregationChanged()"><span>MITRE</span></label>
                         <label class="agg-chip"><input type="checkbox" class="agg-key" value="feas" onchange="onAggregationChanged()"><span>Реализуемость</span></label>
                         <label class="agg-chip"><input type="checkbox" class="agg-key" value="found_by" onchange="onAggregationChanged()"><span>Источник</span></label>
                         <label class="agg-chip"><input type="checkbox" class="agg-key" value="sev" onchange="onAggregationChanged()"><span>Критичность</span></label>
@@ -383,6 +389,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <div class="filter-item">
                         <label>Фильтр по Классу (CWE):</label>
                         <select id="f-cwe" onchange="applyFilters()"><option value="all">-- Все классы --</option></select>
+                    </div>
+                    <div class="filter-item">
+                        <label>Фильтр по MITRE ATT&CK:</label>
+                        <select id="f-mitre" onchange="applyFilters()"><option value="all">-- Все техники --</option></select>
                     </div>
                     <div class="filter-item">
                         <label>🎯 Фильтр по реализуемости:</label>
@@ -1033,6 +1043,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 {title: "📋 CVE (уязвимости)", items: summaryData.cves || [], color: "#da3633", prefix: ""},
                 {title: "🐛 CWE (классы слабостей)", items: summaryData.cwes || [], color: "#d29922", prefix: ""},
                 {title: "🥷 CAPEC (векторы атак)", items: summaryData.capecs || [], color: "#58a6ff", prefix: ""},
+                {title: "⚔️ MITRE ATT&CK", items: summaryData.mitres || [], color: "#d29922", prefix: ""},
                 {title: "📦 ПО (программное обеспечение)", items: summaryData.software || [], color: "#3fb950", prefix: ""}
             ];
             var html = "";
@@ -2345,6 +2356,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             return 0;
         }
 
+        function _mitreTokens(x) {
+            let raw = String(x ?? "");
+            if (!raw) return [];
+            let parts = raw.split(",").map(s => String(s || "").trim().toUpperCase()).filter(Boolean);
+            let seen = new Set();
+            let out = [];
+            for (let i = 0; i < parts.length; i++) {
+                let t = parts[i];
+                if (!/^T\\d{4,5}(?:\\.\\d{3})?$/.test(t)) continue;
+                if (seen.has(t)) continue;
+                seen.add(t);
+                out.push(t);
+            }
+            return out;
+        }
+
+        function _mitreKeyForItem(item) {
+            let toks = _mitreTokens(item && item.mitre);
+            return toks.length ? toks[0] : "MITRE-Не определено";
+        }
+
         function aggregateByKeys(items, keys) {
             let map = {};
             function traceScore(item) {
@@ -2359,7 +2391,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (!keys || keys.length === 0) {
                     key = "__item_" + item.raw_id;
                 } else {
-                    key = keys.map(k => `${k}=${item[k] || ""}`).join("|");
+                    key = keys.map(k => {
+                        if (k === "mitre") return `${k}=${_mitreKeyForItem(item)}`;
+                        return `${k}=${item[k] || ""}`;
+                    }).join("|");
                 }
 
                 if (!map[key]) {
@@ -2372,6 +2407,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         port_set: new Set(),
                         cwe_set: new Set(),
                         capec_set: new Set(),
+                        mitre_set: new Set(),
                         feas_set: new Set(),
                         sev_set: new Set(),
                         members: [],
@@ -2403,6 +2439,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (item.port) g.port_set.add(item.port);
                 if (item.cwe) g.cwe_set.add(item.cwe);
                 if (item.capec) g.capec_set.add(item.capec);
+                _mitreTokens(item.mitre).forEach(m => g.mitre_set.add(m));
                 if (item.feas) g.feas_set.add(item.feas);
                 if (item.sev) g.sev_set.add(item.sev);
                 g.members.push(item);
@@ -2411,6 +2448,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     item.port || "",
                     item.cwe || "",
                     item.capec || "",
+                    item.mitre || "",
                     item.cve || "",
                     item.feas || "",
                     item.sev || "",
@@ -2446,12 +2484,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 let g = map[k];
                 let b = g.base;
                 let rep = g.representative_feas || b;
+                let mitreJoin = Array.from(g.mitre_set).sort().join(", ");
                 return {
                     id: g.id,
                     cve: Array.from(g.cve_set).sort().join(", "),
                     cwe: b.cwe || "CWE-Неизвестно",
                     cwe_desc: b.cwe_desc || "Описание отсутствует.",
                     capec: b.capec || "CAPEC-Неизвестно",
+                    mitre: mitreJoin,
                     name: Array.from(g.name_set).sort().join(" / ") || (b.name || "Атака"),
                     sw: b.sw || "Неизвестное ПО",
                     port: b.port || "Локальный вектор (без порта)",
@@ -2479,19 +2519,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     port_all: Array.from(g.port_set).sort().join(", "),
                     cwe_all: Array.from(g.cwe_set).sort().join(", "),
                     capec_all: Array.from(g.capec_set).sort().join(", "),
+                    mitre_all: Array.from(g.mitre_set).sort().join(", "),
                     feas_all: Array.from(g.feas_set).sort().join(", "),
                     sev_all: Array.from(g.sev_set).sort().join(", "),
                     sw_count: g.sw_set.size,
                     port_count: g.port_set.size,
                     cwe_count: g.cwe_set.size,
-                    capec_count: g.capec_set.size
+                    capec_count: g.capec_set.size,
+                    mitre_count: g.mitre_set.size
                 };
             });
         }
 
         function populateFilters(data) {
-            let capecs = new Set(); let cwes = new Set(); let sws = new Set();
-            (data || []).forEach(r => { capecs.add(r.capec); cwes.add(r.cwe); sws.add(r.sw); });
+            let capecs = new Set(); let cwes = new Set(); let sws = new Set(); let mitres = new Set();
+            (data || []).forEach(r => {
+                capecs.add(r.capec);
+                cwes.add(r.cwe);
+                sws.add(r.sw);
+                _mitreTokens(r.mitre).forEach(m => mitres.add(m));
+            });
 
             let refill = (id, set, firstLabel) => {
                 let el = document.getElementById(id);
@@ -2506,6 +2553,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             refill("f-sw", sws, "-- Все приложения --");
             refill("f-capec", capecs, "-- Все векторы --");
             refill("f-cwe", cwes, "-- Все классы --");
+            refill("f-mitre", mitres, "-- Все техники --");
         }
 
         function expandSeedToRawItems(seed) {
@@ -2533,6 +2581,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         if (!m.sw_purpose) m.sw_purpose = g.sw_purpose || "";
                         if (!m.sw_impact) m.sw_impact = g.sw_impact || "";
                         if (!m.sw_scope) m.sw_scope = g.sw_scope || "";
+                        if (!m.mitre) m.mitre = g.mitre || "";
                         if (!m.feasibility_trace) m.feasibility_trace = g.feasibility_trace || {};
                         out.push(m);
                     }
@@ -2607,6 +2656,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             let capecF = document.getElementById('f-capec').value;
             let cweF = document.getElementById('f-cwe').value;
             let swF = document.getElementById('f-sw').value;
+            let mitreF = document.getElementById('f-mitre').value;
             let feasF = document.getElementById('f-feas').value;
             
             let filtered = reportData.filter(r => {
@@ -2620,7 +2670,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         feasMatch = rFeas === feasF;
                     }
                 }
+                let mitreMatch = true;
+                if (mitreF !== 'all') {
+                    mitreMatch = _mitreTokens(r.mitre).includes(String(mitreF || "").trim().toUpperCase());
+                }
                 return feasMatch &&
+                       mitreMatch &&
                        (capecF === 'all' || String(r.capec || '') === capecF) &&
                        (cweF === 'all' || String(r.cwe || '') === cweF) &&
                        (swF === 'all' || String(r.sw || '') === swF);
@@ -2702,7 +2757,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 let nameShort = r.name.substring(0, 50) + (r.name.length > 50 ? "..." : "");
                 let dupes = r.count > 1 ? `<br><small style="color:#58a6ff;">(Сгруппировано из ${r.count} CVE)</small>` : "";
                 let variants = r.count > 1
-                    ? `<br><small style="color:#8b949e;">В группе: ПО ${r.sw_count || 1}, портов ${r.port_count || 1}, CWE ${r.cwe_count || 1}, CAPEC ${r.capec_count || 1}</small>`
+                    ? `<br><small style="color:#8b949e;">В группе: ПО ${r.sw_count || 1}, портов ${r.port_count || 1}, CWE ${r.cwe_count || 1}, CAPEC ${r.capec_count || 1}, MITRE ${r.mitre_count || 1}</small>`
                     : "";
                 
                 let tr = `<tr class="clickable-row" onclick="openModal('aggr_${r.id}')">
@@ -3183,6 +3238,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             if(network) network.destroy();
             var container = document.getElementById('network-map');
+            if (typeof vis === 'undefined' || !vis || !vis.DataSet || !vis.Network) {
+                container.innerHTML = '<div style="padding:24px;border:1px solid #30363d;border-radius:8px;background:#0d1117;color:#ff7b72;line-height:1.6;">Не удалось загрузить библиотеку визуализации графа `vis-network`. Проверьте доступ к CDN или пересоздайте отчёт после запуска сервера.</div>';
+                return;
+            }
             var visData = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
             
             // Динамическое расстояние узлов
@@ -3236,17 +3295,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 let data = Array.isArray(rows) ? rows : [];
                 let lim = Math.max(1, Number(limit || 30));
                 let slice = data.slice(0, lim);
+                let summarizeList = (raw, maxItems, label) => {
+                    let toks = splitCsv(raw);
+                    if (!toks.length) return "Н/Д";
+                    let shown = toks.slice(0, Math.max(1, Number(maxItems || 6)));
+                    let head = shown.join(", ");
+                    if (toks.length > shown.length) {
+                        return (label ? (label + " (" + toks.length + "): ") : "") + head + " …";
+                    }
+                    return (label ? (label + " (" + toks.length + "): ") : "") + head;
+                };
                 let html = '<div class="group-members" style="border:none;">';
                 html += '<div class="group-members-head">Показаны примеры связей (строк): ' + slice.length + (data.length > slice.length ? ' из ' + data.length : '') + '</div>';
                 html += '<div class="group-members-row" style="font-weight:700; color:#8b949e; background:#0d1117; border-top:1px solid #21262d;">'
                     + '<div>ПО / CVE</div><div>Порт</div><div>CWE</div><div>CAPEC</div><div>Вердикт</div></div>';
                 slice.forEach(function(m) {
                     let feas = String(m.feas || "");
+                    let capecDisp = summarizeList(m.capec || "", 6, "CAPEC");
                     html += '<div class="group-members-row">'
                         + '<div><strong>' + esc(m.sw || '—') + '</strong><br><span class="mono">' + esc(m.cve || 'N/A') + '</span></div>'
                         + '<div>' + esc(m.port || 'Н/Д') + '</div>'
                         + '<div>' + esc(m.cwe || 'Н/Д') + '</div>'
-                        + '<div>' + esc(m.capec || 'Н/Д') + '</div>'
+                        + '<div>' + esc(capecDisp) + '</div>'
                         + '<div><span class="badge ' + getFeasClass(feas) + '">' + esc(feas || 'UNKNOWN') + '</span></div>'
                         + '</div>';
                 });

@@ -1,6 +1,7 @@
 import json
 import os
 import re
+from collections import Counter
 
 from common.models import normalize_feasibility, normalize_severity, report_status_meta
 from common.config import SERVER_PORT
@@ -424,35 +425,325 @@ class ReportGenerator:
         self._mitre_capec_rev = rev
         return rev
 
-    def _infer_mitre_from_capec(self, capec_value) -> str:
-        if capec_value is None:
-            return ""
+    def _mitre_id_re(self):
+        rx = getattr(self, "_mitre_id_rx", None)
+        if rx is None:
+            rx = re.compile(r"^T\d{4,5}(?:\.\d{3})?$")
+            self._mitre_id_rx = rx
+        return rx
 
-        if isinstance(capec_value, list):
-            tokens = [str(x).strip() for x in capec_value]
-        else:
-            tokens = [x.strip() for x in str(capec_value).split(",")]
+    def _target_platforms_for_row(self, sw: str = "") -> set[str]:
+        out = set()
+        os_raw = ""
+        try:
+            os_raw = str((self.system_summary or {}).get("os", "") or "")
+        except Exception:
+            os_raw = ""
+        s = (os_raw + " " + str(sw or "")).lower()
+        if "windows" in s or "win " in s or "microsoft windows" in s:
+            out.add("Windows")
+        if "linux" in s:
+            out.add("Linux")
+        if "macos" in s or "mac os" in s or "os x" in s or "mac " in s:
+            out.add("macOS")
+        return out
 
-        capecs = set()
-        for tok in tokens:
-            up = str(tok or "").strip().upper()
-            if not up.startswith("CAPEC-"):
+    def _filter_mitres_by_platform(self, mitres: list[str], sw: str = "") -> list[str]:
+        targets = self._target_platforms_for_row(sw)
+        if not targets:
+            return mitres
+        idx = self._mitre_index()
+        out = []
+        for mid in mitres:
+            entry = idx.get(mid, {}) if isinstance(idx, dict) else {}
+            plats = []
+            if isinstance(entry, dict):
+                plats = entry.get("platforms", []) or []
+            norm_plats = {str(p or "").strip() for p in plats if str(p or "").strip()}
+            if not norm_plats:
+                out.append(mid)
                 continue
-            if re.fullmatch(r"CAPEC-\d+", up):
-                capecs.add(up)
+            if any(p in targets for p in norm_plats):
+                out.append(mid)
+        return out
 
+    def _limit_join_ranked(self, ranked: list[str], limit: int) -> str:
+        if not ranked:
+            return ""
+        out = ranked
+        if limit and len(out) > limit:
+            out = out[:limit]
+        return ", ".join(out)
+
+    def _mitre_index(self) -> dict:
+        idx = getattr(self, "_mitre_idx", None)
+        if isinstance(idx, dict):
+            return idx
+
+        out = {}
+        db = self.mitre_db
+        if isinstance(db, dict):
+            items = db.items()
+            for k, v in items:
+                mid = str(k or "").strip().upper()
+                if mid:
+                    out[mid] = v
+        elif isinstance(db, list):
+            for v in db:
+                if not isinstance(v, dict):
+                    continue
+                mid = str(v.get("id") or v.get("technique_id") or "").strip().upper()
+                if mid:
+                    out[mid] = v
+
+        self._mitre_idx = out
+        return out
+
+    def _mitre_cwe_reverse_index(self) -> dict:
+        idx = getattr(self, "_mitre_cwe_rev", None)
+        if isinstance(idx, dict):
+            return idx
+
+        rev = {}
+        rx = self._mitre_id_re()
+        mitre_idx = self._mitre_index()
+        for mid, entry in mitre_idx.items():
+            if not rx.match(mid):
+                continue
+            if not isinstance(entry, dict):
+                continue
+            for cwe in (entry.get("related_cwe", []) or []):
+                raw = str(cwe or "").strip().upper()
+                if not raw:
+                    continue
+                m = re.fullmatch(r"CWE-(\d+)", raw)
+                if m:
+                    cid = f"CWE-{m.group(1)}"
+                elif re.fullmatch(r"\d+", raw):
+                    cid = f"CWE-{raw}"
+                else:
+                    continue
+                if cid not in rev:
+                    rev[cid] = set()
+                rev[cid].add(mid)
+
+        self._mitre_cwe_rev = rev
+        return rev
+
+    def _infer_mitre_from_cwe(self, cwe_value, sw: str = "") -> str:
+        cwe_ids = self._canonical_cwe_list(cwe_value)
+        if not cwe_ids:
+            return ""
+        rev = self._mitre_cwe_reverse_index()
+        mitres = set()
+        for cid in cwe_ids:
+            mitres |= set(rev.get(cid, set()) or set())
+        ranked = sorted(list(mitres))
+        ranked = self._filter_mitres_by_platform(ranked, sw)
+        return self._limit_join_ranked(ranked, 8)
+
+    def _capec_index(self) -> dict:
+        idx = getattr(self, "_capec_idx", None)
+        if isinstance(idx, dict):
+            return idx
+
+        out = {}
+        db = self.capec_db
+        if isinstance(db, dict):
+            items = db.items()
+            for k, v in items:
+                cid = str(k or "").strip().upper()
+                if cid:
+                    out[cid] = v
+        elif isinstance(db, list):
+            for v in db:
+                if not isinstance(v, dict):
+                    continue
+                cid = str(v.get("id") or v.get("capec_id") or "").strip().upper()
+                if cid:
+                    out[cid] = v
+
+        self._capec_idx = out
+        return out
+
+    def _cve_index(self) -> dict:
+        idx = getattr(self, "_cve_idx", None)
+        if isinstance(idx, dict):
+            return idx
+
+        out = {}
+        db = self.cve_db
+        if isinstance(db, dict):
+            items = db.items()
+            for k, v in items:
+                cid = str(k or "").strip().upper()
+                if cid:
+                    out[cid] = v
+        elif isinstance(db, list):
+            for v in db:
+                if not isinstance(v, dict):
+                    continue
+                cid = str(v.get("id") or v.get("cve_id") or "").strip().upper()
+                if cid:
+                    out[cid] = v
+
+        self._cve_idx = out
+        return out
+
+    def _capec_cwe_reverse_index(self) -> dict:
+        idx = getattr(self, "_capec_cwe_rev", None)
+        if isinstance(idx, dict):
+            return idx
+
+        rev = {}
+        capec_idx = self._capec_index()
+        for capec_id, entry in capec_idx.items():
+            if not isinstance(entry, dict):
+                continue
+            for cwe in (entry.get("related_cwe", []) or []):
+                cid = str(cwe or "").strip().upper()
+                if not cid:
+                    continue
+                if re.fullmatch(r"CWE-\d+", cid) is None:
+                    continue
+                if cid not in rev:
+                    rev[cid] = set()
+                rev[cid].add(capec_id)
+
+        self._capec_cwe_rev = rev
+        return rev
+
+    def _parse_cve_tokens(self, cve_value) -> list[str]:
+        if cve_value is None:
+            return []
+        if isinstance(cve_value, list):
+            raw = [str(x).strip() for x in cve_value]
+        else:
+            raw = [x.strip() for x in str(cve_value).split(",")]
+        out = []
+        seen = set()
+        for tok in raw:
+            up = str(tok or "").strip().upper()
+            if not up:
+                continue
+            if re.fullmatch(r"CVE-\d{4}-\d{4,}", up) is None:
+                continue
+            if up in seen:
+                continue
+            seen.add(up)
+            out.append(up)
+        return out
+
+    def _parse_capec_tokens(self, capec_value) -> list[str]:
+        if capec_value is None:
+            return []
+        if isinstance(capec_value, list):
+            raw = [str(x).strip() for x in capec_value]
+        else:
+            raw = [x.strip() for x in str(capec_value).split(",")]
+        out = []
+        seen = set()
+        for tok in raw:
+            up = str(tok or "").strip().upper()
+            if not up:
+                continue
+            if re.fullmatch(r"CAPEC-\d+", up) is None:
+                continue
+            if up in seen:
+                continue
+            seen.add(up)
+            out.append(up)
+        return out
+
+    def _limit_join(self, tokens: set[str], limit: int) -> str:
+        if not tokens:
+            return ""
+        out = sorted(list(tokens))
+        if limit and len(out) > limit:
+            out = out[:limit]
+        return ", ".join(out)
+
+    def _infer_mitre_from_capec(self, capec_value, sw: str = "") -> str:
+        capecs = self._parse_capec_tokens(capec_value)
         if not capecs:
             return ""
 
-        rev = self._mitre_capec_reverse_index()
-        mitres = set()
-        for cid in capecs:
-            mitres |= set(rev.get(cid, set()) or set())
+        rx = self._mitre_id_re()
+        counts: Counter[str] = Counter()
 
-        if not mitres:
+        capec_idx = self._capec_index()
+        for cid in capecs:
+            entry = capec_idx.get(cid)
+            if not isinstance(entry, dict):
+                continue
+            for mid in (entry.get("related_mitre", []) or []):
+                up = str(mid or "").strip().upper()
+                if rx.match(up):
+                    counts[up] += 1
+
+        rev = self._mitre_capec_reverse_index()
+        for cid in capecs:
+            for mid in (rev.get(cid, set()) or set()):
+                up = str(mid or "").strip().upper()
+                if rx.match(up):
+                    counts[up] += 1
+
+        if not counts:
             return ""
 
-        return ", ".join(sorted(mitres))
+        ranked = [k for (k, _v) in counts.most_common()]
+        if len(capecs) >= 6:
+            ranked_strict = [k for k in ranked if counts.get(k, 0) >= 2]
+            if ranked_strict:
+                ranked = ranked_strict
+
+        ranked = self._filter_mitres_by_platform(ranked, sw)
+        return self._limit_join_ranked(ranked, 8)
+
+    def _infer_capec_from_cwe(self, cwe_value) -> str:
+        cwe_ids = self._canonical_cwe_list(cwe_value)
+        if not cwe_ids:
+            return ""
+        rev = self._capec_cwe_reverse_index()
+        capecs = set()
+        for cid in cwe_ids:
+            capecs |= set(rev.get(cid, set()) or set())
+        return self._limit_join(capecs, 12)
+
+    def _infer_capec_from_cves(self, cve_value) -> str:
+        cves = self._parse_cve_tokens(cve_value)
+        if not cves:
+            return ""
+        cve_idx = self._cve_index()
+        capecs = set()
+        for cve in cves:
+            entry = cve_idx.get(cve)
+            if not isinstance(entry, dict):
+                continue
+            for cap in (entry.get("related_capec", []) or []):
+                up = str(cap or "").strip().upper()
+                if re.fullmatch(r"CAPEC-\d+", up):
+                    capecs.add(up)
+        return self._limit_join(capecs, 12)
+
+    def _infer_mitre_from_cves(self, cve_value, sw: str = "") -> str:
+        cves = self._parse_cve_tokens(cve_value)
+        if not cves:
+            return ""
+        rx = self._mitre_id_re()
+        cve_idx = self._cve_index()
+        mitres = set()
+        for cve in cves:
+            entry = cve_idx.get(cve)
+            if not isinstance(entry, dict):
+                continue
+            for mid in (entry.get("related_mitre", []) or []):
+                up = str(mid or "").strip().upper()
+                if rx.match(up):
+                    mitres.add(up)
+        ranked = sorted(list(mitres))
+        ranked = self._filter_mitres_by_platform(ranked, sw)
+        return self._limit_join_ranked(ranked, 8)
 
     def _canonical_cwe_list(self, raw) -> list:
         """
@@ -736,10 +1027,11 @@ class ReportGenerator:
         }
 
     def _build_summary_data(self, js_data, raw_js_data):
-        """Строит данные для перечней CVE, CWE, CAPEC, ПО."""
+        """Строит данные для перечней CVE, CWE, CAPEC, MITRE, ПО."""
         all_cves = set()
         all_cwes = set()
         all_capecs = set()
+        all_mitres = set()
         all_software = {}  # name -> version
 
         # Из агрегированных данных
@@ -761,6 +1053,13 @@ class ReportGenerator:
                 for c in capec.split(', '):
                     c = c.strip()
                     if c: all_capecs.add(c)
+            # MITRE
+            mitre = item.get('mitre', '')
+            if mitre:
+                for m in str(mitre).split(','):
+                    up = m.strip().upper()
+                    if up and self._mitre_id_re().match(up):
+                        all_mitres.add(up)
             # ПО
             sw = item.get('sw', '')
             if sw and 'Неидентифицированн' not in sw:
@@ -833,6 +1132,20 @@ class ReportGenerator:
                         break
             capec_list.append({"id": c, "desc": desc})
 
+        mitre_list = []
+        mitre_idx = self._mitre_index()
+        for mid in sorted(list(all_mitres)):
+            entry = mitre_idx.get(mid, {}) if isinstance(mitre_idx, dict) else {}
+            name = ""
+            tactic = ""
+            if isinstance(entry, dict):
+                name = str(entry.get("name") or "").strip()
+                tactic = str(entry.get("tactic") or "").strip()
+            short = name
+            if tactic:
+                short = (short + " · " + tactic).strip(" ·")
+            mitre_list.append({"id": mid, "desc": short[:80]})
+
         sw_list = []
         for name, meta in sorted(all_software.items()):
             port = meta.get("port", "")
@@ -851,6 +1164,7 @@ class ReportGenerator:
             "cves": cve_list,
             "cwes": cwe_list,
             "capecs": capec_list,
+            "mitres": mitre_list,
             "software": sw_list,
         }
 
@@ -1292,9 +1606,19 @@ class ReportGenerator:
             tools = getattr(representative_r, "attack_software", None) or getattr(base_r, "attack_software", None)
             steps = getattr(representative_r, "attack_steps", None) or getattr(base_r, "attack_steps", None)
             mitre_raw = getattr(representative_r, "mitre_technique", None) or getattr(base_r, "mitre_technique", None) or ""
-            if not mitre_raw or str(mitre_raw).strip().upper() in ("N/A", "—", "NONE", "NULL"):
-                capec_for_mitre = getattr(representative_r, "capec_id", None) or getattr(base_r, "capec_id", None) or ""
-                inferred = self._infer_mitre_from_capec(capec_for_mitre)
+            capec_raw = getattr(representative_r, "capec_id", None) or getattr(base_r, "capec_id", None) or ""
+            capec_report = capec_raw
+            if not self._parse_capec_tokens(capec_report):
+                inferred_capec = self._infer_capec_from_cves(cves_joined) or self._infer_capec_from_cwe(cwe_raw)
+                if inferred_capec:
+                    capec_report = inferred_capec
+
+            if not mitre_raw or str(mitre_raw).strip().upper() in ("N/A", "—", "NONE", "NULL", ""):
+                inferred = (
+                    self._infer_mitre_from_capec(capec_report, sw=g["mapped_sw"])
+                    or self._infer_mitre_from_cves(cves_joined, sw=g["mapped_sw"])
+                    or self._infer_mitre_from_cwe(cwe_raw, sw=g["mapped_sw"])
+                )
                 if inferred:
                     mitre_raw = inferred
 
@@ -1334,7 +1658,7 @@ class ReportGenerator:
                     "cve": cves_joined,
                     "cwe": cwe_id or "CWE-Неизвестно",
                     "cwe_desc": cwe_desc,
-                    "capec": getattr(representative_r, "capec_id", None) or getattr(base_r, "capec_id", None) or "CAPEC-Неизвестно",
+                    "capec": capec_report or "CAPEC-Неизвестно",
                     "mitre": mitre_raw,
                     "name": names_joined,
                     "sw": g["mapped_sw"],
@@ -1392,11 +1716,18 @@ class ReportGenerator:
                     "cve": cve_str if cve_str else "N/A",
                     "cwe": cwe_display_row,
                     "cwe_desc": cwe_desc_raw,
-                    "capec": getattr(r, "capec_id", None) or "CAPEC-Неизвестно",
+                    "capec": (
+                        (", ".join(self._parse_capec_tokens(getattr(r, "capec_id", None))) or getattr(r, "capec_id", None) or "")
+                        if self._parse_capec_tokens(getattr(r, "capec_id", None))
+                        else (self._infer_capec_from_cves(cve_str) or self._infer_capec_from_cwe(cwe_raw_row) or "CAPEC-Неизвестно")
+                    ),
                     "mitre": (
-                        getattr(r, "mitre_technique", None)
-                        if (getattr(r, "mitre_technique", None) not in (None, "", "N/A", "—"))
-                        else (self._infer_mitre_from_capec(getattr(r, "capec_id", None) or "") or "")
+                        (", ".join([m for m in [x.strip().upper() for x in str(getattr(r, "mitre_technique", "") or "").split(",")] if self._mitre_id_re().match(m)]) or "")
+                        or self._infer_mitre_from_capec(getattr(r, "capec_id", None) or "", sw=real_sw)
+                        or self._infer_mitre_from_capec(self._infer_capec_from_cves(cve_str) or self._infer_capec_from_cwe(cwe_raw_row) or "", sw=real_sw)
+                        or self._infer_mitre_from_cves(cve_str, sw=real_sw)
+                        or self._infer_mitre_from_cwe(cwe_raw_row, sw=real_sw)
+                        or ""
                     ),
                     "name": getattr(r, "attack_name", None) or "Атака",
                     "sw": real_sw,
