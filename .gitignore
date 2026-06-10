@@ -28,3 +28,4 @@ dist_attacker/logs/
 dist
 dist_attacker
 MITRE_PARSER/.venv/
+rvc_modules/tools/

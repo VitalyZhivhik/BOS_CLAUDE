@@ -83,6 +83,7 @@ def build(name, entry, extra_data=None, onefile=False, dist_dir_name="dist"):
         f"--distpath={dist_path}",
         f"--workpath={work_path}",
         f"--specpath={spec_path}",
+        f"--paths={os.path.join(PROJECT_DIR, 'rvc_module')}",
         f"--add-data={_normalize_add_data(f'common{SEP}common')}",
     ]
 
@@ -95,6 +96,8 @@ def build(name, entry, extra_data=None, onefile=False, dist_dir_name="dist"):
 
     # Скрытые импорты для PyQt6
     for mod in ["common", "common.config", "common.models", "common.logger", "common.bundle_paths"]:
+        cmd.append(f"--hidden-import={mod}")
+    for mod in ["rvc", "rvc.models", "rvc.loaders", "rvc.knowledge", "rvc.engine", "rvc.enrichment", "rvc.pipeline", "rvc_module.app"]:
         cmd.append(f"--hidden-import={mod}")
 
     cmd.append(entry)
@@ -161,6 +164,7 @@ def main():
             extra_data=[
                 f"server{SEP}server",
                 f"databases{SEP}databases",
+                f"rvc_module{SEP}rvc_module",
             ],
             onefile=args.onefile,
             dist_dir_name="dist"

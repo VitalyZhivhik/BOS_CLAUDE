@@ -2760,6 +2760,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return raw.split("&").map(x => x.trim()).filter(Boolean);
             };
             let uniq = (arr) => Array.from(new Set((arr || []).filter(Boolean)));
+            let normMitre = (s) => String(s ?? "").trim().toUpperCase();
+            let isMitreId = (s) => /^T\d{4,5}(\.\d{3})?$/.test(normMitre(s));
             let keys = getSelectedAggregationKeys();
             let noAgg = !keys || keys.length === 0;
 
@@ -2776,21 +2778,31 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     if (!cweTokens.length) cweTokens = [String(r.cwe || "CWE-Неизвестно")];
                     let capecTokens = uniq(splitCsv(r.capec));
                     if (!capecTokens.length) capecTokens = [String(r.capec || "CAPEC-Неизвестно")];
-                    let mitreTokens = uniq(splitCsv(r.mitre));
-                    if (!mitreTokens.length) mitreTokens = ["—"];
+                    let mitreTokens = uniq(splitCsv(r.mitre).map(normMitre).filter(isMitreId));
+                    let mitreUnknownId = "";
+                    if (!mitreTokens.length) {
+                        mitreUnknownId = "ac_mitre_unknown_" + safeIdPart(rk);
+                        addNode({ id: mitreUnknownId, label: "⚔️ MITRE ATT&CK:\\nНе определено", level: 4, shape: "box", color: {background: "#8b949e"} });
+                        addDetail(mitreUnknownId, "mitre_unknown", { data: r }, r);
+                    }
 
                     let verdId = "ac_verd_" + (noAgg ? safeIdPart(rk) : safeIdPart(r.id));
                     addNode({ id: verdId, label: "⚖️ Вердикт:\\n" + (r.feas || ""), level: 5, shape: "box", color: {background: getFeasColor(r.feas)} });
                     addDetail(verdId, "verdict", { data: r }, r);
 
-                    mitreTokens.forEach(mitreTok => {
-                        let mId = "ac_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
-                        let mt = (mitreMeta && mitreMeta[mitreTok] && mitreMeta[mitreTok].tactic) ? String(mitreMeta[mitreTok].tactic) : "";
-                        let lbl = "⚔️ MITRE ATT&CK:\\n" + mitreTok + (mt ? ("\\n" + mt) : "");
-                        addNode({ id: mId, label: lbl, level: 4, shape: "box", color: {background: "#d29922"} });
-                        addDetail(mId, "mitre", { data: r, mitre: mitreTok }, r);
-                        addEdge(mId, verdId, getFeasColor(r.feas), r.feas === "РЕАЛИЗУЕМА" ? 3 : 2, r.feas === "НЕ РЕАЛИЗУЕМА");
-                    });
+                    if (mitreUnknownId) {
+                        addEdge(mitreUnknownId, verdId, getFeasColor(r.feas), r.feas === "РЕАЛИЗУЕМА" ? 3 : 2, r.feas === "НЕ РЕАЛИЗУЕМА");
+                    } else {
+                        mitreTokens.forEach(mitreTok => {
+                            let mitreKey = String(mitreTok || "").trim().toUpperCase();
+                            let mId = "ac_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreKey)) : safeIdPart(mitreKey));
+                            let mt = (mitreMeta && mitreMeta[mitreKey] && mitreMeta[mitreKey].tactic) ? String(mitreMeta[mitreKey].tactic) : "";
+                            let lbl = "⚔️ MITRE ATT&CK:\\n" + (mitreKey || mitreTok) + (mt ? ("\\n" + mt) : "");
+                            addNode({ id: mId, label: lbl, level: 4, shape: "box", color: {background: "#d29922"} });
+                            addDetail(mId, "mitre", { data: r, mitre: (mitreKey || mitreTok) }, r);
+                            addEdge(mId, verdId, getFeasColor(r.feas), r.feas === "РЕАЛИЗУЕМА" ? 3 : 2, r.feas === "НЕ РЕАЛИЗУЕМА");
+                        });
+                    }
 
                     if (noAgg) {
                         let cveTokens = uniq(splitCsv(r.cve));
@@ -2812,10 +2824,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                     addNode({ id: capecId, label: "🥷 CAPEC (Метод):\\n" + capecTok, level: 3, shape: "box", color: {background: "#58a6ff"} });
                                     addDetail(capecId, "capec", { data: r, capec: capecTok }, r);
                                     addEdge(cweId, capecId, "#8b949e");
-                                    mitreTokens.forEach(mitreTok => {
-                                        let mId = "ac_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
-                                        addEdge(capecId, mId, "#8b949e");
-                                    });
+                                    if (mitreUnknownId) {
+                                        addEdge(capecId, mitreUnknownId, "#8b949e");
+                                    } else {
+                                        mitreTokens.forEach(mitreTok => {
+                                            let mitreKey = String(mitreTok || "").trim().toUpperCase();
+                                            let mId = "ac_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreKey)) : safeIdPart(mitreKey));
+                                            addEdge(capecId, mId, "#8b949e");
+                                        });
+                                    }
                                 });
                             });
                         });
@@ -2838,10 +2855,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 addNode({ id: capecId, label: "🥷 CAPEC (Метод):\\n" + capecTok, level: 3, shape: "box", color: {background: "#58a6ff"} });
                                 addDetail(capecId, "capec", { data: r, capec: capecTok }, r);
                                 addEdge(cweId, capecId, "#8b949e");
-                                mitreTokens.forEach(mitreTok => {
-                                    let mId = "ac_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
-                                    addEdge(capecId, mId, "#8b949e");
-                                });
+                                if (mitreUnknownId) {
+                                    addEdge(capecId, mitreUnknownId, "#8b949e");
+                                } else {
+                                    mitreTokens.forEach(mitreTok => {
+                                        let mitreKey = String(mitreTok || "").trim().toUpperCase();
+                                        let mId = "ac_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreKey)) : safeIdPart(mitreKey));
+                                        addEdge(capecId, mId, "#8b949e");
+                                    });
+                                }
                             });
                         });
                     }
@@ -2853,14 +2875,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     r = r || {};
                     let rk = String(r.raw_id ?? r.id ?? idx);
 
-                    let mitreTokens = uniq(splitCsv(r.mitre));
-                    if (!mitreTokens.length) mitreTokens = ["—"];
+                    let mitreTokens = uniq(splitCsv(r.mitre).map(normMitre).filter(isMitreId));
+                    let mitreUnknownId = "";
+                    if (!mitreTokens.length) {
+                        mitreUnknownId = "at_mitre_unknown_" + safeIdPart(rk);
+                        addNode({ id: mitreUnknownId, label: "⚔️ MITRE ATT&CK:\\nНе определено", level: 0, shape: "box", color: {background: "#8b949e"} });
+                        addDetail(mitreUnknownId, "mitre_unknown", { data: r }, r);
+                    }
                     mitreTokens.forEach(mitreTok => {
-                        let mId = "at_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
-                        let mt = (mitreMeta && mitreMeta[mitreTok] && mitreMeta[mitreTok].tactic) ? String(mitreMeta[mitreTok].tactic) : "";
-                        let lbl = "⚔️ MITRE ATT&CK:\\n" + mitreTok + (mt ? ("\\n" + mt) : "");
+                        let mitreKey = String(mitreTok || "").trim().toUpperCase();
+                        let mId = "at_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreKey)) : safeIdPart(mitreKey));
+                        let mt = (mitreMeta && mitreMeta[mitreKey] && mitreMeta[mitreKey].tactic) ? String(mitreMeta[mitreKey].tactic) : "";
+                        let lbl = "⚔️ MITRE ATT&CK:\\n" + (mitreKey || mitreTok) + (mt ? ("\\n" + mt) : "");
                         addNode({ id: mId, label: lbl, level: 0, shape: "box", color: {background: "#d29922"} });
-                        addDetail(mId, "mitre", { data: r, mitre: mitreTok }, r);
+                        addDetail(mId, "mitre", { data: r, mitre: (mitreKey || mitreTok) }, r);
                     });
 
                     let swId = "at_sw_" + (noAgg ? safeIdPart(rk) : (safeIdPart(r.sw) + "_" + safeIdPart(r.port)));
@@ -2883,8 +2911,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             let capecId = "at_capec_" + safeIdPart(rk) + "_" + safeIdPart(capecTok);
                             addNode({ id: capecId, label: "🥷 CAPEC (Метод):\\n" + capecTok, level: 1, shape: "box", color: {background: "#58a6ff"} });
                             addDetail(capecId, "capec", { data: r, capec: capecTok }, r);
+                            if (mitreUnknownId) {
+                                addEdge(mitreUnknownId, capecId, "#8b949e");
+                            }
                             mitreTokens.forEach(mitreTok => {
-                                let mId = "at_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
+                                let mitreKey = String(mitreTok || "").trim().toUpperCase();
+                                let mId = "at_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreKey)) : safeIdPart(mitreKey));
                                 addEdge(mId, capecId, "#8b949e");
                             });
 
@@ -2909,8 +2941,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         let capecId = "at_capec_" + safeIdPart(capecAnchor);
                         addNode({ id: capecId, label: "🥷 CAPEC (Метод):\\n" + capecAnchor, level: 1, shape: "box", color: {background: "#58a6ff"} });
                         addDetail(capecId, "capec", { data: r, capec: capecAnchor }, r);
+                        if (mitreUnknownId) {
+                            addEdge(mitreUnknownId, capecId, "#8b949e");
+                        }
                         mitreTokens.forEach(mitreTok => {
-                            let mId = "at_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
+                            let mitreKey = String(mitreTok || "").trim().toUpperCase();
+                            let mId = "at_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreKey)) : safeIdPart(mitreKey));
                             addEdge(mId, capecId, "#8b949e");
                         });
 
@@ -2946,16 +2982,25 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     addNode({ id: verdId, label: "⚖️ Вердикт:\\n" + (r.feas || ""), level: 5, shape: "box", color: {background: getFeasColor(r.feas)} });
                     addDetail(verdId, "verdict", { data: r }, r);
 
-                    let mitreTokens = uniq(splitCsv(r.mitre));
-                    if (!mitreTokens.length) mitreTokens = ["—"];
+                    let mitreTokens = uniq(splitCsv(r.mitre).map(normMitre).filter(isMitreId));
+                    let mitreUnknownId = "";
+                    if (!mitreTokens.length) {
+                        mitreUnknownId = "cc_mitre_unknown_" + safeIdPart(rk);
+                        addNode({ id: mitreUnknownId, label: "⚔️ MITRE ATT&CK:\\nНе определено", level: 4, shape: "box", color: {background: "#8b949e"} });
+                        addDetail(mitreUnknownId, "mitre_unknown", { data: r }, r);
+                    }
                     mitreTokens.forEach(mitreTok => {
-                        let mId = "cc_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
-                        let mt = (mitreMeta && mitreMeta[mitreTok] && mitreMeta[mitreTok].tactic) ? String(mitreMeta[mitreTok].tactic) : "";
-                        let lbl = "⚔️ MITRE ATT&CK:\\n" + mitreTok + (mt ? ("\\n" + mt) : "");
+                        let mitreKey = String(mitreTok || "").trim().toUpperCase();
+                        let mId = "cc_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreKey)) : safeIdPart(mitreKey));
+                        let mt = (mitreMeta && mitreMeta[mitreKey] && mitreMeta[mitreKey].tactic) ? String(mitreMeta[mitreKey].tactic) : "";
+                        let lbl = "⚔️ MITRE ATT&CK:\\n" + (mitreKey || mitreTok) + (mt ? ("\\n" + mt) : "");
                         addNode({ id: mId, label: lbl, level: 4, shape: "box", color: {background: "#d29922"} });
-                        addDetail(mId, "mitre", { data: r, mitre: mitreTok }, r);
+                        addDetail(mId, "mitre", { data: r, mitre: (mitreKey || mitreTok) }, r);
                         addEdge(mId, verdId, getFeasColor(r.feas), r.feas === "РЕАЛИЗУЕМА" ? 3 : 2, r.feas === "НЕ РЕАЛИЗУЕМА");
                     });
+                    if (mitreUnknownId) {
+                        addEdge(mitreUnknownId, verdId, getFeasColor(r.feas), r.feas === "РЕАЛИЗУЕМА" ? 3 : 2, r.feas === "НЕ РЕАЛИЗУЕМА");
+                    }
                     let swId = "cc_sw_" + (noAgg ? safeIdPart(rk) : (safeIdPart(r.sw) + "_" + safeIdPart(r.port)));
                     addNode({ id: swId, label: "🎯 ПО (Среда):\\n" + (r.sw || ""), level: 2, shape: "box", color: {background: "#1f77b4"} });
                     addDetail(swId, "sw", { data: r, sw: r.sw, port: r.port }, r);
@@ -2978,10 +3023,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                     addNode({ id: capecId, label: "🥷 CAPEC (Вектор):\\n" + capecTok, level: 3, shape: "box", color: {background: "#58a6ff"} });
                                     addDetail(capecId, "capec", { data: r, capec: capecTok }, r);
                                     addEdge(swId, capecId, "#8b949e");
-                                    mitreTokens.forEach(mitreTok => {
-                                        let mId = "cc_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
-                                        addEdge(capecId, mId, "#8b949e");
-                                    });
+                                    if (mitreUnknownId) {
+                                        addEdge(capecId, mitreUnknownId, "#8b949e");
+                                    } else {
+                                        mitreTokens.forEach(mitreTok => {
+                                            let mitreKey = String(mitreTok || "").trim().toUpperCase();
+                                            let mId = "cc_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreKey)) : safeIdPart(mitreKey));
+                                            addEdge(capecId, mId, "#8b949e");
+                                        });
+                                    }
                                 });
                             });
                         });
@@ -3004,10 +3054,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             addNode({ id: capecId, label: "🥷 CAPEC (Вектор):\\n" + capecTok, level: 3, shape: "box", color: {background: "#58a6ff"} });
                             addDetail(capecId, "capec", { data: r, capec: capecTok }, r);
                             addEdge(swId, capecId, "#8b949e");
-                            mitreTokens.forEach(mitreTok => {
-                                let mId = "cc_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreTok)) : safeIdPart(mitreTok));
-                                addEdge(capecId, mId, "#8b949e");
-                            });
+                            if (mitreUnknownId) {
+                                addEdge(capecId, mitreUnknownId, "#8b949e");
+                            } else {
+                                mitreTokens.forEach(mitreTok => {
+                                    let mitreKey = String(mitreTok || "").trim().toUpperCase();
+                                    let mId = "cc_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreKey)) : safeIdPart(mitreKey));
+                                    addEdge(capecId, mId, "#8b949e");
+                                });
+                            }
                         });
                     }
                 });
@@ -3446,8 +3501,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 `;
             }
             else if (nodeInfo.type === 'mitre') {
-                let mitreId = nodeInfo.mitre || (splitCsv(r.mitre)[0] || "");
-                let meta = (mitreMeta && mitreId && mitreMeta[mitreId]) ? mitreMeta[mitreId] : {};
+                let mitreIdRaw = nodeInfo.mitre || (splitCsv(r.mitre)[0] || "");
+                let mitreKey = String(mitreIdRaw || "").trim().toUpperCase();
+                let meta = (mitreMeta && mitreKey && mitreMeta[mitreKey]) ? mitreMeta[mitreKey] : {};
                 let name = meta && meta.name ? String(meta.name) : "";
                 let tactic = meta && meta.tactic ? String(meta.tactic) : "";
                 let desc = meta && meta.description ? String(meta.description) : "";
@@ -3459,7 +3515,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 let reqServices = meta && meta.requires_service ? meta.requires_service : [];
                 contentDiv.innerHTML = `
                     <div class="modal-header">
-                        <h2 style="margin: 0; font-size: 20px; color: #fff;">⚔️ MITRE ATT&CK: ${esc(mitreId || '—')}</h2>
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">⚔️ MITRE ATT&CK: ${esc(mitreKey || mitreIdRaw || '—')}</h2>
                     </div>
                     <div class="grid-info">
                         <div class="grid-item"><span>Техника:</span><strong>${esc(name || '—')}</strong></div>
@@ -3485,6 +3541,33 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <details class="modal-details">
                             <summary>🧩 Требуемые сервисы</summary>
                             <div class="modal-details-body">${traceUl((reqServices || []).map(x => String(x)), "Не указано.")}</div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🔗 Связи и основания</summary>
+                            <div class="modal-details-body">${formatEvidenceTable(items, 40)}</div>
+                        </details>
+                    </div>
+                `;
+            }
+            else if (nodeInfo.type === 'mitre_unknown') {
+                let cap = String(r.capec || "");
+                let rawMitre = String(r.mitre || "");
+                contentDiv.innerHTML = `
+                    <div class="modal-header">
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">⚔️ MITRE ATT&CK: Не определено</h2>
+                    </div>
+                    <div class="grid-info">
+                        <div class="grid-item"><span>Техника:</span><strong>—</strong></div>
+                        <div class="grid-item"><span>Тактика:</span><strong>—</strong></div>
+                        <div class="grid-item"><span>Платформы:</span><strong>—</strong></div>
+                        <div class="grid-item"><span>Связанных CWE (из БД):</span><strong>0</strong></div>
+                        <div class="grid-item"><span>Связанных CAPEC (из БД):</span><strong>0</strong></div>
+                        <div class="grid-item"><span>Строк-оснований (в отчёте):</span><strong>${items.length}</strong></div>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details" open>
+                            <summary>📝 Почему так</summary>
+                            <div class="modal-details-body"><p style="margin:0; line-height:1.55; white-space:pre-wrap;">В данных этой строки отчёта нет валидного MITRE ID (Txxxx или Txxxx.xxx). Поле MITRE: ${esc(rawMitre || 'пусто')}\nПоле CAPEC: ${esc(cap || 'пусто')}</p></div>
                         </details>
                         <details class="modal-details">
                             <summary>🔗 Связи и основания</summary>

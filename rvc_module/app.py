@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import os
 import json
+import sys
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
+
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _THIS_DIR not in sys.path:
+    sys.path.insert(0, _THIS_DIR)
 
 try:
     from flask import Flask, jsonify, request, send_from_directory
@@ -18,7 +23,7 @@ except Exception:
 from rvc.knowledge import Knowledge
 from rvc.pipeline import build_report
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = _THIS_DIR
 WEB_DIR = os.path.join(BASE_DIR, "web")
 REPORT_BASE_DIR = os.environ.get("RVC_BASE_DIR", "").strip() or os.path.join(BASE_DIR, "tools")
 try:
@@ -29,6 +34,17 @@ except Exception:
 
 _kb = Knowledge()
 _cache: dict = {}
+
+def configure(base_dir: str = "") -> None:
+    global REPORT_BASE_DIR
+    d = (base_dir or "").strip()
+    if d:
+        REPORT_BASE_DIR = d
+    try:
+        os.makedirs(os.path.join(REPORT_BASE_DIR, "data", "scan_history"), exist_ok=True)
+        os.makedirs(os.path.join(REPORT_BASE_DIR, "history"), exist_ok=True)
+    except Exception:
+        pass
 
 def _build_cached_report(refresh: bool) -> dict:
     if "report" not in _cache or refresh:
@@ -93,13 +109,19 @@ if Flask is not None:
         return jsonify(_build_cached_report(refresh))
 
 
+def run_server(host: str = "127.0.0.1", port: int = 5000, base_dir: str = "", prefer_flask: bool = False) -> None:
+    configure(base_dir)
+    h = (host or "").strip() or "127.0.0.1"
+    p = int(port) if port else 5000
+    if prefer_flask and Flask is not None:
+        app.run(host=h, port=p, debug=False)  # type: ignore[name-defined]
+        return
+    _run_simple_server(h, p)
+
 if __name__ == "__main__":
     host = os.environ.get("RVC_HOST", "127.0.0.1").strip() or "127.0.0.1"
     try:
         port = int(os.environ.get("RVC_PORT", "5000"))
     except Exception:
         port = 5000
-    if Flask is None:
-        _run_simple_server(host, port)
-    else:
-        app.run(host=host, port=port, debug=False)
+    run_server(host=host, port=port, base_dir=os.environ.get("RVC_BASE_DIR", "").strip(), prefer_flask=True)

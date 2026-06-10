@@ -382,12 +382,77 @@ class ReportGenerator:
 
     def _load_local_db(self, path):
         try:
-            if os.path.exists(path):
-                with open(path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+            candidates = [path]
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            candidates.append(os.path.join(base_dir, path))
+            for p in candidates:
+                if os.path.exists(p):
+                    with open(p, "r", encoding="utf-8") as f:
+                        return json.load(f)
         except Exception:
             pass
         return {}
+
+    def _mitre_capec_reverse_index(self) -> dict:
+        idx = getattr(self, "_mitre_capec_rev", None)
+        if isinstance(idx, dict):
+            return idx
+
+        rev = {}
+        db = self.mitre_db
+        if isinstance(db, dict):
+            values = list(db.values())
+        elif isinstance(db, list):
+            values = db
+        else:
+            values = []
+
+        for row in values:
+            if not isinstance(row, dict):
+                continue
+            mid = str(row.get("id") or row.get("technique_id") or "").strip().upper()
+            if not mid:
+                continue
+            for cap in (row.get("related_capec", []) or []):
+                cid = str(cap or "").strip().upper()
+                if not cid.startswith("CAPEC-"):
+                    continue
+                if cid not in rev:
+                    rev[cid] = set()
+                rev[cid].add(mid)
+
+        self._mitre_capec_rev = rev
+        return rev
+
+    def _infer_mitre_from_capec(self, capec_value) -> str:
+        if capec_value is None:
+            return ""
+
+        if isinstance(capec_value, list):
+            tokens = [str(x).strip() for x in capec_value]
+        else:
+            tokens = [x.strip() for x in str(capec_value).split(",")]
+
+        capecs = set()
+        for tok in tokens:
+            up = str(tok or "").strip().upper()
+            if not up.startswith("CAPEC-"):
+                continue
+            if re.fullmatch(r"CAPEC-\d+", up):
+                capecs.add(up)
+
+        if not capecs:
+            return ""
+
+        rev = self._mitre_capec_reverse_index()
+        mitres = set()
+        for cid in capecs:
+            mitres |= set(rev.get(cid, set()) or set())
+
+        if not mitres:
+            return ""
+
+        return ", ".join(sorted(mitres))
 
     def _canonical_cwe_list(self, raw) -> list:
         """
@@ -1227,6 +1292,11 @@ class ReportGenerator:
             tools = getattr(representative_r, "attack_software", None) or getattr(base_r, "attack_software", None)
             steps = getattr(representative_r, "attack_steps", None) or getattr(base_r, "attack_steps", None)
             mitre_raw = getattr(representative_r, "mitre_technique", None) or getattr(base_r, "mitre_technique", None) or ""
+            if not mitre_raw or str(mitre_raw).strip().upper() in ("N/A", "—", "NONE", "NULL"):
+                capec_for_mitre = getattr(representative_r, "capec_id", None) or getattr(base_r, "capec_id", None) or ""
+                inferred = self._infer_mitre_from_capec(capec_for_mitre)
+                if inferred:
+                    mitre_raw = inferred
 
             if not tools and self.tools_db and cwe_tokens:
                 db_info = None
@@ -1323,7 +1393,11 @@ class ReportGenerator:
                     "cwe": cwe_display_row,
                     "cwe_desc": cwe_desc_raw,
                     "capec": getattr(r, "capec_id", None) or "CAPEC-Неизвестно",
-                    "mitre": getattr(r, "mitre_technique", None) or "",
+                    "mitre": (
+                        getattr(r, "mitre_technique", None)
+                        if (getattr(r, "mitre_technique", None) not in (None, "", "N/A", "—"))
+                        else (self._infer_mitre_from_capec(getattr(r, "capec_id", None) or "") or "")
+                    ),
                     "name": getattr(r, "attack_name", None) or "Атака",
                     "sw": real_sw,
                     "port": port,
@@ -1374,6 +1448,7 @@ class ReportGenerator:
         capec_ids = set()
         cve_ids = set()
         mitre_ids = set()
+        mitre_id_re = re.compile(r"^T\d{4,5}(?:\.\d{3})?$")
 
         def _collect_ids(value, prefix, out_set: set):
             if value is None:
@@ -1388,7 +1463,7 @@ class ReportGenerator:
                 elif prefix == "CVE" and up.startswith("CVE-"):
                     out_set.add(up)
                 elif prefix == "MITRE":
-                    if up.startswith("T") and up[1:].isdigit():
+                    if mitre_id_re.match(up):
                         out_set.add(up)
 
         for it in (raw_findings_data or []):

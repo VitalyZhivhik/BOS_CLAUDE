@@ -1749,6 +1749,28 @@ class ServerGUI(QMainWindow):
         return 5000, "http://127.0.0.1:5000/"
 
     def _start_rvc_subprocess(self, port: int, base_url: str) -> bool:
+        if getattr(sys, "frozen", False):
+            if self._probe_rvc(base_url + "api/report"):
+                return True
+            try:
+                import rvc_module.app as rvc_app
+            except Exception as e:
+                logger.error(f"[RVC] Не удалось импортировать rvc_module.app: {e}", exc_info=True)
+                return False
+            def runner():
+                try:
+                    rvc_app.run_server(host="127.0.0.1", port=port, base_dir=self._rvc_base_dir, prefer_flask=False)
+                except Exception as e:
+                    logger.error(f"[RVC] Ошибка RVC сервера (in-process): {e}", exc_info=True)
+            threading.Thread(target=runner, daemon=True).start()
+            for _ in range(12):
+                if self._probe_rvc(base_url + "api/report", timeout_sec=0.8):
+                    logger.info("[RVC] Сервер запущен в процессе (in-process)")
+                    return True
+                time.sleep(0.25)
+            logger.warning("[RVC] Сервер запущен в процессе, но /api/report не отвечает (таймаут)")
+            return False
+
         app_py = os.path.join(PROJECT_DIR, "rvc_module", "app.py")
         if not os.path.exists(app_py):
             logger.warning(f"[RVC] app.py не найден: {app_py}")
