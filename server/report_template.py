@@ -971,9 +971,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             renderAtkDefSection();
         }
 
-        function loadProfile(profileId) {
-            if (!profilesData || typeof profilesData !== "object") return;
-            var p = profilesData[profileId];
+        function loadPayload(p) {
             if (!p) return;
             reportData = p.reportData || [];
             reportDataSeed = Array.isArray(reportData) ? reportData.slice() : [];
@@ -1000,6 +998,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             atkEditCves = {};
             atkDefPendingSync = {};
             init();
+        }
+
+        function loadProfile(profileId) {
+            if (!profilesData || typeof profilesData !== "object") return;
+            var p = profilesData[profileId];
+            if (!p) return;
+            loadPayload(p);
         }
 
         function initProfileSelector() {
@@ -2817,6 +2822,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             let uniq = (arr) => Array.from(new Set((arr || []).filter(Boolean)));
             let normMitre = (s) => String(s ?? "").trim().toUpperCase();
             let isMitreId = (s) => /^T\d{4,5}(\.\d{3})?$/.test(normMitre(s));
+            let normCapec = (s) => String(s ?? "").trim().toUpperCase();
+            let isCapecId = (s) => /^CAPEC-\d+$/.test(normCapec(s));
+            let capecLinkedToMitre = (capecTok, mitreKey) => {
+                let c = normCapec(capecTok);
+                let m = normMitre(mitreKey);
+                if (!isCapecId(c) || !isMitreId(m)) return false;
+                let meta = (mitreMeta && mitreMeta[m]) ? mitreMeta[m] : null;
+                let rel = meta && meta.related_capec ? meta.related_capec : [];
+                if (!Array.isArray(rel) || rel.length === 0) return false;
+                for (let i = 0; i < rel.length; i++) {
+                    if (normCapec(rel[i]) === c) return true;
+                }
+                return false;
+            };
             let keys = getSelectedAggregationKeys();
             let noAgg = !keys || keys.length === 0;
 
@@ -2885,7 +2904,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                         mitreTokens.forEach(mitreTok => {
                                             let mitreKey = String(mitreTok || "").trim().toUpperCase();
                                             let mId = "ac_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreKey)) : safeIdPart(mitreKey));
-                                            addEdge(capecId, mId, "#8b949e");
+                                            if (capecLinkedToMitre(capecTok, mitreKey)) {
+                                                addEdge(capecId, mId, "#8b949e");
+                                            }
                                         });
                                     }
                                 });
@@ -2916,7 +2937,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                     mitreTokens.forEach(mitreTok => {
                                         let mitreKey = String(mitreTok || "").trim().toUpperCase();
                                         let mId = "ac_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreKey)) : safeIdPart(mitreKey));
-                                        addEdge(capecId, mId, "#8b949e");
+                                        if (capecLinkedToMitre(capecTok, mitreKey)) {
+                                            addEdge(capecId, mId, "#8b949e");
+                                        }
                                     });
                                 }
                             });
@@ -2972,7 +2995,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             mitreTokens.forEach(mitreTok => {
                                 let mitreKey = String(mitreTok || "").trim().toUpperCase();
                                 let mId = "at_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreKey)) : safeIdPart(mitreKey));
-                                addEdge(mId, capecId, "#8b949e");
+                                if (capecLinkedToMitre(capecTok, mitreKey)) {
+                                    addEdge(mId, capecId, "#8b949e");
+                                }
                             });
 
                             cweTokens.forEach(cweTok => {
@@ -3002,7 +3027,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         mitreTokens.forEach(mitreTok => {
                             let mitreKey = String(mitreTok || "").trim().toUpperCase();
                             let mId = "at_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreKey)) : safeIdPart(mitreKey));
-                            addEdge(mId, capecId, "#8b949e");
+                            if (capecLinkedToMitre(capecAnchor, mitreKey)) {
+                                addEdge(mId, capecId, "#8b949e");
+                            }
                         });
 
                         cweTokens.forEach(cweTok => {
@@ -3084,7 +3111,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                         mitreTokens.forEach(mitreTok => {
                                             let mitreKey = String(mitreTok || "").trim().toUpperCase();
                                             let mId = "cc_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreKey)) : safeIdPart(mitreKey));
-                                            addEdge(capecId, mId, "#8b949e");
+                                            if (capecLinkedToMitre(capecTok, mitreKey)) {
+                                                addEdge(capecId, mId, "#8b949e");
+                                            }
                                         });
                                     }
                                 });
@@ -3115,7 +3144,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 mitreTokens.forEach(mitreTok => {
                                     let mitreKey = String(mitreTok || "").trim().toUpperCase();
                                     let mId = "cc_mitre_" + (noAgg ? (safeIdPart(rk) + "_" + safeIdPart(mitreKey)) : safeIdPart(mitreKey));
-                                    addEdge(capecId, mId, "#8b949e");
+                                    if (capecLinkedToMitre(capecTok, mitreKey)) {
+                                        addEdge(capecId, mId, "#8b949e");
+                                    }
                                 });
                             }
                         });

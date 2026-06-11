@@ -1,0 +1,483 @@
+{
+  "scanner_ip": "127.0.0.1",
+  "target_ip": "127.0.0.1",
+  "open_ports": [
+    {
+      "port": 135,
+      "service": "RPC",
+      "banner": "",
+      "protocol": "TCP"
+    },
+    {
+      "port": 445,
+      "service": "SMB",
+      "banner": "",
+      "protocol": "TCP"
+    },
+    {
+      "port": 902,
+      "service": "VMware",
+      "banner": "220 VMware Authentication Daemon Version 1.10: SSL Required, ServerDaemonProtocol:SOAP, MKSDisplayProtocol:VNC , , NFCSSL supported/t,",
+      "protocol": "TCP"
+    },
+    {
+      "port": 912,
+      "service": "VMware",
+      "banner": "220 VMware Authentication Daemon Version 1.0, ServerDaemonProtocol:SOAP, MKSDisplayProtocol:VNC , , ,",
+      "protocol": "TCP"
+    },
+    {
+      "port": 2080,
+      "service": "Unknown",
+      "banner": "",
+      "protocol": "TCP"
+    },
+    {
+      "port": 5000,
+      "service": "Unknown",
+      "banner": "",
+      "protocol": "TCP"
+    },
+    {
+      "port": 5001,
+      "service": "Unknown",
+      "banner": "",
+      "protocol": "TCP"
+    },
+    {
+      "port": 5040,
+      "service": "Unknown",
+      "banner": "",
+      "protocol": "TCP"
+    },
+    {
+      "port": 7680,
+      "service": "Unknown",
+      "banner": "",
+      "protocol": "TCP"
+    },
+    {
+      "port": 8443,
+      "service": "HTTPS-Alt",
+      "banner": "",
+      "protocol": "TCP"
+    }
+  ],
+  "discovered_services": [],
+  "attack_vectors": [
+    {
+      "id": "AV-RPC-ENUM",
+      "name": "RPC Enumeration",
+      "description": "Перечисление RPC-интерфейсов",
+      "target_port": 135,
+      "target_service": "RPC",
+      "attack_type": "information_disclosure",
+      "severity": "LOW",
+      "tools_used": "rpcclient",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "AV-RPC-DCOM",
+      "name": "DCOM Exploitation",
+      "description": "Эксплуатация уязвимостей DCOM",
+      "target_port": 135,
+      "target_service": "RPC",
+      "attack_type": "remote_code_execution",
+      "severity": "HIGH",
+      "tools_used": "Metasploit",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "AV-SMB-ETERNAL",
+      "name": "EternalBlue (MS17-010)",
+      "description": "Эксплуатация CVE-2017-0144 через SMB",
+      "target_port": 445,
+      "target_service": "SMB",
+      "attack_type": "remote_code_execution",
+      "severity": "CRITICAL",
+      "tools_used": "Metasploit, EternalBlue",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "AV-SMB-RELAY",
+      "name": "SMB Relay Attack",
+      "description": "Перенаправление аутентификации SMB",
+      "target_port": 445,
+      "target_service": "SMB",
+      "attack_type": "credential_theft",
+      "severity": "HIGH",
+      "tools_used": "Impacket, Responder",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "AV-SMB-ENUM",
+      "name": "SMB Enumeration",
+      "description": "Перечисление ресурсов через SMB",
+      "target_port": 445,
+      "target_service": "SMB",
+      "attack_type": "information_disclosure",
+      "severity": "LOW",
+      "tools_used": "Enum4linux, SMBClient",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "AV-SMB-SIGN",
+      "name": "SMB Signing Disabled",
+      "description": "Подпись SMB не обязательна — MITM возможен",
+      "target_port": 445,
+      "target_service": "SMB",
+      "attack_type": "man_in_the_middle",
+      "severity": "MEDIUM",
+      "tools_used": "CrackMapExec",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "AV-SMB-NULL",
+      "name": "SMB Null Session",
+      "description": "Анонимный доступ к SMB сессии",
+      "target_port": 445,
+      "target_service": "SMB",
+      "attack_type": "information_disclosure",
+      "severity": "MEDIUM",
+      "tools_used": "rpcclient, enum4linux",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "AV-SMB-ETERNALCHAMP",
+      "name": "EternalChampion (MS17-010)",
+      "description": "Эксплуатация CVE-2017-0146 через SMB",
+      "target_port": 445,
+      "target_service": "SMB",
+      "attack_type": "remote_code_execution",
+      "severity": "CRITICAL",
+      "tools_used": "Metasploit",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "AV-SMB-ETERNALROMANCE",
+      "name": "EternalRomance (MS17-010)",
+      "description": "Эксплуатация CVE-2017-0147 через SMB",
+      "target_port": 445,
+      "target_service": "SMB",
+      "attack_type": "remote_code_execution",
+      "severity": "CRITICAL",
+      "tools_used": "Metasploit",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "AV-CVE-CVE-2021-34527",
+      "name": "CVE-2021-34527 — RPC",
+      "description": "PrintNightmare — Print Spooler vulnerability (обнаружено на порту 135)",
+      "target_port": 135,
+      "target_service": "RPC",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "tools_used": "CVE-specific exploit",
+      "representative_cve_ids": [],
+      "inferred_product": "RPC"
+    },
+    {
+      "id": "AV-CVE-CVE-2020-1472",
+      "name": "CVE-2020-1472 — RPC",
+      "description": "Zerologon — Netlogon vulnerability (обнаружено на порту 135)",
+      "target_port": 135,
+      "target_service": "RPC",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "tools_used": "CVE-specific exploit",
+      "representative_cve_ids": [],
+      "inferred_product": "RPC"
+    },
+    {
+      "id": "AV-CVE-CVE-2017-0144",
+      "name": "CVE-2017-0144 — SMB",
+      "description": "EternalBlue — SMB RCE (обнаружено на порту 445)",
+      "target_port": 445,
+      "target_service": "SMB",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "tools_used": "CVE-specific exploit",
+      "representative_cve_ids": [],
+      "inferred_product": "SMB"
+    },
+    {
+      "id": "AV-CVE-CVE-2020-0796",
+      "name": "CVE-2020-0796 — SMB",
+      "description": "SMBv3 vulnerability (SMBGhost) (обнаружено на порту 445)",
+      "target_port": 445,
+      "target_service": "SMB",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "tools_used": "CVE-specific exploit",
+      "representative_cve_ids": [],
+      "inferred_product": "SMB"
+    },
+    {
+      "id": "AV-CVE-CVE-2019-0708",
+      "name": "CVE-2019-0708 — SMB",
+      "description": "BlueKeep — RDP vulnerability (обнаружено на порту 445)",
+      "target_port": 445,
+      "target_service": "SMB",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "tools_used": "CVE-specific exploit",
+      "representative_cve_ids": [],
+      "inferred_product": "SMB"
+    },
+    {
+      "id": "AV-CVE-CVE-2021-21972",
+      "name": "CVE-2021-21972 — VMware",
+      "description": "VMware vSphere Client RCE (обнаружено на порту 902)",
+      "target_port": 902,
+      "target_service": "VMware",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "tools_used": "CVE-specific exploit",
+      "representative_cve_ids": [],
+      "inferred_product": "VMware"
+    },
+    {
+      "id": "AV-CVE-CVE-2021-21985",
+      "name": "CVE-2021-21985 — VMware",
+      "description": "VMware vSphere Client RCE (обнаружено на порту 902)",
+      "target_port": 902,
+      "target_service": "VMware",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "tools_used": "CVE-specific exploit",
+      "representative_cve_ids": [],
+      "inferred_product": "VMware"
+    },
+    {
+      "id": "AV-CVE-CVE-2020-3992",
+      "name": "CVE-2020-3992 — VMware",
+      "description": "VMware ESXi OpenSLP stack overflow (обнаружено на порту 902)",
+      "target_port": 902,
+      "target_service": "VMware",
+      "attack_type": "known_vulnerability",
+      "severity": "HIGH",
+      "tools_used": "CVE-specific exploit",
+      "representative_cve_ids": [],
+      "inferred_product": "VMware"
+    },
+    {
+      "id": "AV-BANNER-CVE-2021-21972",
+      "name": "CVE-2021-21972 (по баннеру)",
+      "description": "VMware vSphere Client RCE (обнаружено в баннере порта 902)",
+      "target_port": 902,
+      "target_service": "VMware",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "tools_used": "BannerAnalyzer",
+      "representative_cve_ids": [
+        "CVE-2021-21972"
+      ],
+      "inferred_product": "VMware"
+    },
+    {
+      "id": "AV-BANNER-CVE-2021-21985",
+      "name": "CVE-2021-21985 (по баннеру)",
+      "description": "VMware vSphere Client RCE (обнаружено в баннере порта 902)",
+      "target_port": 902,
+      "target_service": "VMware",
+      "attack_type": "known_vulnerability",
+      "severity": "CRITICAL",
+      "tools_used": "BannerAnalyzer",
+      "representative_cve_ids": [
+        "CVE-2021-21985"
+      ],
+      "inferred_product": "VMware"
+    },
+    {
+      "id": "AV-DOS-GENERIC",
+      "name": "Denial of Service",
+      "description": "Атака отказа в обслуживании на обнаруженные сервисы",
+      "target_port": null,
+      "target_service": "generic",
+      "attack_type": "denial_of_service",
+      "severity": "MEDIUM",
+      "tools_used": "hping3, LOIC",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "AV-SURFACE-LARGE",
+      "name": "Large Attack Surface",
+      "description": "Обнаружено 10 открытых портов — большая поверхность атаки",
+      "target_port": null,
+      "target_service": "generic",
+      "attack_type": "misconfiguration",
+      "severity": "MEDIUM",
+      "tools_used": "Firewall configuration",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "AV-WIN-SAM",
+      "name": "SAM Database Extraction",
+      "description": "Извлечение базы SAM с хешами паролей",
+      "target_port": null,
+      "target_service": "Windows",
+      "attack_type": "credential_theft",
+      "severity": "HIGH",
+      "tools_used": "Mimikatz, secretsdump",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "AV-WIN-PASSBACK",
+      "name": "NTLM Hash Passback",
+      "description": "Перехват NTLM-хешей через SMB",
+      "target_port": 445,
+      "target_service": "Windows SMB",
+      "attack_type": "credential_theft",
+      "severity": "HIGH",
+      "tools_used": "Responder, Impacket",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "AV-WIN-KERBEROAST",
+      "name": "Kerberoasting",
+      "description": "Атака на сервисные учётные записи Kerberos",
+      "target_port": null,
+      "target_service": "Windows AD",
+      "attack_type": "credential_theft",
+      "severity": "HIGH",
+      "tools_used": "Rubeus, Invoke-Kerberoast",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "smb-enum",
+      "name": "[NUCLEI] SMB - Enumeration",
+      "description": "SMS Information Extraction is a sophisticated and efficient system designed to retrieve critical information from a remote computer or device through short text messages. This technology enables users to remotely access essential details about a computer, such as its operating system (OS) version, computer name, and hostname,\nall via SMS communication.\n",
+      "target_port": 445,
+      "target_service": "",
+      "attack_type": "",
+      "severity": "INFO",
+      "tools_used": "",
+      "representative_cve_ids": [],
+      "inferred_product": "SMB"
+    },
+    {
+      "id": "smb-enum-domains",
+      "name": "[NUCLEI] SMB - Enum Domains",
+      "description": "SMB enumeration of domains is often part of the reconnaissance phase, where security professionals or attackers attempt to gather information about the target network to identify potential vulnerabilities.\n",
+      "target_port": 445,
+      "target_service": "",
+      "attack_type": "",
+      "severity": "INFO",
+      "tools_used": "",
+      "representative_cve_ids": [],
+      "inferred_product": "SMB"
+    },
+    {
+      "id": "smb-version-detect",
+      "name": "[NUCLEI] SMB Version - Detection",
+      "description": "SMB version detection involves identifying the specific Server Message Block protocol version used by a system or network. This process is crucial for ensuring compatibility and security, as different SMB versions may have distinct features and vulnerabilities.\n",
+      "target_port": 445,
+      "target_service": "",
+      "attack_type": "",
+      "severity": "INFO",
+      "tools_used": "",
+      "representative_cve_ids": [],
+      "inferred_product": "SMB"
+    },
+    {
+      "id": "smb2-capabilities",
+      "name": "[NUCLEI] smb2-capabilities - Enumeration",
+      "description": "Attempts to list the supported capabilities in a SMBv2 server for each enabled dialect.\n",
+      "target_port": 445,
+      "target_service": "",
+      "attack_type": "",
+      "severity": "INFO",
+      "tools_used": "",
+      "representative_cve_ids": [],
+      "inferred_product": "SMB"
+    },
+    {
+      "id": "smb-signing",
+      "name": "[NUCLEI] SMB Signing Not Required",
+      "description": "Signing is not required on the remote SMB server. An unauthenticated, remote attacker can exploit this to conduct man-in-the-middle attacks against the SMB server.\n",
+      "target_port": 445,
+      "target_service": "",
+      "attack_type": "",
+      "severity": "MEDIUM",
+      "tools_used": "",
+      "representative_cve_ids": [],
+      "inferred_product": "SMB"
+    },
+    {
+      "id": "CVE-2019-5544",
+      "name": "[NUCLEI] VMware ESXi SLP - Heap Overflow DoS",
+      "description": "OpenSLP as used in ESXi and the Horizon DaaS appliances has a heap overwrite issue. VMware has evaluated the severity of this issue to be in the Critical severity range with a maximum CVSSv3 base score of 9.8.\n",
+      "target_port": 2080,
+      "target_service": "",
+      "attack_type": "",
+      "severity": "CRITICAL",
+      "tools_used": "",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "tech-detect",
+      "name": "[NUCLEI] Wappalyzer Technology Detection",
+      "description": "Обнаружено Nuclei.",
+      "target_port": 8443,
+      "target_service": "",
+      "attack_type": "",
+      "severity": "INFO",
+      "tools_used": "",
+      "representative_cve_ids": [],
+      "inferred_product": "HTTPS-Alt"
+    },
+    {
+      "id": "addeventlistener-detect",
+      "name": "[NUCLEI] Add DOM EventListener - Detection",
+      "description": "Identifies the use of JavaScript addEventListener calls in the DOM.\n",
+      "target_port": 5001,
+      "target_service": "",
+      "attack_type": "",
+      "severity": "INFO",
+      "tools_used": "",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "http-missing-security-headers",
+      "name": "[NUCLEI] HTTP Missing Security Headers",
+      "description": "This template searches for missing HTTP security headers. The impact of these missing headers can vary.\n",
+      "target_port": 2080,
+      "target_service": "",
+      "attack_type": "",
+      "severity": "INFO",
+      "tools_used": "",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    },
+    {
+      "id": "missing-sri",
+      "name": "[NUCLEI] Missing Subresource Integrity",
+      "description": "Checks if external script and stylesheet tags in the HTML response are missing the Subresource Integrity (SRI) attribute.\n",
+      "target_port": 5001,
+      "target_service": "",
+      "attack_type": "",
+      "severity": "INFO",
+      "tools_used": "",
+      "representative_cve_ids": [],
+      "inferred_product": ""
+    }
+  ],
+  "os_detection": "Windows",
+  "scan_timestamp": "2026-06-11T11:20:19.393684"
+}
