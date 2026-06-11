@@ -31,3 +31,5 @@ MITRE_PARSER/.venv/
 rvc_modules/tools/
 rvc_modules/tools/data
 rvc_modules/tools/history
+rvc_module\tools
+rvc_modules/tools/*

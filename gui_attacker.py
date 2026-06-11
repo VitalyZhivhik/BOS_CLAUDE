@@ -91,6 +91,19 @@ ATTACKER_PROFILE_MAP = {
     "Accurate": "Accurate",
 }
 
+CORRELATION_PARAM_LABELS_RU = {
+    "max_score": "Максимальный score (max_score)",
+    "feasible_threshold": "Порог «РЕАЛИЗУЕМА» (≥) (feasible_threshold)",
+    "partially_feasible_threshold": "Порог «ЧАСТИЧНО РЕАЛИЗУЕМА» (≥) (partially_feasible_threshold)",
+    "not_feasible_threshold": "Порог «НЕ РЕАЛИЗУЕМА» (≤) (not_feasible_threshold)",
+    "network_weight": "Вес: сетевая доступность (network_weight)",
+    "trivy_weight": "Вес: подтверждение Trivy (trivy_weight)",
+    "software_weight": "Вес: уязвимое ПО (software_weight)",
+    "scanner_weight": "Вес: подтверждение сканером (scanner_weight)",
+    "patch_weight": "Вес: состояние обновлений (patch_weight)",
+    "protection_weight": "Вес: ослабление защиты (FW/AV) (protection_weight)",
+}
+
 
 class NoWheelWhenUnfocusedSpinBox(QSpinBox):
     """Не менять значение колесом мыши, пока поле не в фокусе (типичная причина смены порта API)."""
@@ -2804,7 +2817,8 @@ class AttackerGUI(QMainWindow):
             settings_text.append(f"Описание: {desc}")
         settings_text.append("")
         for k in ordered:
-            settings_text.append(f"• {k}: {settings.get(k, '-')}")
+            label = CORRELATION_PARAM_LABELS_RU.get(k, k)
+            settings_text.append(f"• {label}: {settings.get(k, '-')}")
         if self._server_source_note:
             settings_text.append("")
             settings_text.append(f"Источник: {self._server_source_note}")

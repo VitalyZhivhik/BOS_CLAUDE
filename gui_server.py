@@ -60,6 +60,18 @@ DEFAULT_CORRELATION_SETTINGS = {
     "patch_weight": 10,
     "protection_weight": 5,
 }
+CORRELATION_PARAM_LABELS_RU = {
+    "max_score": "Максимальный score (max_score)",
+    "feasible_threshold": "Порог «РЕАЛИЗУЕМА» (≥) (feasible_threshold)",
+    "partially_feasible_threshold": "Порог «ЧАСТИЧНО РЕАЛИЗУЕМА» (≥) (partially_feasible_threshold)",
+    "not_feasible_threshold": "Порог «НЕ РЕАЛИЗУЕМА» (≤) (not_feasible_threshold)",
+    "network_weight": "Вес: сетевая доступность (network_weight)",
+    "trivy_weight": "Вес: подтверждение Trivy (trivy_weight)",
+    "software_weight": "Вес: уязвимое ПО (software_weight)",
+    "scanner_weight": "Вес: подтверждение сканером (scanner_weight)",
+    "patch_weight": "Вес: состояние обновлений (patch_weight)",
+    "protection_weight": "Вес: ослабление защиты (FW/AV) (protection_weight)",
+}
 TRIVY_SCAN_PROFILES = {
     "Fast": {
         "timeout_minutes": 8,
@@ -2973,7 +2985,7 @@ class ServerGUI(QMainWindow):
             "patch_weight",
             "protection_weight",
         ]
-        lines = ["ПАРАМЕТРЫ ПРОФИЛЯ"]
+        lines = ["ПАРАМЕТРЫ КОРРЕЛЯЦИИ"]
         meta = self._correlation_profiles_meta.get(pid, {}) if isinstance(self._correlation_profiles_meta.get(pid), dict) else {}
         name = str(meta.get("name") or pid)
         desc = str(meta.get("description") or "").strip()
@@ -2983,7 +2995,8 @@ class ServerGUI(QMainWindow):
             lines.append(f"Описание: {desc}")
         lines.append("")
         for k in ordered:
-            lines.append(f"• {k}: {settings.get(k, DEFAULT_CORRELATION_SETTINGS.get(k, '-'))}")
+            label = CORRELATION_PARAM_LABELS_RU.get(k, k)
+            lines.append(f"• {label}: {settings.get(k, DEFAULT_CORRELATION_SETTINGS.get(k, '-'))}")
         self.correlation_profile_settings_text.setPlainText("\n".join(lines))
     # ─────────────────────────────────────────
     #  Таблица корреляции
