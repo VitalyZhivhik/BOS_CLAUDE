@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import json
 import sys
+import glob
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -39,6 +40,8 @@ def configure(base_dir: str = "") -> None:
     global REPORT_BASE_DIR
     d = (base_dir or "").strip()
     if d:
+        if d != REPORT_BASE_DIR:
+            _cache.clear()
         REPORT_BASE_DIR = d
     try:
         os.makedirs(os.path.join(REPORT_BASE_DIR, "data", "scan_history"), exist_ok=True)
@@ -46,9 +49,29 @@ def configure(base_dir: str = "") -> None:
     except Exception:
         pass
 
+def _context_signature() -> float:
+    latest = 0.0
+    patterns = [
+        os.path.join(REPORT_BASE_DIR, "data", "trivy_scan_*.json"),
+        os.path.join(REPORT_BASE_DIR, "data", "scan_history", "scan_*.json"),
+        os.path.join(REPORT_BASE_DIR, "history", "**", "*.json"),
+    ]
+    for pat in patterns:
+        for path in glob.glob(pat, recursive=True):
+            try:
+                m = os.path.getmtime(path)
+            except OSError:
+                continue
+            if m > latest:
+                latest = m
+    return latest
+
 def _build_cached_report(refresh: bool) -> dict:
-    if "report" not in _cache or refresh:
+    sig = _context_signature()
+    cached_sig = _cache.get("sig", None)
+    if "report" not in _cache or refresh or cached_sig != sig:
         _cache["report"] = build_report(REPORT_BASE_DIR, _kb)
+        _cache["sig"] = sig
     return _cache["report"]
 
 def _run_simple_server(host: str, port: int) -> None:
