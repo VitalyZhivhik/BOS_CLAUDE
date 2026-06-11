@@ -58,6 +58,7 @@ class ServerConfig:
     running_services: list[str] = field(default_factory=list)
     security_measures: list[dict] = field(default_factory=list)
     flags: dict = field(default_factory=dict)
+    synthesized: bool = False  # True, если конфиг выведен из портов (инвентаризации хоста не было)
 
     def port_numbers(self) -> set[int]:
         return {p.port for p in self.open_ports}
