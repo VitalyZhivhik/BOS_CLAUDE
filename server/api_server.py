@@ -34,6 +34,11 @@ from server.attack_correlator import AttackCorrelator
 from server.report_generator import ReportGenerator
 from server.trivy_scanner import TrivyScanResult
 
+# Import RVC module
+rvc_module_path = os.path.join(os.path.dirname(__file__), "..", "rvc_module")
+if rvc_module_path not in sys.path:
+    sys.path.insert(0, rvc_module_path)
+
 logger = get_server_logger()
 
 PLAYBOOK_DB_PATH = "databases/attack_playbooks.json"
@@ -544,6 +549,26 @@ class RequestHandler(BaseHTTPRequestHandler):
                 # Передаём toolkit, local_scan_report и attacker_scan_data
                 # Без этого схемы 3,4,5 не работали (были пустые)
                 # ──────────────────────────────────────────────────────────────────
+                
+                # Generate RVC report
+                rvc_report = None
+                try:
+                    from rvc.pipeline import build_report
+                    # Save scan data to rvc_module/tools/history to be picked up by RVC
+                    rvc_tools_dir = os.path.join(state.base_dir, "rvc_module", "tools")
+                    os.makedirs(rvc_tools_dir, exist_ok=True)
+                    # Save scan data to history directory
+                    rvc_history_dir = os.path.join(rvc_tools_dir, "history", "127.0.0.1", datetime.now().strftime("%Y%m%d"))
+                    os.makedirs(rvc_history_dir, exist_ok=True)
+                    # Write scan data
+                    rvc_scan_file = os.path.join(rvc_history_dir, f"{datetime.now().strftime('%H%M%S')}_analyze.json")
+                    with open(rvc_scan_file, "w", encoding="utf-8") as f:
+                        json.dump(scan_data, f, ensure_ascii=False, indent=2)
+                    # Build RVC report
+                    rvc_report = build_report(rvc_tools_dir)
+                except Exception as e:
+                    logger.error(f"[RVC] Error building report: {e}", exc_info=True)
+                
                 reporter = ReportGenerator(
                     system_summary=state.system_summary if isinstance(state.system_summary, dict) else {},
                     correlation_results=results,
@@ -557,6 +582,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                     summaries_by_profile=summaries_by_profile,
                     profiles_meta=profiles_meta,
                     default_profile_id=default_profile_id,
+                    rvc_report=rvc_report,
                 )
 
                 html_path = reporter.generate_html(os.path.join(reports_dir, f"report_{ts}.html"))

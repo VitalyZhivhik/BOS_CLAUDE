@@ -31,6 +31,10 @@ except Exception:
     sys.exit(1)
 _BOOT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _BOOT_DIR)
+# Add RVC module path
+RVC_DIR = os.path.join(_BOOT_DIR, "rvc_module")
+if RVC_DIR not in sys.path:
+    sys.path.insert(0, RVC_DIR)
 from common.config import SERVER_HOST, SERVER_PORT
 from common.bundle_paths import application_base_dir, bundle_resources_root
 from common.models import from_json_scan_result, AttackVector, Severity
@@ -360,6 +364,27 @@ class CorrelationRestartWorker(QThread):
             rd = os.path.join(PROJECT_DIR, "reports")
             os.makedirs(rd, exist_ok=True)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # Generate RVC report
+            rvc_report = None
+            try:
+                from rvc.pipeline import build_report
+                from rvc.loaders import load_context
+                # Save scan data to RVC tools directory
+                rvc_tools_dir = os.path.join(PROJECT_DIR, "rvc_module", "tools")
+                os.makedirs(rvc_tools_dir, exist_ok=True)
+                rvc_history_dir = os.path.join(rvc_tools_dir, "history", "127.0.0.1", datetime.now().strftime("%Y%m%d"))
+                os.makedirs(rvc_history_dir, exist_ok=True)
+                # Write scan data
+                if self.last_scan_data:
+                    rvc_scan_file = os.path.join(rvc_history_dir, f"{datetime.now().strftime('%H%M%S')}_analyze.json")
+                    with open(rvc_scan_file, "w", encoding="utf-8") as f:
+                        json.dump(self.last_scan_data, f, ensure_ascii=False, indent=2)
+                # Build RVC report
+                rvc_report = build_report(rvc_tools_dir)
+            except Exception as e:
+                logger.error(f"Error generating RVC report: {e}", exc_info=True)
+            
             rep = ReportGenerator(
                 self.system_summary or {},
                 results,
@@ -367,10 +392,12 @@ class CorrelationRestartWorker(QThread):
                 toolkit=self.toolkit,
                 local_scan_report=self.vuln_scan_report,
                 attacker_scan_data=self.last_scan_data,
+                trivy_result=self.trivy_summary,
                 correlation_results_by_profile=results_by_profile,
                 summaries_by_profile=summaries_by_profile,
                 profiles_meta=profiles_meta,
                 default_profile_id=default_profile_id,
+                rvc_report=rvc_report,
             )
             hp = rep.generate_html(os.path.join(rd, f"report_{ts}.html"))
             jp = rep.generate_json(os.path.join(rd, f"report_{ts}.json"))
@@ -2106,12 +2133,29 @@ class ServerGUI(QMainWindow):
         rd = os.path.join(PROJECT_DIR, "reports")
         os.makedirs(rd, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Generate RVC report
+        rvc_report = None
+        try:
+            from rvc.pipeline import build_report
+            rvc_tools_dir = os.path.join(PROJECT_DIR, "rvc_module", "tools")
+            os.makedirs(rvc_tools_dir, exist_ok=True)
+            rvc_history_dir = os.path.join(rvc_tools_dir, "history", "127.0.0.1", datetime.now().strftime("%Y%m%d"))
+            os.makedirs(rvc_history_dir, exist_ok=True)
+            scan_data = {"target_ip": target_ip, "attack_vectors": [{"id": cve_id, "name": f"Ручной выбор: {cve_id}"}]}
+            rvc_scan_file = os.path.join(rvc_history_dir, f"{datetime.now().strftime('%H%M%S')}_analyze.json")
+            with open(rvc_scan_file, "w", encoding="utf-8") as f:
+                json.dump(scan_data, f, ensure_ascii=False, indent=2)
+            rvc_report = build_report(rvc_tools_dir)
+        except Exception as e:
+            logger.error(f"Error generating RVC report: {e}", exc_info=True)
+        
         rep = ReportGenerator(
             self.system_summary or {},
             results,
             summary,
             toolkit=self.toolkit,
             attacker_scan_data={"target_ip": target_ip},
+            rvc_report=rvc_report,
         )
         hp = rep.generate_html(os.path.join(rd, f"report_{ts}.html"))
         rep.generate_json(os.path.join(rd, f"report_{ts}.json"))
@@ -2779,6 +2823,22 @@ class ServerGUI(QMainWindow):
                     rd = os.path.join(PROJECT_DIR, "reports")
                     os.makedirs(rd, exist_ok=True)
                     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    
+                    # Generate RVC report
+                    rvc_report = None
+                    try:
+                        from rvc.pipeline import build_report
+                        rvc_tools_dir = os.path.join(PROJECT_DIR, "rvc_module", "tools")
+                        os.makedirs(rvc_tools_dir, exist_ok=True)
+                        rvc_history_dir = os.path.join(rvc_tools_dir, "history", "127.0.0.1", datetime.now().strftime("%Y%m%d"))
+                        os.makedirs(rvc_history_dir, exist_ok=True)
+                        rvc_scan_file = os.path.join(rvc_history_dir, f"{datetime.now().strftime('%H%M%S')}_analyze.json")
+                        with open(rvc_scan_file, "w", encoding="utf-8") as f:
+                            json.dump(scan_data, f, ensure_ascii=False, indent=2)
+                        rvc_report = build_report(rvc_tools_dir)
+                    except Exception as e:
+                        logger.error(f"Error generating RVC report: {e}", exc_info=True)
+                    
                     rep = ReportGenerator(
                         state.system_summary or {},
                         results,
@@ -2786,10 +2846,12 @@ class ServerGUI(QMainWindow):
                         toolkit=gui.toolkit,
                         local_scan_report=gui.vuln_scan_report,
                         attacker_scan_data=scan_data,
+                        trivy_result=state.trivy_result,
                         correlation_results_by_profile=results_by_profile,
                         summaries_by_profile=summaries_by_profile,
                         profiles_meta=profiles_meta,
                         default_profile_id=default_profile_id,
+                        rvc_report=rvc_report,
                     )
                     hp = rep.generate_html(os.path.join(rd, f"report_{ts}.html"))
                     jp = rep.generate_json(os.path.join(rd, f"report_{ts}.json"))
@@ -3250,6 +3312,23 @@ class ServerGUI(QMainWindow):
         rd = os.path.join(PROJECT_DIR, "reports")
         os.makedirs(rd, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Generate RVC report
+        rvc_report = None
+        try:
+            from rvc.pipeline import build_report
+            rvc_tools_dir = os.path.join(PROJECT_DIR, "rvc_module", "tools")
+            os.makedirs(rvc_tools_dir, exist_ok=True)
+            rvc_history_dir = os.path.join(rvc_tools_dir, "history", "127.0.0.1", datetime.now().strftime("%Y%m%d"))
+            os.makedirs(rvc_history_dir, exist_ok=True)
+            if self._last_scan_data:
+                rvc_scan_file = os.path.join(rvc_history_dir, f"{datetime.now().strftime('%H%M%S')}_analyze.json")
+                with open(rvc_scan_file, "w", encoding="utf-8") as f:
+                    json.dump(self._last_scan_data, f, ensure_ascii=False, indent=2)
+                rvc_report = build_report(rvc_tools_dir)
+        except Exception as e:
+            logger.error(f"Error generating RVC report: {e}", exc_info=True)
+        
         rep = ReportGenerator(
             self.system_summary or {},
             results,
@@ -3257,6 +3336,8 @@ class ServerGUI(QMainWindow):
             toolkit=self.toolkit,
             local_scan_report=self.vuln_scan_report,
             attacker_scan_data=self._last_scan_data,
+            trivy_result=getattr(self, 'trivy_result', None),
+            rvc_report=rvc_report,
         )
         hp = rep.generate_html(os.path.join(rd, f"report_{ts}.html"))
         jp = rep.generate_json(os.path.join(rd, f"report_{ts}.json"))

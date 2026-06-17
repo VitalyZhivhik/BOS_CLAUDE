@@ -306,6 +306,7 @@ class ReportGenerator:
         summaries_by_profile=None,
         profiles_meta=None,
         default_profile_id=None,
+        rvc_report=None,
         **kwargs,
     ):
         self.system_summary = system_summary
@@ -324,6 +325,7 @@ class ReportGenerator:
         self.mitre_db = self._load_local_db("databases/mitre_attack.json")
         self.playbooks_db = self._load_local_db("databases/attack_playbooks.json")
         self.defense_db = self._load_local_db("databases/defense_database.json")
+        self.rvc_report = rvc_report if isinstance(rvc_report, dict) else None
 
         if self.correlation_results_by_profile:
             keys = list(self.correlation_results_by_profile.keys())
@@ -1108,7 +1110,13 @@ class ReportGenerator:
                     capecs = getattr(v, 'capec_ids', [])
 
                 if vid: all_cves.add(vid)
-                if pkg: all_software[f"{pkg} {ver}".strip()] = ''
+                if pkg:
+                    all_software[f"{pkg} {ver}".strip()] = {
+                        "port": "",
+                        "category": "",
+                        "purpose": "",
+                        "impact": "",
+                    }
                 for c in (cwes or []): all_cwes.add(c)
                 for c in (capecs or []): all_capecs.add(c)
 
@@ -1148,6 +1156,13 @@ class ReportGenerator:
 
         sw_list = []
         for name, meta in sorted(all_software.items()):
+            if not isinstance(meta, dict):
+                meta = {
+                    "port": "",
+                    "category": "",
+                    "purpose": "",
+                    "impact": "",
+                }
             port = meta.get("port", "")
             cat = meta.get("category", "")
             purp = meta.get("purpose", "")
@@ -1300,6 +1315,38 @@ class ReportGenerator:
             steps = a.get("steps", [])
             if isinstance(steps, list) and steps and isinstance(steps[0], str):
                 steps = as_step_list(steps)
+            elif isinstance(steps, list):
+                norm_steps = []
+                for i, st in enumerate(steps):
+                    if st is None:
+                        continue
+                    if isinstance(st, str):
+                        norm_steps.extend(as_step_list([st]))
+                        continue
+                    if not isinstance(st, dict):
+                        continue
+                    step_name = str(st.get("name") or st.get("title") or st.get("label") or st.get("action") or "").strip()
+                    text_parts = []
+                    raw_text = str(st.get("text") or "").strip()
+                    command = str(st.get("command") or "").strip()
+                    expected = st.get("expected")
+                    explanation = st.get("explanation")
+                    if raw_text:
+                        text_parts.append(raw_text)
+                    if command:
+                        text_parts.append(command)
+                    if expected:
+                        text_parts.append(f"# Ожидаемый результат: {str(expected).strip()}")
+                    if explanation:
+                        text_parts.append(f"# Пояснение: {str(explanation).strip()}")
+                    step_text = "\n".join([p for p in text_parts if p]).strip()
+                    if step_name or step_text:
+                        norm_steps.append({
+                            "id": str(st.get("id") or f"s{i+1}").strip() or f"s{i+1}",
+                            "name": step_name,
+                            "text": step_text,
+                        })
+                steps = norm_steps
             if not isinstance(steps, list):
                 steps = []
             return {
@@ -1308,6 +1355,7 @@ class ReportGenerator:
                 "verified": bool(a.get("verified", False)),
                 "steps": steps,
                 "notes": str(a.get("notes") or "").strip(),
+                "source": str(a.get("source") or "").strip(),
                 "tags": a.get("tags", []) if isinstance(a.get("tags", []), list) else [],
                 "updated_at": str(a.get("updated_at") or "").strip(),
             }
@@ -1318,6 +1366,38 @@ class ReportGenerator:
             steps = d.get("steps", d.get("commands", []))
             if isinstance(steps, list) and steps and isinstance(steps[0], str):
                 steps = as_step_list(steps)
+            elif isinstance(steps, list):
+                norm_steps = []
+                for i, st in enumerate(steps):
+                    if st is None:
+                        continue
+                    if isinstance(st, str):
+                        norm_steps.extend(as_step_list([st]))
+                        continue
+                    if not isinstance(st, dict):
+                        continue
+                    step_name = str(st.get("name") or st.get("title") or st.get("label") or st.get("action") or "").strip()
+                    text_parts = []
+                    raw_text = str(st.get("text") or "").strip()
+                    command = str(st.get("command") or "").strip()
+                    expected = st.get("expected")
+                    explanation = st.get("explanation")
+                    if raw_text:
+                        text_parts.append(raw_text)
+                    if command:
+                        text_parts.append(command)
+                    if expected:
+                        text_parts.append(f"# Ожидаемый результат: {str(expected).strip()}")
+                    if explanation:
+                        text_parts.append(f"# Пояснение: {str(explanation).strip()}")
+                    step_text = "\n".join([p for p in text_parts if p]).strip()
+                    if step_name or step_text:
+                        norm_steps.append({
+                            "id": str(st.get("id") or f"s{i+1}").strip() or f"s{i+1}",
+                            "name": step_name,
+                            "text": step_text,
+                        })
+                steps = norm_steps
             if not isinstance(steps, list):
                 steps = []
             return {
@@ -1327,6 +1407,7 @@ class ReportGenerator:
                 "verified": bool(d.get("verified", False)),
                 "steps": steps,
                 "notes": str(d.get("notes") or "").strip(),
+                "source": str(d.get("source") or "").strip(),
                 "tags": d.get("tags", []) if isinstance(d.get("tags", []), list) else [],
                 "updated_at": str(d.get("updated_at") or "").strip(),
             }
@@ -1381,6 +1462,20 @@ class ReportGenerator:
                 if rec:
                     v["recommendations"].add(rec)
 
+        # Create a mapping of CVE IDs to RVC findings
+        rvc_cve_map = {}
+        if self.rvc_report and isinstance(self.rvc_report, dict):
+            findings = self.rvc_report.get("findings", [])
+            for f in findings:
+                references = f.get("references", {})
+                cve_list = references.get("cve", [])
+                for cve in cve_list:
+                    cve_id = cve.get("id", "").strip().upper()
+                    if cve_id:
+                        if cve_id not in rvc_cve_map:
+                            rvc_cve_map[cve_id] = []
+                        rvc_cve_map[cve_id].append(f)
+
         out = []
         for cve_id, v in by_cve.items():
             vectors = playbooks.get("vectors", {}) if isinstance(playbooks.get("vectors", {}), dict) else {}
@@ -1420,69 +1515,201 @@ class ReportGenerator:
                 pb = pb_cve
                 pb_source = "cve"
 
+            attack_tools = []
+            defense_tools = []
+            attack_source = ""
+            defense_source = ""
+
             if isinstance(pb, dict) and (pb.get("attacks") or pb.get("defenses")):
-                v["attacks"] = [normalize_attack(a, f"a{i+1}") for i, a in enumerate(pb.get("attacks", []) if isinstance(pb.get("attacks", []), list) else [])]
-                v["defenses"] = [normalize_defense(d, f"d{i+1}") for i, d in enumerate(pb.get("defenses", []) if isinstance(pb.get("defenses", []), list) else [])]
-                v["source"] = {"attacks": f"db:{pb_source}", "defenses": f"db:{pb_source}"}
+                attack_tools = [normalize_attack(a, f"a{i+1}") for i, a in enumerate(pb.get("attacks", []) if isinstance(pb.get("attacks", []), list) else [])]
+                defense_tools = [normalize_defense(d, f"d{i+1}") for i, d in enumerate(pb.get("defenses", []) if isinstance(pb.get("defenses", []), list) else [])]
+                attack_source = f"db:{pb_source}" if attack_tools else ""
+                defense_source = f"db:{pb_source}" if defense_tools else ""
             else:
-                attack_tools = []
-                defense_tools = []
                 if self.toolkit:
                     tools = self.toolkit.get_attack_commands(cve_id)
                     for t in tools:
-                        attack_tools.append({
+                        attack_tools.append(normalize_attack({
                             "id": str(t.get("tool_id") or t.get("tool_name") or "").strip() or "",
                             "name": t.get("tool_name", ""),
                             "verified": bool(t.get("verified", False)),
                             "steps": as_step_list(t.get("commands", [])),
                             "notes": str(t.get("description") or ""),
+                            "source": "auto",
                             "tags": [],
                             "updated_at": "",
-                        })
+                        }, f"a{len(attack_tools)+1}"))
+                if not attack_tools and isinstance(self.tools_db, list):
+                    for tool in self.tools_db:
+                        if cve_id not in tool.get("applicable_cve", []):
+                            continue
+                        cmds = tool.get("commands", {}).get(cve_id, []) or tool.get("commands", {}).get("default", [])
+                        attack_tools.append(normalize_attack({
+                            "id": str(tool.get("id") or tool.get("name") or "").strip(),
+                            "name": tool.get("name", ""),
+                            "verified": bool(tool.get("verified", False)),
+                            "steps": as_step_list(cmds),
+                            "notes": str(tool.get("description") or ""),
+                            "source": "auto",
+                            "tags": tool.get("phases", []) if isinstance(tool.get("phases", []), list) else [],
+                            "updated_at": "",
+                        }, f"a{len(attack_tools)+1}"))
+                if self.toolkit:
                     defenses = self.toolkit.get_defense_tools(cve_id)
                     for d in defenses:
-                        defense_tools.append({
+                        defense_tools.append(normalize_defense({
                             "id": str(d.get("defense_id") or d.get("tool_name") or "").strip() or "",
                             "name": d.get("tool_name", ""),
                             "priority": d.get("priority", ""),
                             "verified": bool(d.get("verified", False)),
                             "steps": as_step_list(d.get("commands", [])),
                             "notes": str(d.get("defense_description") or d.get("tool_description") or ""),
+                            "source": "auto",
                             "tags": [],
                             "updated_at": "",
-                        })
-                if not attack_tools and isinstance(self.tools_db, list):
-                    for tool in self.tools_db:
-                        if cve_id not in tool.get("applicable_cve", []):
-                            continue
-                        cmds = tool.get("commands", {}).get(cve_id, []) or tool.get("commands", {}).get("default", [])
-                        attack_tools.append({
-                            "id": str(tool.get("id") or tool.get("name") or "").strip(),
-                            "name": tool.get("name", ""),
-                            "verified": bool(tool.get("verified", False)),
-                            "steps": as_step_list(cmds),
-                            "notes": str(tool.get("description") or ""),
-                            "tags": tool.get("phases", []) if isinstance(tool.get("phases", []), list) else [],
-                            "updated_at": "",
-                        })
+                        }, f"d{len(defense_tools)+1}"))
                 if not defense_tools and isinstance(self.defense_db, list):
                     for defense in self.defense_db:
                         if cve_id not in defense.get("cve_ids", []):
                             continue
                         for dt in defense.get("tools", []):
-                            defense_tools.append({
+                            defense_tools.append(normalize_defense({
                                 "id": str(defense.get("id") or dt.get("name") or "").strip(),
                                 "name": dt.get("name", ""),
                                 "priority": str(defense.get("priority") or ""),
                                 "verified": bool(dt.get("verified", False)),
                                 "steps": as_step_list(dt.get("commands", [])),
                                 "notes": str(dt.get("description") or ""),
+                                "source": "auto",
                                 "tags": [],
                                 "updated_at": "",
-                            })
-                v["attacks"] = [normalize_attack(a, f"a{i+1}") for i, a in enumerate(attack_tools)]
-                v["defenses"] = [normalize_defense(d, f"d{i+1}") for i, d in enumerate(defense_tools)]
-                v["source"] = {"attacks": "auto", "defenses": "auto"}
+                            }, f"d{len(defense_tools)+1}"))
+                attack_source = attack_source or ("auto" if attack_tools else "")
+                defense_source = defense_source or ("auto" if defense_tools else "")
+
+            def _rvc_capec_ids(finding: dict) -> set[str]:
+                refs = finding.get("references", {}) if isinstance(finding, dict) else {}
+                out = set()
+                for cap in refs.get("capec", []) or []:
+                    if not isinstance(cap, dict):
+                        continue
+                    cid = str(cap.get("id") or "").strip().upper()
+                    if cid:
+                        out.add(cid)
+                return out
+
+            def _matches_rvc_finding(finding: dict) -> bool:
+                if not isinstance(finding, dict):
+                    return False
+                rvc_capecs = _rvc_capec_ids(finding)
+                own_capecs = {str(x or "").strip().upper() for x in (v.get("capecs") or []) if str(x or "").strip()}
+                if rvc_capecs and own_capecs:
+                    return bool(rvc_capecs & own_capecs)
+                return True
+
+            def _rvc_attack_steps(finding: dict) -> list[dict]:
+                methodic = finding.get("methodic", {}) if isinstance(finding, dict) else {}
+                phases = methodic.get("phases", []) if isinstance(methodic, dict) else []
+                steps = []
+                sidx = 1
+                for phase in phases:
+                    if not isinstance(phase, dict):
+                        continue
+                    phase_title = str(phase.get("title") or "").strip()
+                    for step in phase.get("steps", []) or []:
+                        if not isinstance(step, dict):
+                            continue
+                        action = str(step.get("action") or "").strip()
+                        name = " / ".join([x for x in [phase_title, action] if x]).strip()
+                        text_parts = []
+                        command = str(step.get("command") or "").strip()
+                        expected = str(step.get("expected") or "").strip()
+                        explanation = str(step.get("explanation") or "").strip()
+                        if command:
+                            text_parts.append(command)
+                        if expected:
+                            text_parts.append(f"# Ожидаемый результат: {expected}")
+                        if explanation:
+                            text_parts.append(f"# Пояснение: {explanation}")
+                        text = "\n".join(text_parts).strip()
+                        if name or text:
+                            steps.append({"id": f"s{sidx}", "name": name, "text": text})
+                            sidx += 1
+                if not steps:
+                    summary = str(methodic.get("summary") or "").strip()
+                    if summary:
+                        steps.append({"id": "s1", "name": "Описание методики", "text": summary})
+                return steps
+
+            def _as_named_steps(value, prefix: str) -> list[dict]:
+                out_steps = []
+                if isinstance(value, list):
+                    for i, item in enumerate(value):
+                        text = str(item or "").strip()
+                        if text:
+                            out_steps.append({"id": f"s{i+1}", "name": f"{prefix} {i+1}", "text": text})
+                else:
+                    text = str(value or "").strip()
+                    if text:
+                        out_steps.append({"id": "s1", "name": prefix, "text": text})
+                return out_steps
+
+            rvc_attack_tools = []
+            rvc_defense_tools = []
+            for rvc_finding in rvc_cve_map.get(cve_id, []):
+                if not _matches_rvc_finding(rvc_finding):
+                    continue
+                methodic = rvc_finding.get("methodic", {})
+                if isinstance(methodic, dict) and methodic:
+                    rvc_attack_tools.append(normalize_attack({
+                        "id": f"rvc-attack-{rvc_finding.get('attack_vector_id', cve_id)}",
+                        "name": f"{rvc_finding.get('attack_name', 'RVC Атака')} [RVC]",
+                        "verified": False,
+                        "steps": _rvc_attack_steps(rvc_finding),
+                        "notes": methodic.get("summary", ""),
+                        "source": "rvc",
+                        "tags": ["RVC"],
+                        "updated_at": "",
+                    }, f"rvc-a{len(rvc_attack_tools)+1}"))
+                defense = rvc_finding.get("defense", {})
+                if isinstance(defense, dict) and defense:
+                    def_steps = []
+                    def_steps.extend(_as_named_steps(defense.get("detection", []), "Обнаружение"))
+                    def_steps.extend(_as_named_steps(defense.get("hardening", []), "Харднинг"))
+                    def_steps.extend(_as_named_steps(defense.get("patch", ""), "Патч"))
+                    def_steps.extend(_as_named_steps(defense.get("validation", []), "Проверка"))
+                    rvc_defense_tools.append(normalize_defense({
+                        "id": f"rvc-defense-{rvc_finding.get('attack_vector_id', cve_id)}",
+                        "name": f"{rvc_finding.get('attack_name', 'RVC Защита')} [RVC]",
+                        "priority": "high",
+                        "verified": False,
+                        "steps": def_steps,
+                        "notes": defense.get("summary", ""),
+                        "source": "rvc",
+                        "tags": ["RVC"],
+                        "updated_at": "",
+                    }, f"rvc-d{len(rvc_defense_tools)+1}"))
+
+            attack_tools.extend(rvc_attack_tools)
+            defense_tools.extend(rvc_defense_tools)
+
+            if rvc_attack_tools:
+                attack_source = (attack_source + " + rvc").strip(" +") if attack_source else "rvc"
+            if rvc_defense_tools:
+                defense_source = (defense_source + " + rvc").strip(" +") if defense_source else "rvc"
+            v["source"] = {"attacks": attack_source or "auto", "defenses": defense_source or "auto"}
+            
+            # Clean up None entries in defense steps
+            defense_tools = [
+                {
+                    **d,
+                    "steps": [s for s in d.get("steps", []) if s is not None]
+                }
+                for d in defense_tools
+            ]
+            
+            v["attacks"] = attack_tools
+            v["defenses"] = defense_tools
 
             rec_joined = " / ".join(sorted(v["recommendations"])) if v["recommendations"] else ""
             out.append({
@@ -1901,6 +2128,7 @@ class ReportGenerator:
             "capecMeta": capec_meta,
             "cveMeta": cve_meta,
             "mitreMeta": mitre_meta,
+            "rvcReport": self.rvc_report,
         }
 
     def generate_html(self, filepath):
@@ -1948,6 +2176,7 @@ class ReportGenerator:
             html = html.replace("__DEFAULT_PROFILE_ID__", default_id_json)
             html = html.replace("__SERVER_PORT__", str(SERVER_PORT))
             html = html.replace("__RVC_URL__", rvc_url)
+            html = html.replace("__RVC_REPORT__", json.dumps(payload_default.get("rvcReport", None), ensure_ascii=False))
             f.write(html)
 
         return filepath

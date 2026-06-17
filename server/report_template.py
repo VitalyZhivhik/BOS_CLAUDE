@@ -370,6 +370,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <option value="1_1">🗺️ КАРТА 1.1: Asset-Centric (ПО ➔ CVE ➔ CWE ➔ CAPEC ➔ MITRE ➔ Реализуемость)</option>
                         <option value="1_2">🗺️ КАРТА 1.2: Attacker-Centric (MITRE ➔ CAPEC ➔ CWE ➔ CVE ➔ ПО ➔ Реализуемость)</option>
                         <option value="1_3">🗺️ КАРТА 1.3: Causal Chain (CWE ➔ CVE ➔ ПО ➔ CAPEC ➔ MITRE ➔ Реализуемость)</option>
+                        <option value="rvc">🗺️ КАРТА RVC: Вектор ➔ Цель ➔ Позиции атакующего ➔ Вердикт</option>
                         <option value="2">🗺️ КАРТА 2: Логика Атаки (CAPEC ➔ ПО ➔ CWE ➔ Вердикт)</option>
                         <option value="3">🗺️ КАРТА 3: Источник Обнаружения (Кто нашел ➔ Реальное ПО ➔ Уязвимость)</option>
                         <option value="4">🗺️ КАРТА 4: План Устранения (Уязвимость ➔ Статус ➔ Решение)</option>
@@ -502,6 +503,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         var profilesData = __PROFILES_DATA__;
         var defaultProfileId = __DEFAULT_PROFILE_ID__;
         var API_BASE = "http://127.0.0.1:__SERVER_PORT__";
+        var rvcReport = __RVC_REPORT__;
         var network = null;
         var detailsMapRows = {};
         var detailsMapNodes = {};
@@ -934,6 +936,67 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return wrapTraceViews(h, trace, rec);
             }
             return '<p style="color:#8b949e;font-size:12px;">Не удалось отрисовать трассировку в унифицированном формате.</p>';
+        }
+        function getMatchingRvcFindings(rec) {
+            if (!rvcReport || !Array.isArray(rvcReport.findings)) return [];
+            rec = rec || {};
+            var recCves = splitTokens(String(rec.cve || ""), true);
+            var recCapecs = splitTokens(String(rec.capec || ""), true);
+            var out = [];
+            (rvcReport.findings || []).forEach(function(f) {
+                if (!f || typeof f !== "object") return;
+                var refs = (f.references && typeof f.references === "object") ? f.references : {};
+                var fCves = (refs.cve || []).map(function(x) { return String((x || {}).id || "").trim().toUpperCase(); }).filter(Boolean);
+                var fCapecs = (refs.capec || []).map(function(x) { return String((x || {}).id || "").trim().toUpperCase(); }).filter(Boolean);
+                var cveMatch = recCves.length && fCves.length ? recCves.some(function(x) { return fCves.indexOf(x) !== -1; }) : false;
+                var capecMatch = recCapecs.length && fCapecs.length ? recCapecs.some(function(x) { return fCapecs.indexOf(x) !== -1; }) : false;
+                if ((cveMatch && capecMatch) || (cveMatch && !recCapecs.length) || (!recCves.length && capecMatch)) {
+                    out.push(f);
+                }
+            });
+            return out;
+        }
+        function splitTokens(raw, upper) {
+            var s = String(raw || "");
+            if (!s) return [];
+            return s.split(",").map(function(x) {
+                var v = String(x || "").trim();
+                return upper ? v.toUpperCase() : v;
+            }).filter(Boolean);
+        }
+        function formatRvcTraceForRecord(rec) {
+            var matches = getMatchingRvcFindings(rec);
+            if (!matches.length) {
+                return '<p style="color:#484f58;font-size:12px;">Совпадающая трассировка RVC для этого результата не найдена.</p>';
+            }
+            var positions = (rvcReport && rvcReport.meta && Array.isArray(rvcReport.meta.positions)) ? rvcReport.meta.positions : [];
+            var html = '<div class="trace-human">';
+            html += '<p class="trace-meta">Найдены совпадения с RVC по вектору атаки на основе пересечения <strong>CVE/CAPEC</strong>. Ниже показана отдельная трассировка второго модуля.</p>';
+            matches.forEach(function(f, idx) {
+                var refs = (f.references && typeof f.references === "object") ? f.references : {};
+                html += '<div class="trace-callout neutral" style="margin-top:' + (idx ? '12px' : '0') + ';">';
+                html += '<div style="font-size:14px; color:#fff; font-weight:700; margin-bottom:6px;">🧪 ' + escapeHtml(f.attack_name || "RVC-вектор") + '</div>';
+                html += '<div class="trace-meta">Вектор: <code>' + escapeHtml(String(f.attack_vector_id || "—")) + '</code>';
+                if (f.service || f.port) html += ' · сервис: <strong>' + escapeHtml(String(f.service || "—")) + (f.port ? (" / " + String(f.port)) : "") + '</strong>';
+                html += '</div>';
+                if ((refs.cve || []).length || (refs.capec || []).length) {
+                    html += '<div class="trace-meta">';
+                    if ((refs.cve || []).length) html += 'CVE: ' + escapeHtml((refs.cve || []).map(function(x) { return String((x || {}).id || ""); }).filter(Boolean).join(", "));
+                    if ((refs.capec || []).length) html += ((refs.cve || []).length ? ' · ' : '') + 'CAPEC: ' + escapeHtml((refs.capec || []).map(function(x) { return String((x || {}).id || ""); }).filter(Boolean).join(", "));
+                    html += '</div>';
+                }
+                positions.forEach(function(pos) {
+                    var ass = (f.assessments && f.assessments[pos.id]) ? f.assessments[pos.id] : null;
+                    if (!ass) return;
+                    html += '<details class="trace-details" style="margin-top:8px;"' + (pos.id === "external" ? ' open' : '') + '>';
+                    html += '<summary>Позиция: ' + escapeHtml(pos.label || pos.id) + '</summary>';
+                    html += formatRvcAssessmentHtml(ass);
+                    html += '</details>';
+                });
+                html += '</div>';
+            });
+            html += '</div>';
+            return html;
         }
         function openRawRegistryForCves(cveList) {
             let cont = document.getElementById("raw-cve-container");
@@ -1681,11 +1744,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             html += '<div style="display:flex; gap:10px; align-items:center;">';
                             html += '<span class="step-title">' + escapeHtml(a.name || "Атака") + '</span>';
                             if (a.verified) html += '<span class="atk-verified-badge">проверено</span>';
+                            if (a.source) html += '<span class="tool-badge tool-atk">' + escapeHtml(String(a.source).toUpperCase()) + '</span>';
                             html += '</div>';
                             html += '</div>';
                         }
 
                         html += '<div style="margin-top:10px;">';
+                        if (!isEdit && a.notes) {
+                            html += '<div class="cmd-explain" style="margin-top:0; margin-bottom:10px;">' + escapeHtml(String(a.notes || "")) + '</div>';
+                        }
                         if (isEdit) {
                             html += '<div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">';
                             html += '<span style="color:#8b949e; font-size:12px;">Шаги:</span>';
@@ -1702,7 +1769,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 html += '</div>';
                             } else {
                                 html += '<div class="atk-step-title">' + escapeHtml(stepLabel) + '</div>';
-                                html += '<div class="cmd-block" style="color:#c9d1d9;">' + escapeHtml(String(st.text || "")) + '</div>';
+                                if (String(st.text || "").trim()) {
+                                    html += '<div class="cmd-block" style="color:#c9d1d9;">' + escapeHtml(String(st.text || "")) + '</div>';
+                                } else {
+                                    html += '<div class="cmd-explain">Описание шага вынесено в заголовок, отдельная команда не указана.</div>';
+                                }
                             }
                         });
                         html += '</div>';
@@ -1735,11 +1806,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             html += '<div style="display:flex; gap:10px; align-items:center;">';
                             html += '<span class="step-title" style="color:#3fb950;">' + escapeHtml(d.name || "Мера") + '</span>';
                             if (d.priority) html += '<span style="color:#8b949e; font-size:12px;">Приоритет: ' + escapeHtml(d.priority) + '</span>';
+                            if (d.source) html += '<span class="tool-badge tool-def">' + escapeHtml(String(d.source).toUpperCase()) + '</span>';
                             html += '</div>';
                             html += '</div>';
                         }
 
                         html += '<div style="margin-top:10px;">';
+                        if (!isEdit && d.notes) {
+                            html += '<div class="cmd-explain" style="margin-top:0; margin-bottom:10px;">' + escapeHtml(String(d.notes || "")) + '</div>';
+                        }
                         if (isEdit) {
                             html += '<div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">';
                             html += '<span style="color:#8b949e; font-size:12px;">Шаги:</span>';
@@ -1756,7 +1831,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             } else {
                                 var stepLabel = st.name ? String(st.name) : "Шаг";
                                 html += '<div class="atk-step-title">' + escapeHtml(stepLabel) + '</div>';
-                                html += '<div class="cmd-block" style="color:#c9d1d9; border-color:#238636;">' + escapeHtml(String(st.text || "")) + '</div>';
+                                if (String(st.text || "").trim()) {
+                                    html += '<div class="cmd-block" style="color:#c9d1d9; border-color:#238636;">' + escapeHtml(String(st.text || "")) + '</div>';
+                                } else {
+                                    html += '<div class="cmd-explain">Описание меры вынесено в заголовок, отдельная команда не указана.</div>';
+                                }
                             }
                         });
                         html += '</div>';
@@ -3153,6 +3232,71 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     }
                 });
             }
+            // ---- КАРТА RVC: Вектор -> Цель -> Позиции -> Вердикт ----
+            else if (viewId === "rvc") {
+                let findings = getRvcFindingsFiltered();
+                let positionsMeta = (rvcReport && rvcReport.meta && Array.isArray(rvcReport.meta.positions)) ? rvcReport.meta.positions : [];
+                findings.forEach((f, idx) => {
+                    f = f || {};
+                    let refs = (f.references && typeof f.references === "object") ? f.references : {};
+                    let target = (f.target_software && typeof f.target_software === "object") ? f.target_software : {};
+                    let baseKey = safeIdPart(f.attack_vector_id || f.attack_name || ("rvc_" + idx));
+                    let attackId = "rvc_find_" + baseKey;
+                    let targetId = "rvc_target_" + baseKey;
+                    let attackLabel = "🧪 RVC:\\n" + String(f.attack_name || "Атака");
+                    if (f.service) attackLabel += "\\nСервис: " + String(f.service);
+                    addNode({ id: attackId, label: attackLabel, level: 4, shape: "box", color: {background: "#7c3aed"} });
+                    addDetail(attackId, "rvc_finding", { finding: f }, f);
+
+                    let targetLabel = "🎯 Цель RVC:\\n" + String(target.product || f.service || "Неизвестная цель");
+                    if (f.port) targetLabel += "\\nПорт: " + String(f.port);
+                    addNode({ id: targetId, label: targetLabel, level: 5, shape: "box", color: {background: "#1f77b4"} });
+                    addDetail(targetId, "rvc_target", { finding: f, target: target }, f);
+                    addEdge(attackId, targetId, "#8b949e", 2, false);
+
+                    (refs.cve || []).forEach(function(ref, i) {
+                        let refId = "rvc_cve_" + baseKey + "_" + i + "_" + safeIdPart((ref || {}).id || "CVE");
+                        addNode({ id: refId, label: "🛡️ CVE:\\n" + String((ref || {}).id || "—"), level: 0, shape: "box", color: {background: "#da3633"} });
+                        addDetail(refId, "rvc_ref", { ref_type: "cve", ref: ref, finding: f }, f);
+                        addEdge(refId, attackId, "#8b949e");
+                    });
+                    (refs.cwe || []).forEach(function(ref, i) {
+                        let refId = "rvc_cwe_" + baseKey + "_" + i + "_" + safeIdPart((ref || {}).id || "CWE");
+                        addNode({ id: refId, label: "🐛 CWE:\\n" + String((ref || {}).id || "—"), level: 1, shape: "box", color: {background: "#484f58"} });
+                        addDetail(refId, "rvc_ref", { ref_type: "cwe", ref: ref, finding: f }, f);
+                        addEdge(refId, attackId, "#8b949e");
+                    });
+                    (refs.capec || []).forEach(function(ref, i) {
+                        let refId = "rvc_capec_" + baseKey + "_" + i + "_" + safeIdPart((ref || {}).id || "CAPEC");
+                        addNode({ id: refId, label: "🥷 CAPEC:\\n" + String((ref || {}).id || "—"), level: 2, shape: "box", color: {background: "#58a6ff"} });
+                        addDetail(refId, "rvc_ref", { ref_type: "capec", ref: ref, finding: f }, f);
+                        addEdge(refId, attackId, "#8b949e");
+                    });
+                    (refs.attack || []).forEach(function(ref, i) {
+                        let refId = "rvc_mitre_" + baseKey + "_" + i + "_" + safeIdPart((ref || {}).id || "MITRE");
+                        let tactic = String((ref || {}).tactic || "").trim();
+                        let label = "⚔️ ATT&CK:\\n" + String((ref || {}).id || "—");
+                        if (tactic) label += "\\n" + tactic;
+                        addNode({ id: refId, label: label, level: 3, shape: "box", color: {background: "#d29922"} });
+                        addDetail(refId, "rvc_ref", { ref_type: "attack", ref: ref, finding: f }, f);
+                        addEdge(refId, attackId, "#8b949e");
+                    });
+
+                    positionsMeta.forEach(function(pos, pi) {
+                        let assessment = (f.assessments && f.assessments[pos.id]) ? f.assessments[pos.id] : null;
+                        if (!assessment) return;
+                        let qual = assessment.qualitative || {};
+                        let num = assessment.numeric || {};
+                        let label = "⚖️ " + String(pos.label || pos.id || ("Позиция " + (pi + 1)));
+                        label += "\\n" + String(qual.label || "—");
+                        if (num.score !== undefined && num.score !== null) label += "\\n" + String(num.score) + "/100";
+                        let posId = "rvc_assess_" + baseKey + "_" + safeIdPart(pos.id || ("p" + pi));
+                        addNode({ id: posId, label: label, level: 6, shape: "box", color: {background: getRvcVerdictColor(String(qual.label || ""))} });
+                        addDetail(posId, "rvc_assessment", { finding: f, assessment: assessment, position: pos }, f);
+                        addEdge(targetId, posId, getRvcVerdictColor(String(qual.label || "")), 3, String(qual.label || "") === "не реализуемо");
+                    });
+                });
+            }
             // ---- КАРТА 2: Логическая (С УЗЛОМ ПО) ----
             else if (viewId === "2") {
                 data.forEach((r, idx) => {
@@ -3267,8 +3411,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 });
             }
 
-            if(network) network.destroy();
             var container = document.getElementById('network-map');
+            if (viewId === "rvc" && nodes.length === 0) {
+                if (network) network.destroy();
+                container.innerHTML = '<div style="padding:24px;border:1px solid #30363d;border-radius:8px;background:#0d1117;color:#8b949e;line-height:1.6;">Нет данных RVC для текущих фильтров. Снимите фильтры или пересоздайте отчёт с данными `rvc_report`.</div>';
+                return;
+            }
+            if(network) network.destroy();
             if (typeof vis === 'undefined' || !vis || !vis.DataSet || !vis.Network) {
                 container.innerHTML = '<div style="padding:24px;border:1px solid #30363d;border-radius:8px;background:#0d1117;color:#ff7b72;line-height:1.6;">Не удалось загрузить библиотеку визуализации графа `vis-network`. Проверьте доступ к CDN или пересоздайте отчёт после запуска сервера.</div>';
                 return;
@@ -3384,6 +3533,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <details class="modal-details">
                             <summary>🔬 Трассировка вердикта</summary>
                             <div class="modal-details-body">${formatTraceBlock(r.feasibility_trace, r)}</div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🧪 Трассировка по RVC</summary>
+                            <div class="modal-details-body">${formatRvcTraceForRecord(r)}</div>
                         </details>
                         <details class="modal-details">
                             <summary>📝 Описание уязвимости</summary>
@@ -3677,6 +3830,109 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
                 `;
             }
+            else if (nodeInfo.type === 'rvc_ref') {
+                let ref = (nodeInfo.ref && typeof nodeInfo.ref === "object") ? nodeInfo.ref : {};
+                let refType = String(nodeInfo.ref_type || "").toUpperCase();
+                let extra = [];
+                if (ref.cvss !== undefined && ref.cvss !== null && ref.cvss !== "") extra.push("CVSS: " + String(ref.cvss));
+                if (ref.tactic) extra.push("Тактика: " + String(ref.tactic));
+                if (ref.cpe_affected) extra.push("CPE: " + String(ref.cpe_affected));
+                contentDiv.innerHTML = `
+                    <div class="modal-header">
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">🧪 RVC ${esc(refType)}: ${esc(ref.id || '—')}</h2>
+                    </div>
+                    <div class="grid-info">
+                        <div class="grid-item"><span>Название:</span><strong>${esc(ref.name || '—')}</strong></div>
+                        <div class="grid-item"><span>Тип:</span><strong>${esc(refType || '—')}</strong></div>
+                        <div class="grid-item"><span>Дополнительно:</span><strong>${esc(extra.join(' | ') || '—')}</strong></div>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details" open>
+                            <summary>📝 Описание</summary>
+                            <div class="modal-details-body"><p style="margin:0; line-height:1.55; white-space:pre-wrap;">${esc(ref.description || 'Описание отсутствует.')}</p></div>
+                        </details>
+                    </div>
+                `;
+            }
+            else if (nodeInfo.type === 'rvc_target') {
+                let finding = (nodeInfo.finding && typeof nodeInfo.finding === "object") ? nodeInfo.finding : {};
+                let target = (nodeInfo.target && typeof nodeInfo.target === "object") ? nodeInfo.target : {};
+                contentDiv.innerHTML = `
+                    <div class="modal-header">
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">🎯 Цель из RVC</h2>
+                    </div>
+                    <div class="grid-info">
+                        <div class="grid-item"><span>Продукт:</span><strong>${esc(target.product || finding.service || '—')}</strong></div>
+                        <div class="grid-item"><span>Наблюдаемая версия:</span><strong>${esc(target.version_observed || '—')}</strong></div>
+                        <div class="grid-item"><span>Сервис / порт:</span><strong>${esc((finding.service || '—') + (finding.port ? (' / ' + finding.port) : ''))}</strong></div>
+                        <div class="grid-item"><span>Компонент:</span><strong>${esc(target.system_component || '—')}</strong></div>
+                        <div class="grid-item"><span>Семейство:</span><strong>${esc(finding.family_title || finding.family || '—')}</strong></div>
+                        <div class="grid-item"><span>Основа методики:</span><strong>${esc(finding.methodic_basis_label || finding.methodic_basis || '—')}</strong></div>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details" open>
+                            <summary>💥 Последствия эксплуатации</summary>
+                            <div class="modal-details-body"><p style="margin:0; line-height:1.55; white-space:pre-wrap;">${esc(target.impact_if_exploited || 'Не указано.')}</p></div>
+                        </details>
+                    </div>
+                `;
+            }
+            else if (nodeInfo.type === 'rvc_assessment') {
+                let assessment = (nodeInfo.assessment && typeof nodeInfo.assessment === "object") ? nodeInfo.assessment : {};
+                let position = (nodeInfo.position && typeof nodeInfo.position === "object") ? nodeInfo.position : {};
+                contentDiv.innerHTML = `
+                    <div class="modal-header">
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">⚖️ Оценка RVC: ${esc(position.label || position.id || 'Позиция')}</h2>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details" open>
+                            <summary>📊 Оценка и обоснование</summary>
+                            <div class="modal-details-body">${formatRvcAssessmentHtml(assessment)}</div>
+                        </details>
+                    </div>
+                `;
+            }
+            else if (nodeInfo.type === 'rvc_finding') {
+                let finding = (nodeInfo.finding && typeof nodeInfo.finding === "object") ? nodeInfo.finding : {};
+                let refs = (finding.references && typeof finding.references === "object") ? finding.references : {};
+                let positions = (rvcReport && rvcReport.meta && Array.isArray(rvcReport.meta.positions)) ? rvcReport.meta.positions : [];
+                let assessmentsHtml = "";
+                positions.forEach(function(pos) {
+                    let ass = (finding.assessments && finding.assessments[pos.id]) ? finding.assessments[pos.id] : null;
+                    if (!ass) return;
+                    assessmentsHtml += '<details class="modal-details"' + (pos.id === "external" ? ' open' : '') + '>';
+                    assessmentsHtml += '<summary>⚖️ ' + escapeHtml(pos.label || pos.id) + '</summary>';
+                    assessmentsHtml += '<div class="modal-details-body">' + formatRvcAssessmentHtml(ass) + '</div>';
+                    assessmentsHtml += '</details>';
+                });
+                contentDiv.innerHTML = `
+                    <div class="modal-header">
+                        <h2 style="margin: 0; font-size: 20px; color: #fff;">🧪 ${esc(finding.attack_name || 'RVC-вектор')}</h2>
+                    </div>
+                    <div class="grid-info">
+                        <div class="grid-item"><span>Вектор:</span><strong>${esc(finding.attack_vector_id || '—')}</strong></div>
+                        <div class="grid-item"><span>Тип атаки:</span><strong>${esc(finding.attack_type || '—')}</strong></div>
+                        <div class="grid-item"><span>Сервис / порт:</span><strong>${esc((finding.service || '—') + (finding.port ? (' / ' + finding.port) : ''))}</strong></div>
+                        <div class="grid-item"><span>Семейство:</span><strong>${esc(finding.family_title || finding.family || '—')}</strong></div>
+                        <div class="grid-item"><span>Основа методики:</span><strong>${esc(finding.methodic_basis_label || finding.methodic_basis || '—')}</strong></div>
+                        <div class="grid-item"><span>Ссылок:</span><strong>${esc('CVE: ' + ((refs.cve || []).length) + ', CWE: ' + ((refs.cwe || []).length) + ', CAPEC: ' + ((refs.capec || []).length) + ', ATT&CK: ' + ((refs.attack || []).length))}</strong></div>
+                    </div>
+                    <div class="modal-body modal-body-accordion">
+                        <details class="modal-details" open>
+                            <summary>📊 Оценки по позициям атакующего</summary>
+                            <div class="modal-details-body">${assessmentsHtml || '<p style="margin:0;">Нет оценок.</p>'}</div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🥷 Методика атаки</summary>
+                            <div class="modal-details-body">${formatRvcMethodicHtml(finding.methodic)}</div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🛡️ Методика защиты</summary>
+                            <div class="modal-details-body">${formatRvcDefenseHtml(finding.defense)}</div>
+                        </details>
+                    </div>
+                `;
+            }
             else if (nodeInfo.type === 'finding') {
                 let rawCves = JSON.stringify((r.cve || "").split(",").map(s => s.trim()).filter(Boolean));
                 contentDiv.innerHTML = `
@@ -3708,6 +3964,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             <div class="modal-details-body">${formatTraceBlock(r.feasibility_trace, r)}</div>
                         </details>
                         <details class="modal-details">
+                            <summary>🧪 Трассировка по RVC</summary>
+                            <div class="modal-details-body">${formatRvcTraceForRecord(r)}</div>
+                        </details>
+                        <details class="modal-details">
                             <summary>🔗 Связи и основания</summary>
                             <div class="modal-details-body">${formatEvidenceTable(items, 40)}</div>
                         </details>
@@ -3737,6 +3997,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         <details class="modal-details">
                             <summary>🔬 Трассировка вердикта (представитель группы)</summary>
                             <div class="modal-details-body">${formatTraceBlock(r.feasibility_trace, r)}</div>
+                        </details>
+                        <details class="modal-details">
+                            <summary>🧪 Трассировка по RVC</summary>
+                            <div class="modal-details-body">${formatRvcTraceForRecord(r)}</div>
                         </details>
                         <details class="modal-details">
                             <summary>Состав группы и контекст ПО</summary>
@@ -3833,6 +4097,94 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 </div>`;
             });
             holder.innerHTML = html;
+        }
+
+        function getRvcVerdictColor(verdict) {
+            if (verdict === "реализуемо") return "#238636";
+            if (verdict === "возможно") return "#d29922";
+            if (verdict === "не реализуемо") return "#da3633";
+            return "#8b949e";
+        }
+
+        function getRvcFindingsFiltered() {
+            if (!rvcReport || !Array.isArray(rvcReport.findings)) return [];
+            var capecF = document.getElementById('f-capec').value;
+            var cweF = document.getElementById('f-cwe').value;
+            var swF = document.getElementById('f-sw').value;
+            var mitreF = document.getElementById('f-mitre').value;
+            return rvcReport.findings.filter(function(f) {
+                f = f || {};
+                var refs = (f.references && typeof f.references === "object") ? f.references : {};
+                var target = (f.target_software && typeof f.target_software === "object") ? f.target_software : {};
+                var sw = String(target.product || f.service || "").trim();
+                var capecs = (refs.capec || []).map(function(x) { return String((x || {}).id || "").trim().toUpperCase(); }).filter(Boolean);
+                var cwes = (refs.cwe || []).map(function(x) { return String((x || {}).id || "").trim().toUpperCase(); }).filter(Boolean);
+                var mitres = (refs.attack || []).map(function(x) { return String((x || {}).id || "").trim().toUpperCase(); }).filter(Boolean);
+                return (swF === 'all' || sw === swF || String(f.service || '') === swF) &&
+                       (capecF === 'all' || capecs.includes(String(capecF || '').trim().toUpperCase())) &&
+                       (cweF === 'all' || cwes.includes(String(cweF || '').trim().toUpperCase())) &&
+                       (mitreF === 'all' || mitres.includes(String(mitreF || '').trim().toUpperCase()));
+            });
+        }
+
+        function formatRvcAssessmentHtml(assessment) {
+            assessment = assessment || {};
+            var num = assessment.numeric || {};
+            var qual = assessment.qualitative || {};
+            var html = '<div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; margin-bottom:10px;">';
+            html += '<div style="font-size:24px; color:' + getRvcVerdictColor(String(qual.label || "")) + '; font-weight:bold;">' + escapeHtml(String(num.score != null ? num.score : "—")) + '/100</div>';
+            html += '<div style="flex:1; min-width:260px;">';
+            html += '<div style="font-weight:bold; color:#fff; margin-bottom:4px;">' + escapeHtml(qual.label || "—") + '</div>';
+            html += '<div style="color:#8b949e; font-size:12px;">' + escapeHtml(qual.justification || "Обоснование не указано.") + '</div>';
+            html += '</div></div>';
+            if (Array.isArray(num.factors) && num.factors.length) {
+                html += '<div class="trace-sec-title">Факторы оценки</div>';
+                html += '<div style="display:flex; flex-direction:column; gap:8px;">';
+                num.factors.forEach(function(f) {
+                    html += '<div class="trace-callout neutral"><strong>' + escapeHtml(f.label || f.key || "Фактор") + ':</strong> ' + escapeHtml(String(f.delta != null ? f.delta : "0")) + '<br><span class="trace-meta">' + escapeHtml(f.evidence || "") + '</span></div>';
+                });
+                html += '</div>';
+            }
+            if (Array.isArray(num.gates) && num.gates.length) {
+                html += '<div class="trace-sec-title">Гейты</div>' + traceUl(num.gates.map(function(g) { return String((g && (g.evidence || g.key)) || ""); }), "Нет");
+            }
+            if (Array.isArray(qual.verify) && qual.verify.length) {
+                html += '<div class="trace-sec-title">Что нужно уточнить</div>' + traceUl(qual.verify.map(function(x) { return String(x); }), "Нет");
+            }
+            return html;
+        }
+
+        function formatRvcMethodicHtml(methodic) {
+            methodic = methodic || {};
+            var html = '';
+            html += '<p style="margin:0 0 10px 0; line-height:1.55; white-space:pre-wrap;">' + escapeHtml(methodic.summary || 'Методика не указана.') + '</p>';
+            if (Array.isArray(methodic.prerequisites) && methodic.prerequisites.length) {
+                html += '<div class="trace-sec-title">Предпосылки</div>' + traceUl(methodic.prerequisites.map(function(x) { return String(x); }), "Нет");
+            }
+            if (Array.isArray(methodic.phases) && methodic.phases.length) {
+                methodic.phases.forEach(function(phase) {
+                    html += '<div class="step-card">';
+                    html += '<div class="step-header"><span class="step-title">' + escapeHtml((phase || {}).title || "Фаза") + '</span></div>';
+                    ((phase || {}).steps || []).forEach(function(step, idx) {
+                        html += '<div class="atk-step-title">' + escapeHtml((step || {}).action || ("Шаг " + (idx + 1))) + '</div>';
+                        if (step && step.command) html += '<div class="cmd-block" style="color:#c9d1d9;">' + escapeHtml(step.command) + '</div>';
+                        if (step && step.expected) html += '<div class="cmd-explain">Ожидаемый результат: ' + escapeHtml(step.expected) + '</div>';
+                        if (step && step.explanation) html += '<div class="cmd-explain">Пояснение: ' + escapeHtml(step.explanation) + '</div>';
+                    });
+                    html += '</div>';
+                });
+            }
+            return html;
+        }
+
+        function formatRvcDefenseHtml(defense) {
+            defense = defense || {};
+            var html = '<p style="margin:0 0 10px 0; line-height:1.55; white-space:pre-wrap;">' + escapeHtml(defense.summary || 'Методика защиты не указана.') + '</p>';
+            html += '<div class="trace-sec-title">Обнаружение</div>' + traceUl((defense.detection || []).map(function(x) { return String(x); }), "Нет");
+            html += '<div class="trace-sec-title">Харднинг</div>' + traceUl((defense.hardening || []).map(function(x) { return String(x); }), "Нет");
+            html += '<div class="trace-sec-title">Патч</div><p style="margin:0; line-height:1.55; white-space:pre-wrap;">' + escapeHtml(defense.patch || 'Не указан.') + '</p>';
+            html += '<div class="trace-sec-title">Проверка</div>' + traceUl((defense.validation || []).map(function(x) { return String(x); }), "Нет");
+            return html;
         }
 
         window.onload = function() {
