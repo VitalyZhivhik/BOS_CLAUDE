@@ -11,6 +11,7 @@
   - Интеграция AttackToolkit и ReportHistory
   - Вкладка «Обнаруженное ПО» (показ сырых данных от сканера)
 """
+import importlib.util
 import sys, os, json, socket, threading, webbrowser, ctypes, subprocess, time, urllib.request
 from datetime import datetime
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -36,7 +37,7 @@ RVC_DIR = os.path.join(_BOOT_DIR, "rvc_module")
 if RVC_DIR not in sys.path:
     sys.path.insert(0, RVC_DIR)
 from common.config import SERVER_HOST, SERVER_PORT
-from common.bundle_paths import application_base_dir, bundle_resources_root
+from common.bundle_paths import application_base_dir, bundle_resources_root, resource_path
 from common.models import from_json_scan_result, AttackVector, Severity
 from common.logger import get_server_logger, GUILogHandler
 from server.system_analyzer import SystemAnalyzer
@@ -52,6 +53,9 @@ from server.trivy_history import TrivyHistory
 logger = get_server_logger()
 PROJECT_DIR = application_base_dir()
 BUNDLE_ROOT = bundle_resources_root()
+RVC_RESOURCE_DIR = resource_path("rvc_module")
+if os.path.isdir(RVC_RESOURCE_DIR) and RVC_RESOURCE_DIR not in sys.path:
+    sys.path.insert(0, RVC_RESOURCE_DIR)
 DEFAULT_CORRELATION_SETTINGS = {
     "max_score": 100,
     "feasible_threshold": 60,
@@ -1763,6 +1767,20 @@ class ServerGUI(QMainWindow):
     def _rvc_tools_dir(self) -> str:
         return os.path.join(PROJECT_DIR, "rvc_module", "tools")
 
+    def _rvc_app_path(self) -> str:
+        return os.path.join(RVC_RESOURCE_DIR, "app.py")
+
+    def _load_rvc_app_module(self):
+        app_py = self._rvc_app_path()
+        if not os.path.exists(app_py):
+            raise FileNotFoundError(app_py)
+        spec = importlib.util.spec_from_file_location("embedded_rvc_app", app_py)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Не удалось создать spec для {app_py}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
     def _ensure_rvc_dirs(self) -> None:
         base = self._rvc_tools_dir()
         os.makedirs(os.path.join(base, "data", "scan_history"), exist_ok=True)
@@ -1792,9 +1810,9 @@ class ServerGUI(QMainWindow):
             if self._probe_rvc(base_url + "api/report"):
                 return True
             try:
-                import rvc_module.app as rvc_app
+                rvc_app = self._load_rvc_app_module()
             except Exception as e:
-                logger.error(f"[RVC] Не удалось импортировать rvc_module.app: {e}", exc_info=True)
+                logger.error(f"[RVC] Не удалось загрузить app.py из ресурсов: {e}", exc_info=True)
                 return False
             def runner():
                 try:
@@ -1810,7 +1828,7 @@ class ServerGUI(QMainWindow):
             logger.warning("[RVC] Сервер запущен в процессе, но /api/report не отвечает (таймаут)")
             return False
 
-        app_py = os.path.join(PROJECT_DIR, "rvc_module", "app.py")
+        app_py = self._rvc_app_path()
         if not os.path.exists(app_py):
             logger.warning(f"[RVC] app.py не найден: {app_py}")
             return False
@@ -1830,7 +1848,7 @@ class ServerGUI(QMainWindow):
         try:
             self._rvc_process = subprocess.Popen(
                 [sys.executable, "-u", app_py],
-                cwd=os.path.join(PROJECT_DIR, "rvc_module"),
+                cwd=RVC_RESOURCE_DIR,
                 env=env,
                 stdout=rvc_log or subprocess.DEVNULL,
                 stderr=rvc_log or subprocess.DEVNULL,
@@ -1869,9 +1887,9 @@ class ServerGUI(QMainWindow):
             try:
                 self._ensure_rvc_dirs()
                 port, base_url = self._pick_rvc_port_and_url()
-                started = self._start_rvc_subprocess(port, base_url)
                 self._rvc_url = base_url
                 os.environ["RVC_URL"] = base_url
+                started = self._start_rvc_subprocess(port, base_url)
                 if started:
                     logger.info(f"[RVC] Интеграция активна: {base_url}")
                 else:

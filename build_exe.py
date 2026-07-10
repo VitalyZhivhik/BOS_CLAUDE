@@ -97,7 +97,7 @@ def build(name, entry, extra_data=None, onefile=False, dist_dir_name="dist"):
     # Скрытые импорты для PyQt6
     for mod in ["common", "common.config", "common.models", "common.logger", "common.bundle_paths"]:
         cmd.append(f"--hidden-import={mod}")
-    for mod in ["rvc", "rvc.models", "rvc.loaders", "rvc.knowledge", "rvc.engine", "rvc.enrichment", "rvc.pipeline", "rvc_module.app"]:
+    for mod in ["rvc", "rvc.models", "rvc.loaders", "rvc.knowledge", "rvc.engine", "rvc.enrichment", "rvc.pipeline", "rvc_module", "rvc_module.app"]:
         cmd.append(f"--hidden-import={mod}")
 
     cmd.append(entry)

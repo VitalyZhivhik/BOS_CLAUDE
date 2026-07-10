@@ -41,5 +41,30 @@ def application_base_dir() -> str:
     return _repo_root()
 
 
+def resource_path(*parts: str) -> str:
+    """
+    Возвращает путь к ресурсу из бандла/репозитория.
+
+    Для PyInstaller onedir/onefile данные могут лежать либо рядом с .exe,
+    либо во внутреннем каталоге запуска (`sys._MEIPASS`). Поэтому пробуем
+    несколько кандидатов и возвращаем первый существующий путь.
+    """
+    exe_dir = os.path.dirname(os.path.abspath(sys.executable)) if getattr(sys, "frozen", False) else None
+    meipass = getattr(sys, "_MEIPASS", None)
+    candidates = [
+        bundle_resources_root(),
+        meipass,
+        exe_dir,
+        _repo_root(),
+    ]
+    for base in candidates:
+        if not base:
+            continue
+        candidate = os.path.join(base, *parts)
+        if os.path.exists(candidate):
+            return candidate
+    return os.path.join(bundle_resources_root(), *parts)
+
+
 def tools_dir() -> str:
     return os.path.join(bundle_resources_root(), "tools")
